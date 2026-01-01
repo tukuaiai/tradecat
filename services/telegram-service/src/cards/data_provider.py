@@ -462,11 +462,9 @@ def get_wide_adapter() -> WideTableAdapter:
 
 
 # 数据库类型开关
-# 0 = 旧版 market_data.db
-# 1 = JSON版 indicator.db  
-# 2 = 宽表版 indicator_wide.db (推荐)
+# 0 = market_data.db（每个指标一张表）
 import os
-DB_TYPE = int(os.getenv("INDICATOR_DB_TYPE", "2"))
+DB_TYPE = int(os.getenv("INDICATOR_DB_TYPE", "0"))
 
 
 # ============================================================
