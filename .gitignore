@@ -9,6 +9,7 @@ __pycache__/
 *.pyo
 .venv/
 venv/
+data_export/
 
 # Node
 node_modules/

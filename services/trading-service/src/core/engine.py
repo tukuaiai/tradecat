@@ -18,7 +18,6 @@ from typing import Dict, List, Tuple, Any
 import pandas as pd
 
 from ..config import config
-from ..db import writer
 from ..indicators.base import get_all_indicators, get_batch_indicators, get_incremental_indicators
 from ..utils.precision import trim_dataframe
 from ..observability import get_logger, log_context, metrics, trace, alert, AlertLevel
@@ -113,7 +112,6 @@ class Engine:
         lookback: int = None,
         max_workers: int = None,
         compute_backend: str = None,
-        stream_write: bool = None,
     ):
         self.symbols = symbols
         self.intervals = intervals or config.intervals
@@ -121,7 +119,6 @@ class Engine:
         self.lookback = lookback or config.default_lookback
         self.max_workers = max_workers or min(cpu_count(), 8)
         self.compute_backend = (compute_backend or config.compute_backend or "thread").lower()
-        self.stream_write = config.stream_write if stream_write is None else stream_write
     
     def run(self, mode: str = "all"):
         """运行计算 - 使用缓存，只读取一次"""
@@ -220,17 +217,15 @@ class Engine:
                 t1 = time.time()
                 indicator_names = list(indicators.keys())
                 
-                wrote_stream = False
                 if len(task_list) <= 20:
                     all_results = _compute_batch((task_list, indicator_names, futures_cache))
                 else:
-                    all_results, wrote_stream = self._compute_parallel(
+                    all_results = self._compute_parallel(
                         task_list,
                         indicator_names,
                         indicators,
                         futures_cache,
                         backend=self.compute_backend,
-                        stream_write=self.stream_write,
                     )
                 
                 t_compute = time.time() - t1
@@ -242,10 +237,6 @@ class Engine:
                 t2 = time.time()
                 # 写入 market_data.db（每个指标一张表，全量覆盖）
                 self._write_simple_db(all_results)
-                # 写入宽表（如果启用）
-                if self.stream_write and not wrote_stream:
-                    symbol_data = self._build_symbol_data(all_results)
-                    self._write_wide_db(symbol_data)
                 t_write = time.time() - t2
                 _db_write_duration.observe(t_write)
                 write_span.set_tag("duration_s", round(t_write, 2))
@@ -267,7 +258,7 @@ class Engine:
                 alert(AlertLevel.WARNING, "计算耗时过长", f"总耗时 {total_time:.1f}s 超过阈值", symbols=len(symbols), rows=total_rows)
     
     def _build_symbol_data(self, all_results: Dict[str, list]) -> Dict[str, Dict[str, Any]]:
-        """构建按币种聚合的数据结构"""
+        """构建按币种聚合的数据结构（保留用于调试）"""
         symbol_data = {}
         for indicator_name, records_list in all_results.items():
             for records in records_list:
@@ -276,12 +267,10 @@ class Engine:
                     interval = r.get("周期")
                     if not symbol or not interval:
                         continue
-                    
                     if symbol not in symbol_data:
                         symbol_data[symbol] = {}
                     if interval not in symbol_data[symbol]:
                         symbol_data[symbol][interval] = {}
-                    
                     fields = {k: v for k, v in r.items() if k not in ("交易对", "周期")}
                     symbol_data[symbol][interval][indicator_name.replace('.py', '')] = fields
         return symbol_data
@@ -377,10 +366,6 @@ class Engine:
         except Exception:
             pass
     
-    def _write_wide_db(self, symbol_data: Dict[str, Dict[str, Any]]):
-        """写入宽表数据库 - 已禁用"""
-        pass  # 禁用宽表写入，只使用 market_data.db
-    
     def _compute_parallel(
         self,
         task_list: list,
@@ -388,13 +373,8 @@ class Engine:
         indicators: dict,
         futures_cache: dict = None,
         backend: str = "process",
-        stream_write: bool = False,
-    ) -> Tuple[Dict[str, list], bool]:
-        """
-        并行计算
-        backend: thread | process
-        stream_write: 是否在批次级别立即写入宽表
-        """
+    ) -> Dict[str, list]:
+        """并行计算 (backend: thread | process)"""
         batch_size = max(1, len(task_list) // self.max_workers)
         batches = []
         for i in range(0, len(task_list), batch_size):
@@ -402,7 +382,6 @@ class Engine:
             batches.append((batch, indicator_names, futures_cache))
         
         all_results = {name: [] for name in indicators}
-        wrote_stream = False
         
         if backend == "thread":
             executor: Any
@@ -411,9 +390,6 @@ class Engine:
                 for future in as_completed(futures):
                     try:
                         batch_results = future.result()
-                        if stream_write:
-                            self._write_wide_db(self._build_symbol_data(batch_results))
-                            wrote_stream = True
                         for name, records_list in batch_results.items():
                             all_results[name].extend(records_list)
                     except Exception as e:
@@ -426,9 +402,6 @@ class Engine:
             for future in as_completed(futures):
                 try:
                     batch_results = future.result()
-                    if stream_write:
-                        self._write_wide_db(self._build_symbol_data(batch_results))
-                        wrote_stream = True
                     for name, records_list in batch_results.items():
                         all_results[name].extend(records_list)
                 except Exception as e:
@@ -436,7 +409,7 @@ class Engine:
                     LOG.error(f"计算失败: {e}")
                     alert(AlertLevel.ERROR, "批次计算失败", str(e), backend="process")
         
-        return all_results, wrote_stream
+        return all_results
     
     def run_single(self, symbol: str, interval: str, indicator_name: str):
         """单次增量计算 - 走缓存"""

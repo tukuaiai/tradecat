@@ -48,8 +48,6 @@ class Config:
     exchange: str = "binance_futures_um"
     # 计算后端: thread | process
     compute_backend: str = field(default_factory=lambda: os.getenv("COMPUTE_BACKEND", "thread").lower())
-    # 是否分批流式写入宽表
-    stream_write: bool = field(default_factory=lambda: os.getenv("STREAM_WRITE", "0").lower() not in ("0", "false", "no"))
     
     # K线指标周期
     kline_intervals: List[str] = field(default_factory=lambda: _parse_intervals(
