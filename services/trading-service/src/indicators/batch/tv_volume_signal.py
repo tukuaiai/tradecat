@@ -42,11 +42,11 @@ def calculate_ribbon(df: pd.DataFrame) -> Dict:
 
 @register
 class TvVolumeSignal(Indicator):
-    meta = IndicatorMeta(name="量能信号扫描器.py", lookback=200, is_incremental=False)
+    meta = IndicatorMeta(name="量能信号扫描器.py", lookback=200, is_incremental=False, min_data=100)
 
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
-        if len(df) < MA_PERIODS[-1]:
-            return pd.DataFrame()
+        if not self._check_data(df):
+            return self._make_insufficient_result(df, symbol, interval, {"信号": None})
 
         result = calculate_ribbon(df)
         return self._make_result(df, symbol, interval, {

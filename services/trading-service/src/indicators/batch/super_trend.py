@@ -46,7 +46,7 @@ def _zlema(close: pd.Series, length: int = DEFAULT_LENGTH, lag: int = DEFAULT_LA
 
 @register
 class SuperTrend(Indicator):
-    meta = IndicatorMeta(name="超级精准趋势扫描器.py", lookback=280, is_incremental=False)
+    meta = IndicatorMeta(name="超级精准趋势扫描器.py", lookback=280, is_incremental=False, min_data=70)
 
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         # 周线放宽到 70 根
@@ -54,7 +54,7 @@ class SuperTrend(Indicator):
         if str(interval).lower() == "1w":
             min_bars = DEFAULT_LENGTH
         if len(df) < min_bars:
-            return pd.DataFrame()
+            return self._make_insufficient_result(df, symbol, interval, {"信号": None})
 
         close = df["close"]
         zlema = _zlema(close, DEFAULT_LENGTH, DEFAULT_LAG)

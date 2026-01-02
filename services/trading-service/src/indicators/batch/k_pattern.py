@@ -204,11 +204,11 @@ def _to_chinese(key: str) -> str:
 
 @register
 class KPattern(Indicator):
-    meta = IndicatorMeta(name="K线形态扫描器.py", lookback=50, is_incremental=False)
+    meta = IndicatorMeta(name="K线形态扫描器.py", lookback=50, is_incremental=False, min_data=10)
 
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
-        if len(df) < 10:
-            return pd.DataFrame()
+        if not self._check_data(df):
+            return self._make_insufficient_result(df, symbol, interval, {"形态": None})
         
         # 准备 OHLCV 数据
         ohlcv = df.copy()

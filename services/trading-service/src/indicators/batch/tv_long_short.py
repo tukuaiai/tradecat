@@ -68,11 +68,11 @@ def calculate_smoothed_heikin_ashi(df: pd.DataFrame) -> dict:
 
 @register
 class TvLongShort(Indicator):
-    meta = IndicatorMeta(name="多空信号扫描器.py", lookback=120, is_incremental=False)
+    meta = IndicatorMeta(name="多空信号扫描器.py", lookback=120, is_incremental=False, min_data=20)
 
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
-        if len(df) < max(SMOOTH1, SMOOTH2) + 10:
-            return pd.DataFrame()
+        if not self._check_data(df):
+            return self._make_insufficient_result(df, symbol, interval, {"信号": None})
 
         result = calculate_smoothed_heikin_ashi(df)
         return self._make_result(df, symbol, interval, {

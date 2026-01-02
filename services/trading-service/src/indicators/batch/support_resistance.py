@@ -5,11 +5,11 @@ from ..base import Indicator, IndicatorMeta, register
 
 @register
 class SupportResistance(Indicator):
-    meta = IndicatorMeta(name="全量支撑阻力扫描器.py", lookback=100, is_incremental=False)
+    meta = IndicatorMeta(name="全量支撑阻力扫描器.py", lookback=100, is_incremental=False, min_data=20)
     
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
-        if len(df) < 20:
-            return pd.DataFrame()
+        if not self._check_data(df):
+            return self._make_insufficient_result(df, symbol, interval, {"支撑位": None, "阻力位": None})
         high, low, close = df["high"], df["low"], df["close"]
         price = float(close.iloc[-1])
         # 简单支撑阻力：近期高低点

@@ -6,11 +6,11 @@ from ..base import Indicator, IndicatorMeta, register
 
 @register
 class Scalping(Indicator):
-    meta = IndicatorMeta(name="剥头皮信号扫描器.py", lookback=50, is_incremental=False)
+    meta = IndicatorMeta(name="剥头皮信号扫描器.py", lookback=50, is_incremental=False, min_data=20)
     
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
-        if len(df) < 20:
-            return pd.DataFrame()
+        if not self._check_data(df):
+            return self._make_insufficient_result(df, symbol, interval, {"剥头皮信号": None})
         close = df["close"]
         # RSI
         delta = close.diff()

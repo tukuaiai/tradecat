@@ -10,8 +10,13 @@
 """
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Dict, Any
 import pandas as pd
+import numpy as np
+
+
+# 默认最小数据量
+DEFAULT_MIN_DATA = 5
 
 
 @dataclass
@@ -20,6 +25,7 @@ class IndicatorMeta:
     name: str                    # 指标名称（SQLite 表名）
     lookback: int = 300          # 所需 K 线窗口
     is_incremental: bool = True  # True=增量计算, False=批量计算
+    min_data: int = 5            # 最小数据量要求
 
 
 class Indicator(ABC):
@@ -41,6 +47,20 @@ class Indicator(ABC):
             DataFrame，必须包含: 交易对, 周期, 数据时间, ...指标字段
         """
         pass
+    
+    def _check_data(self, df: pd.DataFrame, min_required: int = None) -> bool:
+        """检查数据是否充足"""
+        min_req = min_required or getattr(self.meta, 'min_data', DEFAULT_MIN_DATA)
+        return len(df) >= min_req
+    
+    def _make_insufficient_result(self, df: pd.DataFrame, symbol: str, interval: str, 
+                                   fields: Dict[str, Any]) -> pd.DataFrame:
+        """生成数据不足时的结果（所有值为None，状态标记为数据不足）"""
+        data = {k: None for k in fields}
+        if "信号" in fields or "信号概述" in fields:
+            key = "信号" if "信号" in fields else "信号概述"
+            data[key] = "数据不足"
+        return self._make_result(df, symbol, interval, data)
     
     def _make_result(self, df: pd.DataFrame, symbol: str, interval: str, data: dict, timestamp=None) -> pd.DataFrame:
         """构建标准输出格式，前3列固定为: 交易对, 周期, 数据时间"""

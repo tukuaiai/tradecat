@@ -48,11 +48,11 @@ def _calc_trend(close: pd.Series, basis: pd.Series, band: pd.Series) -> pd.Serie
 
 @register
 class TvZeroLag(Indicator):
-    meta = IndicatorMeta(name="零延迟趋势扫描器.py", lookback=220, is_incremental=False)
+    meta = IndicatorMeta(name="零延迟趋势扫描器.py", lookback=220, is_incremental=False, min_data=215)
 
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
-        if len(df) < MIN_BARS:
-            return pd.DataFrame()
+        if not self._check_data(df):
+            return self._make_insufficient_result(df, symbol, interval, {"信号": None})
 
         close = df["close"].astype(float)
         basis = _zlema(close, DEFAULT_LENGTH)

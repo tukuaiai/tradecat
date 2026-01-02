@@ -42,11 +42,11 @@ def detect_engulfing(df: pd.DataFrame) -> str:
 
 @register
 class TvTrendCloud(Indicator):
-    meta = IndicatorMeta(name="趋势云反转扫描器.py", lookback=220, is_incremental=False)
+    meta = IndicatorMeta(name="趋势云反转扫描器.py", lookback=220, is_incremental=False, min_data=200)
 
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
-        if len(df) < 200:
-            return pd.DataFrame()
+        if not self._check_data(df):
+            return self._make_insufficient_result(df, symbol, interval, {"信号": None})
 
         close = df["close"]
         smma200 = calculate_smma(close, 200)

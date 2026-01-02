@@ -46,7 +46,7 @@ def _计算价值区(桶集合: List[成交密度桶], 控制点索引: int, 覆
 
 @register
 class VPVR(Indicator):
-    meta = IndicatorMeta(name="VPVR排行生成器.py", lookback=200, is_incremental=False)
+    meta = IndicatorMeta(name="VPVR排行生成器.py", lookback=200, is_incremental=False, min_data=5)
 
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         桶数量 = 48
@@ -54,8 +54,8 @@ class VPVR(Indicator):
         高节点系数 = 0.7
         低节点系数 = 0.25
 
-        if len(df) < 5:
-            return pd.DataFrame()
+        if not self._check_data(df):
+            return self._make_insufficient_result(df, symbol, interval, {"控制点价格": None})
 
         价格下限 = float(df["low"].min())
         价格上限 = float(df["high"].max())
@@ -86,7 +86,7 @@ class VPVR(Indicator):
             总成交量 += 成交量
 
         if 总成交量 <= 0:
-            return pd.DataFrame()
+            return self._make_insufficient_result(df, symbol, interval, {"控制点价格": None})
 
         控制点索引 = max(range(桶数量), key=lambda i: 桶集合[i].总成交量)
         控制点桶 = 桶集合[控制点索引]

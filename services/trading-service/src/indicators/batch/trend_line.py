@@ -138,14 +138,14 @@ def _pick_direction_and_distance(blines: List, tlines: List, bar_index: int, clo
 
 @register
 class TrendLine(Indicator):
-    meta = IndicatorMeta(name="趋势线榜单.py", lookback=100, is_incremental=False)
+    meta = IndicatorMeta(name="趋势线榜单.py", lookback=100, is_incremental=False, min_data=45)
 
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         prd = 20
         PPnum = 3
         
-        if len(df) < 2 * prd + 5:
-            return pd.DataFrame()
+        if not self._check_data(df):
+            return self._make_insufficient_result(df, symbol, interval, {"信号": None})
 
         highs = df["high"].to_numpy(dtype=float)
         lows = df["low"].to_numpy(dtype=float)

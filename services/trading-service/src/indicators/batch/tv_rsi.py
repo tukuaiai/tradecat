@@ -3,22 +3,18 @@ import numpy as np
 import pandas as pd
 from typing import Dict, Optional, Tuple
 from ..base import Indicator, IndicatorMeta, register
+from ..safe_calc import safe_rsi, safe_ema, safe_atr
 
 RSI_PERIODS = [7, 14, 21]
 EMA_TREND_PERIOD = 34
 ATR_PERIOD = 14
+MIN_DATA = 15  # 最小数据量
 
 
 def calc_rsi(series: pd.Series, period: int) -> pd.Series:
-    if len(series) < period + 1:
-        return pd.Series([np.nan] * len(series), index=series.index)
-    delta = series.diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-    avg_gain = gain.ewm(alpha=1/period, min_periods=period).mean()
-    avg_loss = loss.ewm(alpha=1/period, min_periods=period).mean()
-    rs = avg_gain / avg_loss
-    return 100 - (100 / (1 + rs))
+    """兼容旧接口"""
+    rsi, _ = safe_rsi(series, period, min_period=3)
+    return rsi
 
 
 def calc_dynamic_threshold(atr_normalized: float) -> Tuple[float, float]:
@@ -108,21 +104,49 @@ class TvRSI(Indicator):
     meta = IndicatorMeta(name="智能RSI扫描器.py", lookback=100, is_incremental=False)
 
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
-        if len(df) < max(RSI_PERIODS) + ATR_PERIOD + 10:
-            return pd.DataFrame()
+        # 动态最小数据量：至少需要最大RSI周期+5
+        min_required = max(RSI_PERIODS) + 5
+        
+        if len(df) < MIN_DATA:
+            # 数据太少，返回带状态的空结果
+            return self._make_result(df, symbol, interval, {
+                "信号": "数据不足",
+                "方向": "未知",
+                "强度": 0,
+                "RSI均值": None,
+                "RSI7": None,
+                "RSI14": None,
+                "RSI21": None,
+                "位置": "未知",
+                "背离": "未知",
+                "超买阈值": 70,
+                "超卖阈值": 30,
+            })
 
         high, low, close = df["high"], df["low"], df["close"]
-        atr = high.rolling(ATR_PERIOD).max() - low.rolling(ATR_PERIOD).min()
-        atr_normalized = (atr - atr.min()) / (atr.max() - atr.min() + 1e-10)
-        current_atr_norm = atr_normalized.iloc[-1]
+        
+        # 使用安全计算 ATR
+        atr, atr_status = safe_atr(high, low, close, ATR_PERIOD, min_period=3)
+        if atr_status == "数据不足":
+            atr_normalized = pd.Series([0.5] * len(df), index=df.index)
+        else:
+            atr_normalized = (atr - atr.min()) / (atr.max() - atr.min() + 1e-10)
+        
+        current_atr_norm = atr_normalized.iloc[-1] if not np.isnan(atr_normalized.iloc[-1]) else 0.5
         overbought, oversold = calc_dynamic_threshold(current_atr_norm)
 
-        rsi_7 = calc_rsi(close, RSI_PERIODS[0])
-        rsi_14 = calc_rsi(close, RSI_PERIODS[1])
-        rsi_21 = calc_rsi(close, RSI_PERIODS[2])
+        # 使用安全计算 RSI
+        rsi_7, status_7 = safe_rsi(close, RSI_PERIODS[0], min_period=3)
+        rsi_14, status_14 = safe_rsi(close, RSI_PERIODS[1], min_period=3)
+        rsi_21, status_21 = safe_rsi(close, RSI_PERIODS[2], min_period=3)
 
         rsi_state = evaluate_rsi_state(df, rsi_7, rsi_14, rsi_21, overbought, oversold)
-        divergence_type, divergence_strength = detect_divergence(df, rsi_14, lookback=50)
+        
+        # 背离检测需要更多数据
+        if len(df) >= 50:
+            divergence_type, divergence_strength = detect_divergence(df, rsi_14, lookback=50)
+        else:
+            divergence_type, divergence_strength = "数据不足", 0.0
 
         final_signal = rsi_state["signal"]
         if divergence_type == "底背离" and rsi_state["direction"] == "多头":
@@ -132,8 +156,11 @@ class TvRSI(Indicator):
             final_signal = "卖出"
             rsi_state["strength"] = min(100.0, rsi_state["strength"] + divergence_strength * 0.5)
 
+        # 标记参考值状态
+        data_status = "参考值" if any(s == "参考值" for s in [status_7, status_14, status_21]) else ""
+
         return self._make_result(df, symbol, interval, {
-            "信号": final_signal,
+            "信号": final_signal + (f"({data_status})" if data_status else ""),
             "方向": rsi_state["direction"],
             "强度": round(rsi_state["strength"], 2),
             "RSI均值": rsi_state["rsi_avg"],

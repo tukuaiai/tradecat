@@ -127,11 +127,11 @@ def calculate_liquidity_score(df: pd.DataFrame) -> tuple:
 
 @register
 class Liquidity(Indicator):
-    meta = IndicatorMeta(name="流动性扫描器.py", lookback=200, is_incremental=False)
+    meta = IndicatorMeta(name="流动性扫描器.py", lookback=200, is_incremental=False, min_data=50)
 
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
-        if len(df) < 50:
-            return pd.DataFrame()
+        if not self._check_data(df):
+            return self._make_insufficient_result(df, symbol, interval, {"流动性得分": None, "流动性等级": None})
 
         amihud_il, amihud_level, amihud_score = calculate_amihud_zscore(df)
         kyle_lambda, kyle_level, kyle_score = calculate_kyle_zscore(df)

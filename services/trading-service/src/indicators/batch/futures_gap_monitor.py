@@ -62,12 +62,12 @@ def detect_gaps(times: List[datetime], interval_sec: int = 300) -> Dict:
 
 @register
 class FuturesGapMonitor(Indicator):
-    meta = IndicatorMeta(name="期货情绪缺口监控.py", lookback=1, is_incremental=False)
+    meta = IndicatorMeta(name="期货情绪缺口监控.py", lookback=1, is_incremental=False, min_data=1)
     
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         # 只监控 5m 周期
         if interval != "5m":
-            return pd.DataFrame()
+            return self._make_insufficient_result(df, symbol, interval, {"信号": "仅支持5m周期"})
         
         times = get_metrics_times(symbol, 240, interval)
         gap_info = detect_gaps(times, 300)

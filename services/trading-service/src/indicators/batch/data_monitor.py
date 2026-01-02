@@ -13,11 +13,11 @@ def _calc_expected_bars(interval: str, days: int = 7) -> int:
 
 @register
 class DataMonitor(Indicator):
-    meta = IndicatorMeta(name="数据监控.py", lookback=1, is_incremental=False)
+    meta = IndicatorMeta(name="数据监控.py", lookback=1, is_incremental=False, min_data=1)
     
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         if df.empty:
-            return pd.DataFrame()
+            return self._make_insufficient_result(df, symbol, interval, {"已加载K线": 0})
         
         loaded = len(df)
         latest = df.index[-1] if hasattr(df.index[-1], 'isoformat') else None

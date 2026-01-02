@@ -85,11 +85,11 @@ def calculate_fibonacci_bands(df: pd.DataFrame) -> Dict:
 
 @register
 class TvFibSniper(Indicator):
-    meta = IndicatorMeta(name="量能斐波狙击扫描器.py", lookback=220, is_incremental=False)
+    meta = IndicatorMeta(name="量能斐波狙击扫描器.py", lookback=220, is_incremental=False, min_data=210)
 
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
-        if len(df) < LENGTH + 10:
-            return pd.DataFrame()
+        if not self._check_data(df):
+            return self._make_insufficient_result(df, symbol, interval, {"信号": None})
 
         result = calculate_fibonacci_bands(df)
         return self._make_result(df, symbol, interval, {

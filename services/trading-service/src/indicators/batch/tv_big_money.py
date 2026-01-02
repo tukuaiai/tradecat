@@ -163,11 +163,11 @@ def combine_signal(structure: StructureState, order_block: Dict, fvg: Optional[D
 
 @register
 class TvBigMoney(Indicator):
-    meta = IndicatorMeta(name="大资金操盘扫描器.py", lookback=250, is_incremental=False)
+    meta = IndicatorMeta(name="大资金操盘扫描器.py", lookback=250, is_incremental=False, min_data=50)
 
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
-        if len(df) < 50:
-            return pd.DataFrame()
+        if not self._check_data(df):
+            return self._make_insufficient_result(df, symbol, interval, {"信号": None})
 
         pivots = identify_swing_points(df, PIVOT)
         structure = evaluate_structure(df, pivots)

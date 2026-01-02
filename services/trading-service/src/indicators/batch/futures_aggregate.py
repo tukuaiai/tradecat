@@ -104,14 +104,15 @@ def get_metrics_history(symbol: str, limit: int = 100, interval: str = "5m") -> 
 
 @register
 class FuturesAggregate(Indicator):
-    meta = IndicatorMeta(name="期货情绪聚合表.py", lookback=1, is_incremental=False)
+    meta = IndicatorMeta(name="期货情绪聚合表.py", lookback=1, is_incremental=False, min_data=1)
     
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         # 期货数据只有 5m/15m/1h/4h/1d/1w，跳过1m
         if interval == "1m":
-            return pd.DataFrame()
+            return self._make_insufficient_result(df, symbol, interval, {"信号": "不支持1m周期"})
         history = get_metrics_history(symbol, 240, interval)
-        if not history: return pd.DataFrame()
+        if not history:
+            return self._make_insufficient_result(df, symbol, interval, {"信号": None})
         
         latest = history[-1]
         prev = history[-2] if len(history) >= 2 else None

@@ -8,11 +8,11 @@ WINDOW = 300
 
 @register
 class VWAP(Indicator):
-    meta = IndicatorMeta(name="VWAP离线信号扫描.py", lookback=300, is_incremental=False)
+    meta = IndicatorMeta(name="VWAP离线信号扫描.py", lookback=300, is_incremental=False, min_data=10)
 
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
-        if len(df) < 10:
-            return pd.DataFrame()
+        if not self._check_data(df):
+            return self._make_insufficient_result(df, symbol, interval, {"VWAP价格": None})
 
         window_df = df.tail(WINDOW).copy() if len(df) >= WINDOW else df.copy()
         price = (window_df["high"] + window_df["low"] + window_df["close"]) / 3
