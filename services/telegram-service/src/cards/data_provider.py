@@ -40,67 +40,30 @@ def _parse_timestamp(ts_str: str) -> datetime:
         return datetime.min
 
 
-# 新旧表名映射
+# 表名映射（简称 -> 实际表名）
 TABLE_NAME_MAP = {
+    # 基础
     "基础数据": "基础数据同步器.py",
+    # 指标
     "ATR波幅榜单": "ATR波幅扫描器.py",
-    "ATR波幅扫描器.py": "ATR波幅扫描器.py",
     "BB榜单": "布林带扫描器.py",
     "布林带榜单": "布林带扫描器.py",
-    "布林带扫描器.py": "布林带扫描器.py",
     "CVD榜单": "CVD信号排行榜.py",
-    "CVD信号排行榜.py": "CVD信号排行榜.py",
     "KDJ随机指标榜单": "KDJ随机指标扫描器.py",
-    "KDJ随机指标扫描器.py": "KDJ随机指标扫描器.py",
     "K线形态榜单": "K线形态扫描器.py",
-    "K线形态扫描器.py": "K线形态扫描器.py",
     "MACD柱状榜单": "MACD柱状扫描器.py",
-    "MACD柱状扫描器.py": "MACD柱状扫描器.py",
     "MFI资金流量榜单": "MFI资金流量扫描器.py",
-    "MFI资金流量扫描器.py": "MFI资金流量扫描器.py",
     "OBV能量潮榜单": "OBV能量潮扫描器.py",
-    "OBV能量潮扫描器.py": "OBV能量潮扫描器.py",
     "VPVR榜单": "VPVR排行生成器.py",
-    "VPVR排行生成器.py": "VPVR排行生成器.py",
     "VWAP榜单": "VWAP离线信号扫描.py",
-    "VWAP离线信号扫描.py": "VWAP离线信号扫描.py",
     "主动买卖比榜单": "主动买卖比扫描器.py",
-    "主动买卖比扫描器.py": "主动买卖比扫描器.py",
     "成交量比率榜单": "成交量比率扫描器.py",
-    "成交量比率扫描器.py": "成交量比率扫描器.py",
     "支撑阻力榜单": "全量支撑阻力扫描器.py",
-    "全量支撑阻力扫描器.py": "全量支撑阻力扫描器.py",
     "收敛发散榜单": "G，C点扫描器.py",
-    "G，C点扫描器.py": "G，C点扫描器.py",
     "流动性榜单": "流动性扫描器.py",
-    "流动性扫描器.py": "流动性扫描器.py",
     "谐波信号榜单": "谐波信号扫描器.py",
-    "谐波信号扫描器.py": "谐波信号扫描器.py",
-    "趋势线榜单": "趋势线榜单",
-    "布林带扫描器": "布林带扫描器.py",
-    "成交量比率扫描器": "成交量比率扫描器.py",
-    "主动买卖比扫描器": "主动买卖比扫描器.py",
-    "全量支撑阻力扫描器": "全量支撑阻力扫描器.py",
-    "KDJ随机指标扫描器": "KDJ随机指标扫描器.py",
-    "MACD柱状扫描器": "MACD柱状扫描器.py",
-    "OBV能量潮扫描器": "OBV能量潮扫描器.py",
-    "谐波信号扫描器": "谐波信号扫描器.py",
-    "基础数据同步器": "基础数据同步器.py",
-    "G，C点扫描器": "G，C点扫描器.py",
-    "流动性扫描器": "流动性扫描器.py",
-    "MFI资金流量扫描器": "MFI资金流量扫描器.py",
-    "CVD信号排行榜": "CVD信号排行榜.py",
-    "VWAP离线信号扫描": "VWAP离线信号扫描.py",
-    "VPVR排行生成器": "VPVR排行生成器.py",
-    "K线形态扫描器": "K线形态扫描器.py",
-    "ATR波幅扫描器": "ATR波幅扫描器.py",
-    "大资金操盘扫描器": "大资金操盘扫描器.py",
-    "智能RSI扫描器": "智能RSI扫描器.py",
-    "超级精准趋势扫描器": "超级精准趋势扫描器.py",
-    "趋势线榜单.py": "趋势线榜单.py",
-    "期货情绪聚合表": "期货情绪聚合表.py",
-    "期货情绪聚合榜单": "期货情绪聚合榜单",
-    "期货情绪元数据": "期货情绪元数据",
+    "趋势线榜单": "趋势线榜单.py",
+    "期货情绪聚合榜单": "期货情绪聚合表.py",
 }
 
 
@@ -245,7 +208,16 @@ class RankingDataProvider:
         self._pool.put(conn)
 
     def _resolve_table(self, name: str) -> str:
-        return TABLE_NAME_MAP.get(name, name)
+        """解析表名，支持简称和自动补 .py 后缀"""
+        if name in TABLE_NAME_MAP:
+            return TABLE_NAME_MAP[name]
+        # 自动补 .py 后缀
+        if not name.endswith('.py'):
+            with_py = name + '.py'
+            if with_py in TABLE_NAME_MAP:
+                return TABLE_NAME_MAP[with_py]
+            return with_py
+        return name
 
     def _load_table(self, table: str) -> List[sqlite3.Row]:
         table = self._resolve_table(table)
