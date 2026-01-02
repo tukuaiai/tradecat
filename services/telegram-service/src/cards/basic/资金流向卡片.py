@@ -287,95 +287,28 @@ class MoneyFlowCard(RankingCard):
 
         items: List[Dict] = []
 
-        # 优先使用基础表中的“资金流向”列，禁止用买卖额自行计算
+        # 从基础数据表读取
         try:
-            # 直接使用用户选择的周期
-            # db_period = period  # 已移除回退逻辑
             base_map = self.provider.fetch_base(period)
             for sym, r in base_map.items():
-                flow = float(r.get("资金流向") or 0)
-                quote_volume = float(r.get("成交额") or r.get("quote_volume") or 0)
-                price = float(r.get("当前价格") or r.get("price") or 0)
-                outflow_val = float(r.get("主动卖出额") or r.get("主动卖额") or r.get("sell_quote") or 0)
-                inflow_val = float(r.get("主动买入额") or r.get("主动买额") or 0)
-                if not inflow_val:
-                    # 若无主动买额字段，用资金流向 + 主动卖额估算
-                    inflow_val = flow + outflow_val
                 items.append({
                     "symbol": format_symbol(sym),
-                    "absolute": flow,
-                    "volume": quote_volume,
-                    "inflow": inflow_val,
-                    "outflow": outflow_val,
+                    "absolute": float(r.get("资金流向") or 0),
+                    "volume": float(r.get("成交额") or 0),
+                    "inflow": float(r.get("主动买额") or 0),
+                    "outflow": float(r.get("主动卖出额") or 0),
                     "成交笔数": float(r.get("成交笔数") or r.get("交易次数") or 0),
-                    "price": price,
-                    "quote_volume": quote_volume,
+                    "price": float(r.get("当前价格") or 0),
+                    "quote_volume": float(r.get("成交额") or 0),
                 })
         except Exception:
-            items = []
-
-        # 兜底：若未来补充“资金流向榜单”表或 handler 内置，则尝试读取
-        if not items:
-            try:
-                metrics = self.provider.merge_with_base("资金流向榜单", period, base_fields=["成交额", "当前价格"])
-                for row in metrics:
-                    sym = format_symbol(row.get("symbol") or row.get("交易对") or row.get("币种") or "")
-                    if not sym:
-                        continue
-                    items.append({
-                        "symbol": sym,
-                        "absolute": float(row.get("净流") or row.get("absolute") or 0),
-                        "volume": float(row.get("成交额") or row.get("quote_volume") or 0),
-                        "inflow": float(row.get("流入") or 0),
-                        "outflow": float(row.get("流出") or 0),
-                        "price": float(row.get("价格") or row.get("price") or row.get("当前价格") or 0),
-                        "quote_volume": float(row.get("成交额") or row.get("quote_volume") or 0),
-                    })
-            except Exception:
-                pass
-
-        # 兜底旧 handler（若仍可用）
-        if not items:
-            try:
-                data = handler.get_money_flow(limit=limit, period=period, sort_order=sort_order, flow_type=flow_type, market=market)
-                if isinstance(data, list):
-                    for row in data:
-                        sym = (row.get("symbol") or "").upper()
-                        if not sym:
-                            continue
-                        items.append({
-                            "symbol": sym,
-                            "absolute": float(row.get("absolute") or row.get("flow") or 0),
-                            "volume": float(row.get("volume") or row.get("quote_volume") or 0),
-                            "inflow": float(row.get("inflow") or 0),
-                            "outflow": float(row.get("outflow") or 0),
-                            "price": float(row.get("price") or row.get("last_close") or 0),
-                            "quote_volume": float(row.get("quote_volume") or 0),
-                        })
-            except Exception:
-                pass
+            pass
 
         reverse = sort_order != "asc"
-        # 过滤异常值（防止脏数据把榜单占满）
-        sane_items = []
-        for it in items:
-            ok = True
-            for key in ("absolute", "volume", "inflow", "outflow"):
-                v = it.get(key)
-                if v is None:
-                    v = 0
-                if isinstance(v, (int, float)) and abs(v) > 1e12:  # >1万亿视为异常
-                    ok = False
-                    break
-            if ok:
-                sane_items.append(it)
-        items = sane_items
-
         items.sort(key=lambda x: x.get(flow_type, 0), reverse=reverse)
 
-        # 修复：如果字段状态不存在，默认显示字段（而不是隐藏）
-        active_special = [f for f in self.special_display_fields if field_state.get(f[0], True)]  # 默认True
-        active_general = [f for f in self.general_display_fields if field_state.get(f[0], True)]  # 默认True
+        active_special = [f for f in self.special_display_fields if field_state.get(f[0], True)]
+        active_general = [f for f in self.general_display_fields if field_state.get(f[0], True)]
 
         header_parts = ["排名", "币种"] + [lab for _, lab, _ in active_special] + [lab for _, lab, _ in active_general]
 
