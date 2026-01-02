@@ -43,7 +43,7 @@
 cd /path/to/tradecat
 
 # 2. 一键安装（首次）
-./install.sh
+./scripts/install.sh
 
 # 3. 或手动初始化单个服务
 ./scripts/init.sh trading-service
@@ -92,7 +92,7 @@ ruff check services/
 
 | 命令 | 说明 | 前置条件 |
 |:---|:---|:---|
-| `./install.sh` | 一键安装所有依赖 | Python 3.10+ |
+| `./scripts/install.sh` | 一键安装所有依赖 | Python 3.10+ |
 | `./scripts/init.sh` | 初始化所有服务虚拟环境 | Python 3.10+ |
 | `./scripts/init.sh <service>` | 初始化单个服务 | Python 3.10+ |
 
@@ -261,7 +261,7 @@ tradecat/
 │   ├── export_timescaledb.sh   # 数据导出
 │   └── timescaledb_compression.sh  # 压缩管理
 │
-├── install.sh                  # 一键安装
+# install.sh 已移至 scripts/                  # 一键安装
 ├── Makefile                    # 常用命令
 └── README.md                   # 项目文档
 ```
