@@ -189,6 +189,20 @@ def _get_pool(db_path: Path) -> _SQLitePool:
         return _global_pool
 
 
+def _cleanup_pool():
+    """进程退出时关闭连接池"""
+    global _global_pool
+    with _pool_lock:
+        if _global_pool is not None:
+            _global_pool.close_all()
+            _global_pool = None
+
+
+# 注册退出钩子
+import atexit
+atexit.register(_cleanup_pool)
+
+
 # ============================================================
 # RankingDataProvider（market_data.db）
 # ============================================================
@@ -310,21 +324,23 @@ class RankingDataProvider:
 
     # ---------------- 公共读取 ----------------
     def fetch_base(self, period: str) -> Dict[str, Dict]:
-        """按周期取基础数据"""
+        """按周期取基础数据（使用 datetime 比较时间戳）"""
         rows = self._load_table_period("基础数据", period)
         target_period = _normalize_period_value(period)
         latest: Dict[str, Dict] = {}
+        latest_ts: Dict[str, datetime] = {}
         for row in rows:
             r = dict(row)
             r_period = _normalize_period_value(str(r.get("周期")))
             if r_period != target_period:
                 continue
             sym = str(r.get("交易对", "")).upper()
-            ts = str(r.get("数据时间", ""))
             if not sym:
                 continue
-            if sym not in latest or ts > latest[sym].get("数据时间", ""):
+            ts = _parse_timestamp(str(r.get("数据时间", "")))
+            if sym not in latest or ts > latest_ts.get(sym, datetime.min):
                 latest[sym] = r
+                latest_ts[sym] = ts
         return latest
 
     def fetch_metric(self, table: str, period: str) -> List[Dict]:

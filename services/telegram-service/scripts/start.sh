@@ -20,10 +20,13 @@ safe_load_env() {
     local file="$1"
     [ -f "$file" ] || return 0
     
+    # 检查权限（生产环境强制 600）
     if [[ "$file" == *"config/.env" ]] && [[ ! "$file" == *".example" ]]; then
         local perm=$(stat -c %a "$file" 2>/dev/null)
         if [[ "$perm" != "600" && "$perm" != "400" ]]; then
-            echo "⚠️  警告: $file 权限为 $perm，建议设为 600"
+            echo "❌ 错误: $file 权限为 $perm，必须设为 600"
+            echo "   执行: chmod 600 $file"
+            exit 1
         fi
     fi
     
@@ -46,14 +49,16 @@ safe_load_env() {
 safe_load_env "$PROJECT_ROOT/config/.env"
 safe_load_env "$SERVICE_DIR/config/.env"
 
-# 代理自检
+# 代理自检（同时检测 HTTP_PROXY 和 HTTPS_PROXY）
 check_proxy() {
-    [ -z "${HTTP_PROXY:-}" ] && return 0
-    if curl -s --max-time 3 --proxy "$HTTP_PROXY" https://api.binance.com/api/v3/ping >/dev/null 2>&1; then
-        echo "✓ 代理可用: $HTTP_PROXY"
+    local proxy="${HTTP_PROXY:-${HTTPS_PROXY:-}}"
+    [ -z "$proxy" ] && return 0
+    
+    if curl -s --max-time 3 --proxy "$proxy" https://api.binance.com/api/v3/ping >/dev/null 2>&1; then
+        echo "✓ 代理可用: $proxy"
     else
-        echo "⚠️  代理不可用，已禁用: $HTTP_PROXY"
-        unset HTTP_PROXY HTTPS_PROXY
+        echo "⚠️  代理不可用，已禁用: $proxy"
+        unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy
     fi
 }
 check_proxy
