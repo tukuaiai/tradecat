@@ -88,7 +88,8 @@ start_component() {
     
     cd "$SERVICE_DIR"
     source .venv/bin/activate
-    PYTHONPATH=src nohup bash -c "${START_CMDS[$name]}" >> "$log_file" 2>&1 &
+    export PYTHONPATH=src
+    nohup bash -c "${START_CMDS[$name]}" >> "$log_file" 2>&1 &
     local new_pid=$!
     echo "$new_pid" > "$pid_file"
     

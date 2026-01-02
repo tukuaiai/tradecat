@@ -53,7 +53,7 @@ def _get_configured_symbols() -> List[str]:
     extra = _parse_list(os.getenv("SYMBOLS_EXTRA", ""))
     exclude = set(_parse_list(os.getenv("SYMBOLS_EXCLUDE", "")))
     
-    selected_groups = _parse_list(groups_str.lower())
+    selected_groups = [g.strip().lower() for g in groups_str.split(",") if g.strip()]
     
     # 特殊分组返回 None，让调用方处理
     if "all" in selected_groups or "auto" in selected_groups:
