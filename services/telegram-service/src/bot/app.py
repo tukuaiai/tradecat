@@ -1088,6 +1088,10 @@ class UserRequestHandler:
                 KeyboardButton("🏠 主菜单"),
                 KeyboardButton("📊 数据面板"),
                 KeyboardButton("ℹ️ 帮助")
+            ],
+            [
+                KeyboardButton("🔍 币种查询"),
+                KeyboardButton("🤖 AI分析"),
             ]
         ]
         return ReplyKeyboardMarkup(
@@ -3647,8 +3651,23 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer(f"处理失败: {e}")
             return
 
-    # 其他AI/信号功能占位
-    if button_data in {"start_coin_analysis", "signal_menu", "aggregated_alerts"}:
+    # AI分析入口
+    if button_data == "start_coin_analysis":
+        try:
+            from bot.ai_integration import get_ai_handler, AI_SERVICE_AVAILABLE
+            if not AI_SERVICE_AVAILABLE:
+                await query.answer("🤖 AI 分析模块未安装", show_alert=True)
+                return
+            ai_handler = get_ai_handler(symbols_provider=lambda: user_handler.get_active_symbols() if user_handler else None)
+            await ai_handler.start_ai_analysis(update, context)
+            return
+        except Exception as e:
+            logger.error(f"AI分析入口失败: {e}")
+            await query.answer(f"AI分析失败: {e}", show_alert=True)
+            return
+
+    # 其他信号功能占位
+    if button_data in {"signal_menu", "aggregated_alerts"}:
         await query.answer("功能暂未开放")
         return
 
@@ -5064,6 +5083,36 @@ async def data_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
 
 
+async def query_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """币种查询指令 /query [币种]"""
+    if not _is_command_allowed(update):
+        return
+    args = context.args
+    if args:
+        # 直接查询指定币种
+        coin = args[0].upper().replace("USDT", "")
+        symbol = coin + "USDT"
+        # 触发单币查询
+        update.message.text = f"{coin}!"
+        await handle_message(update, context)
+    else:
+        # 显示币种列表
+        from common.symbols import get_configured_symbols
+        symbols = get_configured_symbols()
+        coins = [s.replace("USDT", "") for s in symbols] if symbols else ["BTC", "ETH", "SOL"]
+        coins_text = "\n".join(coins)
+        text = (
+            "🔍 *币种查询*\n\n"
+            f"```\n{coins_text}\n```\n"
+            "📊 可查询币种 ({} 个)\n"
+            "💡 使用方法:\n"
+            "• `/query BTC` - 直接查询\n"
+            "• `BTC!` - 发送币种名+感叹号"
+        ).format(len(coins))
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]])
+        await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
+
+
 async def ai_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """AI分析指令 /ai"""
     if not _is_command_allowed(update):
@@ -5195,6 +5244,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
         "📊 数据面板": "ranking_menu",
         "🚨 信号": "aggregated_alerts",
         "🤖 AI分析": "start_coin_analysis",
+        "🔍 币种查询": "coin_query",
         "🏠 主菜单": "main_menu",
         "ℹ️ 帮助": "help"
     }
@@ -5555,6 +5605,8 @@ async def post_init(application):
     commands = [
         BotCommand("start", "🏠 主菜单"),
         BotCommand("data", "📊 数据面板"),
+        BotCommand("query", "🔍 币种查询"),
+        BotCommand("ai", "🤖 AI分析"),
         BotCommand("help", "ℹ️ 帮助")
     ]
     
@@ -5761,6 +5813,8 @@ def main():
         logger.info("✅ /status 命令处理器已注册")
         application.add_handler(CommandHandler("data", data_command))
         logger.info("✅ /data 命令处理器已注册")
+        application.add_handler(CommandHandler("query", query_command))
+        logger.info("✅ /query 命令处理器已注册")
         application.add_handler(CommandHandler("ai", ai_command))
         logger.info("✅ /ai 命令处理器已注册")
         
