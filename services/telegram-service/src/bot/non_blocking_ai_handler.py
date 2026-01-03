@@ -251,6 +251,7 @@ class NonBlockingAIHandler:
                         
                         detailed_content = f"{coin_name} AI分析报告\n\n"
                         detailed_content += ai_content + "\n\n"
+                        
                         detailed_content += f"分析时间: {format_beijing_time(get_beijing_time().isoformat(), '%Y-%m-%d %H:%M:%S')}\n"
                         
                         filename = f"{coin_name}_AI分析详细报告_{format_beijing_time(get_beijing_time().isoformat(), '%Y%m%d_%H%M%S')}.txt"
