@@ -3589,8 +3589,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # AI深度分析入口
     if button_data == "start_ai_analysis":
         try:
-            from bot.ai_integration import get_ai_handler
+            from bot.ai_integration import get_ai_handler, AI_SERVICE_AVAILABLE, SELECTING_COIN
+            if not AI_SERVICE_AVAILABLE:
+                raise ImportError("ai-service 未安装")
             ai_handler = get_ai_handler(symbols_provider=lambda: user_handler.get_active_symbols() if user_handler else None)
+            context.user_data["ai_state"] = SELECTING_COIN
             await ai_handler.start_ai_analysis(update, context)
             return
         except ImportError as e:
@@ -3611,14 +3614,28 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # AI 分析相关回调（币种选择、周期选择、提示词选择）
     if button_data.startswith("ai_"):
         try:
-            from bot.ai_integration import get_ai_handler, SELECTING_COIN, SELECTING_INTERVAL
+            from bot.ai_integration import get_ai_handler, AI_SERVICE_AVAILABLE, SELECTING_COIN, SELECTING_INTERVAL
+            if not AI_SERVICE_AVAILABLE:
+                await query.answer("AI模块未安装")
+                return
             ai_handler = get_ai_handler(symbols_provider=lambda: user_handler.get_active_symbols() if user_handler else None)
             
-            # 根据当前状态分发到对应处理器
-            ai_state = context.user_data.get("ai_state", SELECTING_COIN)
-            if ai_state == SELECTING_INTERVAL or button_data.startswith("ai_interval_") or button_data == "ai_back_to_coin":
+            # 根据按钮类型和当前状态分发
+            if button_data.startswith("ai_interval_"):
+                context.user_data["ai_state"] = SELECTING_INTERVAL
                 await ai_handler.handle_interval_selection(update, context)
+            elif button_data == "ai_back_to_coin":
+                context.user_data["ai_state"] = SELECTING_COIN
+                await ai_handler.handle_interval_selection(update, context)
+            elif button_data.startswith("ai_coin_"):
+                # 选择币种后进入周期选择
+                context.user_data["ai_state"] = SELECTING_INTERVAL
+                await ai_handler.handle_coin_selection(update, context)
+            elif button_data == "ai_cancel":
+                context.user_data.pop("ai_state", None)
+                await ai_handler.handle_coin_selection(update, context)
             else:
+                # 其他 ai_ 开头的按钮（翻页、提示词选择等）
                 await ai_handler.handle_coin_selection(update, context)
             return
         except ImportError as e:

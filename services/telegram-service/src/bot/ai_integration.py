@@ -12,15 +12,27 @@ AI_SERVICE_PATH = Path(__file__).resolve().parents[3] / "ai-service"
 if str(AI_SERVICE_PATH) not in sys.path:
     sys.path.insert(0, str(AI_SERVICE_PATH))
 
+# 会话状态常量
+SELECTING_COIN = 0
+SELECTING_INTERVAL = 1
+
 # 导入 ai-service 模块
-from src import (
-    AIAnalysisHandler,
-    get_ai_handler,
-    register_ai_handlers,
-    run_analysis,
-    PromptRegistry,
-)
-from src.bot import SELECTING_COIN, SELECTING_INTERVAL
+try:
+    from src import (
+        AIAnalysisHandler,
+        get_ai_handler,
+        register_ai_handlers,
+        run_analysis,
+        PromptRegistry,
+    )
+    AI_SERVICE_AVAILABLE = True
+except ImportError as e:
+    AI_SERVICE_AVAILABLE = False
+    AIAnalysisHandler = None
+    get_ai_handler = None
+    register_ai_handlers = None
+    run_analysis = None
+    PromptRegistry = None
 
 __all__ = [
     "AIAnalysisHandler",
@@ -30,4 +42,5 @@ __all__ = [
     "PromptRegistry",
     "SELECTING_COIN",
     "SELECTING_INTERVAL",
+    "AI_SERVICE_AVAILABLE",
 ]
