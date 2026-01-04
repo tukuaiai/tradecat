@@ -59,7 +59,6 @@ except ImportError:
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
-from libs.common.i18n import build_i18n_from_env
 # 当前位置 bot/app.py，需要上移一层回到 src 作为根
 SRC_ROOT = Path(__file__).resolve().parent.parent  # .../src
 PROJECT_ROOT = SRC_ROOT.parent                    # .../telegram-service
@@ -74,6 +73,9 @@ if str(REPO_SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_SRC_ROOT))
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+
+# 延后导入依赖于 sys.path 的模块
+from libs.common.i18n import build_i18n_from_env
 
 # 当以脚本方式运行（__main__）时，为避免 utils.signal_formatter 反向导入失败，显式注册模块别名
 if __name__ == "__main__":
@@ -139,6 +141,7 @@ def _require_env(name: str, default=None, required: bool = False, cast=None):
 # ================== i18n 支撑 ==================
 I18N = build_i18n_from_env()
 _user_locale_map: Dict[int, str] = {}
+_user_locale_lock = threading.RLock()
 
 
 def _ensure_locale_store():
@@ -152,27 +155,32 @@ def _ensure_locale_store():
 def _load_user_locales():
     """加载已存储的用户语言偏好"""
     global _user_locale_map
-    if _user_locale_map:
+    with _user_locale_lock:
+        if _user_locale_map:
+            return _user_locale_map
+        if not LOCALE_STORE.exists():
+            _user_locale_map = {}
+            return _user_locale_map
+        try:
+            _user_locale_map = json.loads(LOCALE_STORE.read_text(encoding="utf-8"))
+        except Exception:
+            _user_locale_map = {}
         return _user_locale_map
-    if not LOCALE_STORE.exists():
-        _user_locale_map = {}
-        return _user_locale_map
-    try:
-        _user_locale_map = json.loads(LOCALE_STORE.read_text(encoding="utf-8"))
-    except Exception:
-        _user_locale_map = {}
-    return _user_locale_map
 
 
 def _save_user_locale(user_id: int, lang: str):
     """持久化用户语言"""
     _ensure_locale_store()
-    data = _load_user_locales()
-    data[str(user_id)] = lang
-    try:
-        LOCALE_STORE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    except Exception as exc:
-        logger.warning("⚠️ 保存用户语言失败: %s", exc)
+    with _user_locale_lock:
+        data = _load_user_locales()
+        data[str(user_id)] = lang
+        try:
+            tmp_path = LOCALE_STORE.with_suffix(".tmp")
+            tmp_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            os.replace(tmp_path, LOCALE_STORE)
+            _user_locale_map = data  # 刷新内存缓存
+        except Exception as exc:
+            logger.warning("⚠️ 保存用户语言失败: %s", exc)
 
 
 def _resolve_lang(update) -> str:
@@ -1021,37 +1029,25 @@ class UserRequestHandler:
             'hour_min': f"{now.hour}时{now.minute}分"
         }
     
-    def get_main_menu_text(self):
-        """获取主菜单文本"""
+    def get_main_menu_text(self, update: Optional[Update] = None):
+        """获取主菜单文本（随用户语言）"""
         time_info = self.get_current_time_display()
+        lang = _resolve_lang(update) if update else I18N.default_locale
+        return I18N.gettext("menu.main_text", lang=lang, time=time_info["full"])
 
-        return (
-            "⚡️ 交易猫\n\n"
-            "📊 数据面板\n"
-            "├─ 基础数据：MACD/RSI/布林带/支撑阻力/资金流向/\n"
-            "├─ 合约数据：OI系列/主动买卖比/持仓变动/波动率/\n"
-            "└─ 高级数据：EMA/K线形态/VPVR/VWAP/流动性/趋势/\n\n"
-            "🚨 信号面板\n"
-            "├─ 异常监控\n"
-            "└─ 自选推送\n\n"
-            "🤖 AI分析\n"
-            "├─ 深度报告\n"
-            "└─ 点位速览\n\n"
-            f"⏰ 更新时间：{time_info['full']}（北京时间）\n"
-            "👇 点击按钮开始"
-        )
-
-    def get_main_menu_keyboard(self):
-        """获取主菜单键盘"""
+    def get_main_menu_keyboard(self, update: Optional[Update] = None):
+        """获取主菜单键盘（随用户语言渲染）"""
+        lang = _resolve_lang(update) if update else I18N.default_locale
         keyboard = [
             [
-                InlineKeyboardButton("📊 数据面板", callback_data="ranking_menu"),
-                InlineKeyboardButton("🔍 币种查询", callback_data="coin_query"),
-                InlineKeyboardButton("🤖 AI分析", callback_data="start_coin_analysis"),
+                InlineKeyboardButton(I18N.gettext("kb.data", lang=lang), callback_data="ranking_menu"),
+                InlineKeyboardButton(I18N.gettext("kb.query", lang=lang), callback_data="coin_query"),
+                InlineKeyboardButton(I18N.gettext("kb.ai", lang=lang), callback_data="start_coin_analysis"),
             ],
             [
-                InlineKeyboardButton("🔔 信号", callback_data="signal_menu"),
-                InlineKeyboardButton("ℹ️ 帮助", callback_data="help"),
+                InlineKeyboardButton(I18N.gettext("kb.signal", lang=lang), callback_data="signal_menu"),
+                InlineKeyboardButton(I18N.gettext("kb.help", lang=lang), callback_data="help"),
+                InlineKeyboardButton(I18N.gettext("kb.lang", lang=lang), callback_data="lang_menu"),
             ],
         ]
         return InlineKeyboardMarkup(keyboard)
@@ -3304,24 +3300,11 @@ class TradeCatBot:
         }
     
 
-    def get_main_menu_text(self):
-        """获取主菜单文本"""
+    def get_main_menu_text(self, update: Optional[Update] = None):
+        """获取主菜单文本（随用户语言）"""
         time_info = self.get_current_time_display()
-        return (
-            "⚡️ 交易猫\n\n"
-            "📊 数据面板\n"
-            "├─ 基础数据：MACD/RSI/布林带/支撑阻力/资金流向/\n"
-            "├─ 合约数据：OI系列/主动买卖比/持仓变动/波动率/\n"
-            "└─ 高级数据：EMA/K线形态/VPVR/VWAP/流动性/趋势/\n\n"
-            "🚨 信号面板\n"
-            "├─ 异常监控\n"
-            "└─ 自选推送\n\n"
-            "🤖 AI分析\n"
-            "├─ 深度报告\n"
-            "└─ 点位速览\n\n"
-            f"⏰ 更新时间：{time_info['full']}（北京时间）\n"
-            "👇 点击按钮开始"
-        )
+        lang = _resolve_lang(update) if update else I18N.default_locale
+        return I18N.gettext("menu.main_text", lang=lang, time=time_info["full"])
 
     def get_position_ranking(self, limit=10, sort_order='desc', period='24h', sort_field: str = "position"):
         """获取持仓量排行榜"""
@@ -3596,8 +3579,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 先发送带键盘的消息刷新底部键盘
         await update.message.reply_text(_t(update, "start.greet"), reply_markup=user_handler.get_reply_keyboard(update))
         
-        text = user_handler.get_main_menu_text()
-        inline_keyboard = user_handler.get_main_menu_keyboard()
+        text = user_handler.get_main_menu_text(update)
+        inline_keyboard = user_handler.get_main_menu_keyboard(update)
         text = ensure_valid_text(text, _t(update, "start.fallback"))
         
         await update.message.reply_text(text, reply_markup=inline_keyboard)
@@ -3626,16 +3609,10 @@ def ensure_valid_text(text, fallback="🔄 数据加载中，请稍后重试..."
 def mdv2(text: str) -> str:
     """兼容旧调用，直接返回原文（统一使用Markdown普通模式）"""
     return text or ""
-def _build_ranking_menu_text(group: str) -> str:
-    """根据分组返回排行榜菜单文案"""
-    return (
-        "📊 数据面板\n"
-        "├─ 选榜单进入详情\n"
-        "├─ 选周期：1m/5m/15m/1h/4h/1d/1w\n"
-        "├─ 排序：字段升/降序切换\n"
-        "└─ 字段：按钮点一下开/关\n\n"
-        "👇 请选择要查看的榜单"
-    )
+def _build_ranking_menu_text(group: str, update: Optional[Update] = None) -> str:
+    """根据分组返回排行榜菜单文案（多语言）"""
+    lang = _resolve_lang(update) if update else I18N.default_locale
+    return I18N.gettext("menu.ranking", lang=lang)
 
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3648,6 +3625,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     button_data = query.data
     chat_type = query.message.chat.type
+
+    # 打开语言选择菜单
+    if button_data == "lang_menu":
+        await lang_command(update, context)
+        return
 
     # 语言切换
     if button_data.startswith("set_lang_"):
@@ -3662,6 +3644,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             I18N.gettext("lang.set", lang=new_lang, lang_name=display_names.get(new_lang, new_lang))
         )
+        if user_handler:
+            main_text = user_handler.get_main_menu_text(update)
+            main_keyboard = user_handler.get_main_menu_keyboard(update)
+            await query.message.reply_text(main_text, reply_markup=main_keyboard)
         return
 
     # AI深度分析入口
@@ -3694,8 +3680,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             from bot.ai_integration import get_ai_handler, AI_SERVICE_AVAILABLE, SELECTING_COIN, SELECTING_INTERVAL
             if not AI_SERVICE_AVAILABLE:
-                await query.answer("AI模块未安装")
+                await query.answer(_t(update, "ai.not_installed"))
                 return
+            # 记录用户语言偏好，贯通到 AI 服务
+            context.user_data["lang_preference"] = _resolve_lang(update)
             ai_handler = get_ai_handler(symbols_provider=lambda: user_handler.get_active_symbols() if user_handler else None)
             
             # 根据按钮类型和当前状态分发
@@ -3730,14 +3718,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             from bot.ai_integration import get_ai_handler, AI_SERVICE_AVAILABLE
             if not AI_SERVICE_AVAILABLE:
-                await query.answer("🤖 AI 分析模块未安装", show_alert=True)
+                await query.answer(_t(update, "ai.not_installed"), show_alert=True)
                 return
+            context.user_data["lang_preference"] = _resolve_lang(update)
             ai_handler = get_ai_handler(symbols_provider=lambda: user_handler.get_active_symbols() if user_handler else None)
             await ai_handler.start_ai_analysis(update, context)
             return
         except Exception as e:
             logger.error(f"AI分析入口失败: {e}")
-            await query.answer(f"AI分析失败: {e}", show_alert=True)
+            await query.answer(_t(update, "ai.failed", error=e), show_alert=True)
             return
 
     # 信号开关界面
@@ -4008,7 +3997,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 # 🔧 强化主菜单文本处理：确保永远不为空
                 try:
-                    text = user_handler.get_main_menu_text()
+                    text = user_handler.get_main_menu_text(update)
                 except Exception as e:
                     logger.warning(f"⚠️ 获取主菜单文本失败: {e}")
                     text = None
@@ -4025,7 +4014,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 # 强化键盘处理：确保永远有键盘
                 try:
-                    keyboard = user_handler.get_main_menu_keyboard()
+                    keyboard = user_handler.get_main_menu_keyboard(update)
                 except Exception as e:
                     logger.warning(f"⚠️ 获取主菜单键盘失败: {e}")
                     keyboard = None
@@ -4074,8 +4063,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 del context.user_data['symbols_page']
             
             # 直接返回主菜单，不显示中间提示
-            text = user_handler.get_main_menu_text()
-            keyboard = user_handler.get_main_menu_keyboard()
+            text = user_handler.get_main_menu_text(update)
+            keyboard = user_handler.get_main_menu_keyboard(update)
             text = ensure_valid_text(text, "⚡️欢迎使用交易猫")
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
 
@@ -4110,7 +4099,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             current_group = user_handler.user_states.get("ranking_group", "basic")
             keyboard = user_handler.get_ranking_menu_keyboard()
             await query.edit_message_text(
-                _build_ranking_menu_text(current_group),
+                _build_ranking_menu_text(current_group, update),
                 reply_markup=keyboard,
                 parse_mode='Markdown'
             )
@@ -4122,7 +4111,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             current_group = user_handler.user_states.get("ranking_group", "basic")
             keyboard = user_handler.get_ranking_menu_keyboard()
             await query.edit_message_text(
-                _build_ranking_menu_text(current_group),
+                _build_ranking_menu_text(current_group, update),
                 reply_markup=keyboard,
                 parse_mode='Markdown'
             )
@@ -4337,8 +4326,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 # 未知功能类型，返回主菜单
                 loop = asyncio.get_event_loop()
-                text = await loop.run_in_executor(None, user_handler.get_main_menu_text)
-                keyboard = user_handler.get_main_menu_keyboard()
+                text = await loop.run_in_executor(None, lambda: user_handler.get_main_menu_text(update))
+                keyboard = user_handler.get_main_menu_keyboard(update)
             
             text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
@@ -4963,7 +4952,12 @@ async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for code in I18N.supported_locales:
         label = display_names.get(code, code)
         buttons.append([InlineKeyboardButton(label, callback_data=f"set_lang_{code}")])
-    await update.message.reply_text(_t(update, "lang.prompt"), reply_markup=InlineKeyboardMarkup(buttons))
+    # 支持命令与回调两种入口
+    if getattr(update, "callback_query", None):
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text(_t(update, "lang.prompt"), reply_markup=InlineKeyboardMarkup(buttons))
+    elif getattr(update, "message", None):
+        await update.message.reply_text(_t(update, "lang.prompt"), reply_markup=InlineKeyboardMarkup(buttons))
 
 async def vol_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """交易量数据查询指令 /vol"""
@@ -5184,8 +5178,8 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 发送主菜单，保持永久常驻键盘
     reply_keyboard = user_handler.get_reply_keyboard(update)
-    text = user_handler.get_main_menu_text()
-    keyboard = user_handler.get_main_menu_keyboard()
+    text = user_handler.get_main_menu_text(update)
+    keyboard = user_handler.get_main_menu_keyboard(update)
     
     # 确保文本不为空
     text = ensure_valid_text(text, "⚡️欢迎使用交易猫")
@@ -5213,7 +5207,7 @@ async def data_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     # 先发送带键盘的消息刷新底部键盘
     await update.message.reply_text("你好👋", reply_markup=user_handler.get_reply_keyboard(update))
-    text = _build_ranking_menu_text("basic")
+    text = _build_ranking_menu_text("basic", update)
     keyboard = user_handler.get_ranking_menu_keyboard()
     await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
 
@@ -5253,19 +5247,21 @@ async def ai_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not _is_command_allowed(update):
         return
     try:
+        # 记录用户语言偏好，贯通到 AI 服务
+        context.user_data["lang_preference"] = _resolve_lang(update)
         from bot.ai_integration import get_ai_handler
         ai_handler = get_ai_handler(symbols_provider=lambda: user_handler.get_active_symbols() if user_handler else None)
         await ai_handler.start_ai_analysis(update, context)
     except ImportError as e:
         logger.warning(f"AI模块未安装: {e}")
         await update.message.reply_text(
-            "🤖 AI分析模块未安装\n\n请联系管理员配置 ai-service",
+            _t(update, "ai.not_installed"),
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]])
         )
     except Exception as e:
         logger.error(f"AI分析启动失败: {e}")
         await update.message.reply_text(
-            f"❌ AI分析启动失败: {e}",
+            _t(update, "ai.failed", error=e),
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]])
         )
 
@@ -5406,8 +5402,9 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 try:
                     from bot.ai_integration import get_ai_handler, AI_SERVICE_AVAILABLE, SELECTING_INTERVAL
                     if not AI_SERVICE_AVAILABLE:
-                        await update.message.reply_text("🤖 AI 分析模块未安装")
+                        await update.message.reply_text(_t(update, "ai.not_installed"))
                         return
+                    context.user_data["lang_preference"] = _resolve_lang(update)
                     ai_handler = get_ai_handler(symbols_provider=lambda: user_handler.get_active_symbols() if user_handler else None)
                     coin = m.group(1).upper()
                     context.user_data["ai_state"] = SELECTING_INTERVAL
@@ -5415,7 +5412,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     return
                 except Exception as e:
                     logger.error(f"AI 分析触发失败: {e}")
-                    await update.message.reply_text(f"❌ AI 分析失败: {e}")
+                    await update.message.reply_text(_t(update, "ai.failed", error=e))
                     return
 
         # -------- 单币双感叹号触发完整TXT：如 "btc!!" 或 "BTC！！" --------
@@ -5642,15 +5639,15 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
 
             elif action == "ranking_menu":
                 # 数据面板入口：显示榜单列表
-                text = _build_ranking_menu_text(user_handler.user_states.get("ranking_group", "basic"))
+                text = _build_ranking_menu_text(user_handler.user_states.get("ranking_group", "basic"), update)
                 keyboard = user_handler.get_ranking_menu_keyboard()
                 await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
                 
             elif action == "main_menu":
                 # 修复: 使用与/start命令相同的逻辑，避免空字符串错误
                 reply_keyboard = user_handler.get_reply_keyboard(update)  # 常驻键盘
-                main_text = user_handler.get_main_menu_text()
-                main_keyboard = user_handler.get_main_menu_keyboard()  # 内联键盘
+                main_text = user_handler.get_main_menu_text(update)
+                main_keyboard = user_handler.get_main_menu_keyboard(update)  # 内联键盘
                 
                 # 确保文本不为空
                 main_text = ensure_valid_text(main_text, "⚡️欢迎使用交易猫")
@@ -5694,13 +5691,14 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 try:
                     from bot.ai_integration import get_ai_handler, AI_SERVICE_AVAILABLE
                     if not AI_SERVICE_AVAILABLE:
-                        await update.message.reply_text("🤖 AI 分析模块未安装")
+                        await update.message.reply_text(_t(update, "ai.not_installed"))
                         return
+                    context.user_data["lang_preference"] = _resolve_lang(update)
                     ai_handler = get_ai_handler(symbols_provider=lambda: user_handler.get_active_symbols() if user_handler else None)
                     await ai_handler.start_ai_analysis(update, context)
                 except Exception as e:
                     logger.error(f"AI分析入口失败: {e}")
-                    await update.message.reply_text(f"❌ AI分析失败: {e}")
+                    await update.message.reply_text(_t(update, "ai.failed", error=e))
                 
             elif action in {"aggregated_alerts", "coin_search"}:
                 await update.message.reply_text("🚧 功能开发中，敬请期待！")
@@ -6031,12 +6029,12 @@ def main():
         logger.info("✅ /status 命令处理器已注册")
         application.add_handler(CommandHandler("data", data_command))
         logger.info("✅ /data 命令处理器已注册")
-    application.add_handler(CommandHandler("query", query_command))
-    logger.info("✅ /query 命令处理器已注册")
-    application.add_handler(CommandHandler("ai", ai_command))
-    logger.info("✅ /ai 命令处理器已注册")
-    application.add_handler(CommandHandler("lang", lang_command))
-    logger.info("✅ /lang 命令处理器已注册")
+        application.add_handler(CommandHandler("query", query_command))
+        logger.info("✅ /query 命令处理器已注册")
+        application.add_handler(CommandHandler("ai", ai_command))
+        logger.info("✅ /ai 命令处理器已注册")
+        application.add_handler(CommandHandler("lang", lang_command))
+        logger.info("✅ /lang 命令处理器已注册")
         
         # 保留旧命令兼容性
         application.add_handler(CommandHandler("stats", user_command))

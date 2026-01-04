@@ -32,8 +32,15 @@ async def run_analysis(symbol: str, interval: str, prompt_name: str, lang: str |
 
     # 2. 构建提示词（完整数据，不精简）
     system_prompt, data_json = await asyncio.to_thread(build_prompt, prompt_name, payload, lang)
-    
-    # 根据语言调整输出要求，默认中文\n+    lang_hint = \"中文\" if not lang or lang.startswith(\"zh\") else \"English\"\n+    user_content = (\n+        f\"请基于以下交易数据进行市场分析，输出{lang_hint}结论\\n\"\n+        \"禁止原样粘贴 DATA_JSON 或长表格；只输出摘要和关键数值\\n\"\n+        \"===DATA_JSON===\\n\"\n+        f\"{data_json}\"\n+    )
+
+    # 根据语言调整输出要求，默认中文
+    lang_hint = "中文" if not lang or (isinstance(lang, str) and lang.startswith("zh")) else "English"
+    user_content = (
+        f"请基于以下交易数据进行市场分析，输出{lang_hint}结论\n"
+        "禁止原样粘贴 DATA_JSON 或长表格；只输出摘要和关键数值\n"
+        "===DATA_JSON===\n"
+        f"{data_json}"
+    )
 
     # 3. 调用 LLM
     messages = [

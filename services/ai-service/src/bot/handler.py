@@ -16,7 +16,7 @@ from telegram.ext import ContextTypes
 from src.prompt import PromptRegistry
 from src.pipeline import run_analysis
 from src.config import PROJECT_ROOT
-from libs.common.i18n import normalize_locale
+from libs.common.i18n import normalize_locale, build_i18n_from_env
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,9 @@ SELECTING_INTERVAL = 1
 
 # 提示词注册表
 prompt_registry = PromptRegistry()
+
+# i18n
+I18N = build_i18n_from_env()
 
 
 def get_configured_symbols() -> List[str]:
@@ -49,6 +52,21 @@ class AIAnalysisHandler:
         self._cached_symbols: List[str] = []
         self._cache_time = 0
         self.default_prompt = "市场全局解析"
+
+    @staticmethod
+    def _get_lang(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
+        """优先使用上下文缓存的语言，其次 Telegram 语言码，默认中文"""
+        if context and hasattr(context, "user_data"):
+            lang = context.user_data.get("lang_preference")
+            if lang:
+                return normalize_locale(lang)
+        if update and getattr(getattr(update, "effective_user", None), "language_code", None):
+            return normalize_locale(update.effective_user.language_code)
+        return "zh_CN"
+
+    def _t(self, update: Update, context: ContextTypes.DEFAULT_TYPE, msgid: str, **kwargs) -> str:
+        lang = self._get_lang(update, context)
+        return I18N.gettext(msgid, lang=lang, **kwargs)
 
     def get_supported_symbols(self) -> List[str]:
         """获取支持的币种列表"""
@@ -83,19 +101,18 @@ class AIAnalysisHandler:
         # 去掉 USDT 后缀，每行一个
         coins = [s.replace("USDT", "") for s in symbols]
         coins_text = "\n".join(coins)
-        
+
         prompt_name = context.user_data.get("ai_prompt_name", self.default_prompt)
-        
+
         text = (
-            "🤖 *AI 分析*\n"
+            f"{self._t(update, context, 'ai.list.title')}\n"
             f"```\n{coins_text}\n```\n"
-            f"📊 可分析币种 ({len(coins)} 个)\n"
-            "💡 使用方法: 发送 `币种名@` 触发分析\n"
-            "例如: `BTC@` 或 `ETH@`"
+            f"{self._t(update, context, 'ai.list.supported', count=len(coins))}\n"
+            f"{self._t(update, context, 'ai.list.usage')}"
         )
-        
+
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")],
+            [InlineKeyboardButton(self._t(update, context, "menu.home"), callback_data="main_menu")],
         ])
         
         if update.callback_query:
@@ -114,7 +131,7 @@ class AIAnalysisHandler:
         symbols = self.get_supported_symbols()
         if symbol not in symbols:
             await update.message.reply_text(
-                f"❌ 不支持的币种: {coin}\n\n请从支持列表中选择",
+                self._t(update, context, "ai.unsupported", coin=coin),
                 parse_mode='Markdown'
             )
             return SELECTING_COIN
@@ -146,19 +163,18 @@ class AIAnalysisHandler:
             prompt_name = context.user_data.get("ai_prompt_name", self.default_prompt)
             
             if not symbol:
-                await query.edit_message_text("❌ 未选择币种，请重新发送 `币种名@`", parse_mode='Markdown')
+                await query.edit_message_text(self._t(update, context, "ai.no_symbol"), parse_mode='Markdown')
                 return SELECTING_COIN
-            
+
             await query.edit_message_text(
-                f"🔄 正在分析 *{symbol.replace('USDT','')}* @ {interval} ...\n\n"
-                f"⏳ AI 分析需要 30-60 秒，请稍候",
+                self._t(update, context, "ai.analyzing", symbol=symbol.replace('USDT',''), interval=interval),
                 parse_mode='Markdown'
             )
             asyncio.create_task(self._run_analysis(update, context, symbol, interval, prompt_name))
             return SELECTING_COIN
 
         if data == "ai_cancel":
-            await query.edit_message_text("已取消 AI 分析")
+            await query.edit_message_text(self._t(update, context, "ai.cancelled"))
             return SELECTING_COIN
 
         return SELECTING_COIN
@@ -213,16 +229,16 @@ class AIAnalysisHandler:
             prompt_row.append(InlineKeyboardButton(label, callback_data=f"ai_set_prompt_{name}"))
         if prompt_row:
             keyboard.append(prompt_row)
-        
+
         # 底部按钮
         keyboard.append([
-            InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu"),
+            InlineKeyboardButton(self._t(update, context, "menu.home"), callback_data="main_menu"),
         ])
-        
+
         text = (
-            f"🤖 *AI 深度分析*\n"
-            f"```\n📌 币种: {symbol.replace('USDT','')}\n🧠 提示词: {current_prompt}\n```\n"
-            f"请选择分析周期:"
+            f"{self._t(update, context, 'ai.interval.title')}\n"
+            f"```\n📌 {symbol.replace('USDT','')}\n🧠 {self._t(update, context, 'ai.prompt.label')}: {current_prompt}\n```\n"
+            f"{self._t(update, context, 'ai.interval.choose')}"
         )
         markup = InlineKeyboardMarkup(keyboard)
         
@@ -261,10 +277,12 @@ class AIAnalysisHandler:
                             symbol: str, interval: str, prompt: str):
         """执行 AI 分析"""
         try:
-            user_lang = None
-            if update.effective_user and update.effective_user.language_code:
-                user_lang = normalize_locale(update.effective_user.language_code)
-            result = await run_analysis(symbol, interval, prompt, lang=user_lang)
+            preferred_lang = None
+            if context and hasattr(context, "user_data"):
+                preferred_lang = context.user_data.get("lang_preference")
+            if not preferred_lang and update.effective_user and update.effective_user.language_code:
+                preferred_lang = normalize_locale(update.effective_user.language_code)
+            result = await run_analysis(symbol, interval, prompt, lang=preferred_lang)
             analysis_text = result.get("analysis", "未生成 AI 分析结果")
             
             # Telegram 消息限制 4096 字符

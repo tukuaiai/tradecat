@@ -31,7 +31,7 @@ def build_prompt(prompt_name: str, payload: Dict[str, Any], lang: Optional[str] 
 
     prompt_path = next((p for p in candidates if p.is_file()), None)
     if not prompt_path:
-        raise FileNotFoundError(f\"提示词不存在: {candidates[0] if candidates else prompt_name}\")
+        raise FileNotFoundError(f"提示词不存在: {candidates[0] if candidates else prompt_name}")
     
     base = prompt_path.read_text(encoding="utf-8")
     data_json = json.dumps(payload, ensure_ascii=False)

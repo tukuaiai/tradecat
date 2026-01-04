@@ -65,3 +65,64 @@ msgstr "ℹ️ Help"
 
 msgid "kb.lang"
 msgstr "🌐 Language"
+
+msgid "menu.main_text"
+msgstr ""
+"⚡️ TradeCat\n"
+"\n"
+"📊 Data panel\n"
+"├─ Basic: MACD/RSI/Bollinger/Support-Resistance/Flow/\n"
+"├─ Futures: OI series/Buy-Sell ratio/Position change/Volatility/\n"
+"└─ Advanced: EMA/Candle patterns/VPVR/VWAP/Liquidity/Trend/\n"
+"\n"
+"🚨 Signals\n"
+"├─ Anomaly monitor\n"
+"└─ Watchlist pushes\n"
+"\n"
+"🤖 AI analysis\n"
+"├─ Deep report\n"
+"└─ Quick levels\n"
+"\n"
+"⏰ Updated at: {time} (Beijing time)\n"
+"👇 Tap a button to start"
+
+msgid "menu.ranking"
+msgstr ""
+"📊 Data panel\n"
+"├─ Pick a board to view details\n"
+"├─ Choose interval: 1m/5m/15m/1h/4h/1d/1w\n"
+"├─ Sorting: toggle asc/desc\n"
+"└─ Fields: tap to show/hide\n"
+"\n"
+"👇 Select a board"
+
+# AI module
+msgid "ai.list.title"
+msgstr "🤖 *AI Analysis*"
+
+msgid "ai.list.usage"
+msgstr "💡 How to use: send `symbol@` to start, e.g. `BTC@`"
+
+msgid "ai.list.supported"
+msgstr "📊 Supported symbols ({count})"
+
+msgid "ai.unsupported"
+msgstr "❌ Unsupported symbol: {coin}\n\nPlease choose from the list"
+
+msgid "ai.interval.title"
+msgstr "🤖 *AI Deep Analysis*"
+
+msgid "ai.prompt.label"
+msgstr "Prompt"
+
+msgid "ai.interval.choose"
+msgstr "Select timeframe:"
+
+msgid "ai.analyzing"
+msgstr "🔄 Analysing *{symbol}* @ {interval} ...\n\n⏳ AI analysis takes 30–60s, please wait"
+
+msgid "ai.cancelled"
+msgstr "AI analysis cancelled"
+
+msgid "ai.no_symbol"
+msgstr "❌ No symbol selected, please send `symbol@` again"
