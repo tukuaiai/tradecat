@@ -15,16 +15,22 @@
 ---
 
 <p>
-  <img src="https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python">
-  <img src="https://img.shields.io/badge/TimescaleDB-时序数据库-orange?style=for-the-badge&logo=postgresql&logoColor=white" alt="TimescaleDB">
+  <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/PostgreSQL-TimescaleDB-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="TimescaleDB">
   <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" alt="License">
 </p>
 
 <p>
   <img src="https://img.shields.io/badge/Pandas-数据处理-150458?style=for-the-badge&logo=pandas&logoColor=white" alt="Pandas">
+  <img src="https://img.shields.io/badge/NumPy-计算-013243?style=for-the-badge&logo=numpy&logoColor=white" alt="NumPy">
   <img src="https://img.shields.io/badge/TA--Lib-技术分析-green?style=for-the-badge" alt="TA-Lib">
+  <img src="https://img.shields.io/badge/CCXT-交易所API-000?style=for-the-badge" alt="CCXT">
+</p>
+
+<p>
   <img src="https://img.shields.io/badge/Telegram_Bot-机器人-26A5E4?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram Bot">
-  <img src="https://img.shields.io/badge/AsyncIO-异步-red?style=for-the-badge&logo=python&logoColor=white" alt="AsyncIO">
+  <img src="https://img.shields.io/badge/AsyncIO-异步-FF6F00?style=for-the-badge&logo=python&logoColor=white" alt="AsyncIO">
+  <img src="https://img.shields.io/badge/AIOHTTP-HTTP客户端-2C5BB4?style=for-the-badge&logo=aiohttp&logoColor=white" alt="AIOHTTP">
 </p>
 
 <p>
