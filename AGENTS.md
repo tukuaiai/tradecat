@@ -36,39 +36,43 @@
 
 ## 2. Golden Path（推荐执行路径）
 
-### 2.1 环境准备
+### 2.1 最短可复现场景
 
 ```bash
-# 1. 进入项目目录
+# 进入项目根目录
 cd /path/to/tradecat
 
-# 2. 一键安装（首次）
-./scripts/install.sh
+# 1) 初始化：创建各服务 .venv、安装依赖、复制配置模板
+./scripts/init.sh
 
-# 3. 或手动初始化单个服务
-./scripts/init.sh trading-service
+# 2) 填写全局配置（含 BOT_TOKEN / DB / 代理 等）
+cp config/.env.example config/.env && chmod 600 config/.env
+vim config/.env
+
+# 3) 启动核心服务（data + trading + telegram）
+./scripts/start.sh start
+./scripts/start.sh status
 ```
 
-### 2.2 开发流程
+> 顶层 `./scripts/start.sh` 只管理 data-service / trading-service / telegram-service。  
+> 手动启动：`cd services/markets-service && ./scripts/start.sh start`（多市场采集）；`cd services/order-service && python -m src.market-maker.main`（做市，需 API Key）；ai-service 作为 Telegram 子模块随 Bot 运行。
+
+### 2.2 开发/修改流程
 
 ```bash
-# 1. 激活虚拟环境
-source services/trading-service/.venv/bin/activate
+# 修改前确认已执行 init.sh 并填好 config/.env
+
+# 1. 进入对应服务并激活虚拟环境（如需要）
+cd services/trading-service && source .venv/bin/activate
 
 # 2. 修改代码
 # ...
 
-# 3. 运行验证
+# 3. 验证
+cd /path/to/tradecat
 ./scripts/verify.sh
 
-# 4. 测试运行
-cd services/trading-service
-./scripts/start.sh start
-./scripts/start.sh status
-./scripts/start.sh stop
-
-# 5. 更新文档（如有变更）
-# 同步更新 README.md 和 AGENTS.md
+# 4. 若涉及命令/配置/目录变更，同步更新 README.md 与 AGENTS.md
 ```
 
 ### 2.3 提交前检查

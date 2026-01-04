@@ -139,17 +139,36 @@ networkingMode=mirrored
 
 重启 WSL：`wsl --shutdown`，然后使用上面的 AI 安装提示词。
 
-### ⚙️ 配置 Bot Token（必须）
+### ⚙️ 最短可跑通三步
 
 ```bash
-vim ~/.projects/tradecat/services/telegram-service/config/.env
+# 1) 初始化（创建各服务 .venv + 依赖 + 复制配置模板）
+./scripts/init.sh
+
+# 2) 填写全局配置（含 BOT_TOKEN / DB / 代理 等）
+cp config/.env.example config/.env && chmod 600 config/.env
+vim config/.env
+
+# 3) 启动核心服务（data + trading + telegram）
+./scripts/start.sh start
+./scripts/start.sh status
 ```
 
-```ini
-TELEGRAM_BOT_TOKEN=你的Token
-# 如需代理
-HTTPS_PROXY=http://127.0.0.1:7890
-```
+> 说明：顶层 `./scripts/start.sh` 仅管理 `data-service`、`trading-service`、`telegram-service`。  
+> 其他服务需手动：`cd services/markets-service && ./scripts/start.sh start`（多市场采集）；`cd services/order-service && python -m src.market-maker.main`（做市，需 API Key）；`ai-service` 作为 Telegram 子模块随 Bot 一起运行。
+
+### ⚙️ 配置（必须）
+
+- 路径：`config/.env`（已由 init.sh 复制），权限建议 600。  
+- 核心字段：  
+  - `DATABASE_URL`（TimescaleDB，见下方端口说明）  
+  - `BOT_TOKEN`（Telegram Bot Token）  
+  - `HTTP_PROXY` / `HTTPS_PROXY`（需要代理时填写）  
+  - 币种/周期：`SYMBOLS_GROUPS`、`SYMBOLS_EXTRA`、`SYMBOLS_EXCLUDE`、`INTERVALS`、`KLINE_INTERVALS`、`FUTURES_INTERVALS`  
+  - 采集/计算开关：`BACKFILL_MODE`/`BACKFILL_DAYS`/`BACKFILL_ON_START`、`MAX_CONCURRENT`、`RATE_LIMIT_PER_MINUTE`  
+  - 计算后端：`COMPUTE_BACKEND`、`MAX_WORKERS`、`HIGH_PRIORITY_TOP_N`、`INDICATORS_ENABLED`/`INDICATORS_DISABLED`  
+  - 展示过滤：`BINANCE_API_DISABLED`、`DISABLE_SINGLE_TOKEN_QUERY`、`SNAPSHOT_HIDDEN_FIELDS`、`BLOCKED_SYMBOLS`  
+  - AI/交易：`AI_INDICATOR_TABLES`、`AI_INDICATOR_TABLES_DISABLED`、`BINANCE_API_KEY`、`BINANCE_API_SECRET`
 
 ### 📦 下载历史数据（可选）
 
@@ -158,22 +177,21 @@ HTTPS_PROXY=http://127.0.0.1:7890
 🔗 **数据集**: [huggingface.co/datasets/123olp/binance-futures-ohlcv-2018-2026](https://huggingface.co/datasets/123olp/binance-futures-ohlcv-2018-2026)
 
 ```bash
-# 导入 K线数据 (3.73亿条)
+# 0. 创建库并导入 schema（依次执行仓库内 SQL）
+for f in libs/database/db/schema/*.sql; do
+  psql -h localhost -p 5433 -U postgres -d market_data -f "$f"
+done
+
+# 1. 导入 K线数据 (3.73亿条)
 zstd -d candles_1m.bin.zst -c | psql -h localhost -p 5433 -U postgres -d market_data \
-    -c "COPY market_data.candles_1m FROM STDIN WITH (FORMAT binary)"
+  -c "COPY market_data.candles_1m FROM STDIN WITH (FORMAT binary)"
 
-# 导入期货数据 (9457万条)
+# 2. 导入期货数据 (9457万条)
 zstd -d futures_metrics_5m.bin.zst -c | psql -h localhost -p 5433 -U postgres -d market_data \
-    -c "COPY market_data.binance_futures_metrics_5m FROM STDIN WITH (FORMAT binary)"
+  -c "COPY market_data.binance_futures_metrics_5m FROM STDIN WITH (FORMAT binary)"
 ```
 
-### 🎬 启动服务
-
-```bash
-cd ~/.projects/tradecat
-./scripts/start.sh start     # 启动
-./scripts/start.sh status    # 查看状态
-```
+> 端口说明：运维脚本 `scripts/export_timescaledb.sh` / `scripts/timescaledb_compression.sh` 默认使用 5433；`config/.env.example` 默认 5434。请统一为同一端口（推荐改 `.env` 为 5433，或同步修改脚本 DB_PORT）。<!-- TODO: 若选用 5434，请同步更新所有脚本与示例端口 -->
 
 ### ✅ 验证安装
 

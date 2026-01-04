@@ -46,8 +46,20 @@ fi
 # 3. 语法检查
 echo ""
 echo "3. Python 语法检查..."
-SYNTAX_ERRORS=0
-for service in data-service trading-service telegram-service; do
+# 3.1 关键入口文件
+if python3 -m py_compile services/telegram-service/src/bot/app.py 2>/dev/null; then
+    success "telegram-service app.py 语法正确"
+else
+    fail "telegram-service app.py 语法错误"
+fi
+# 3.2 ai-service 全量（compileall，确保真正命中所有文件）
+if python3 -m compileall -q services/ai-service/src 2>/dev/null; then
+    success "ai-service 源码语法正确"
+else
+    fail "ai-service 语法检查失败"
+fi
+# 3.3 其他服务（粗粒度）
+for service in data-service trading-service; do
     if [ -d "services/$service/src" ]; then
         if python3 -m py_compile services/$service/src/*.py 2>/dev/null; then
             success "services/$service 语法正确"

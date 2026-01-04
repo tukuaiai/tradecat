@@ -6,16 +6,17 @@
 
 # 🐱 TradeCat
 
-感谢社区ca给我的资金，让我去完成我的梦想！！！真心感谢你们！！！
+Community-funded open-source project. Thanks for the support!  
+Donations (optional):
 <p>
-sol：Gysp4iZ6uNuAksAPR37fQwLDRFU9Rz255UjExhiwpump
+Solana: Gysp4iZ6uNuAksAPR37fQwLDRFU9Rz255UjExhiwpump
 </p>
 
 <p>
-bsc：0x8a99b8d53eff6bc331af529af74ad267f3167777
+BSC (BEP20): 0x8a99b8d53eff6bc331af529af74ad267f3167777
 </p>
 
-本项目为永久开源项目，目前接受且只接受SOL(CA) / BSC(CA) 两个社群的捐赠。交易市场风云变幻，投资请谨慎。
+*Toy-level data analysis / trading data platform*
 
 **Toy-level Data Analysis / Trading Data Platform**
 
@@ -135,17 +136,36 @@ networkingMode=mirrored
 
 Restart WSL: `wsl --shutdown`, then use the AI installation prompt above.
 
-### ⚙️ Configure Bot Token (Required)
+### ⚙️ Fastest path (3 steps)
 
 ```bash
-vim ~/.projects/tradecat/services/telegram-service/config/.env
+# 1) Init (create per-service .venv, install deps, copy config)
+./scripts/init.sh
+
+# 2) Fill global config (DB / BOT_TOKEN / proxy)
+cp config/.env.example config/.env && chmod 600 config/.env
+vim config/.env
+
+# 3) Start core services (data + trading + telegram)
+./scripts/start.sh start
+./scripts/start.sh status
 ```
 
-```ini
-TELEGRAM_BOT_TOKEN=your_token
-# If proxy needed
-HTTPS_PROXY=http://127.0.0.1:7890
-```
+> Note: top-level `./scripts/start.sh` only manages `data-service`, `trading-service`, `telegram-service`.  
+> Others are manual: `cd services/markets-service && ./scripts/start.sh start` (multi-market); `cd services/order-service && python -m src.market-maker.main` (market making, API key required); `ai-service` runs as a Telegram sub-module.
+
+### ⚙️ Configuration (required)
+
+- Location: `config/.env` (copied by init.sh), recommend chmod 600.  
+- Key fields:  
+  - `DATABASE_URL` (TimescaleDB, see port note below)  
+  - `BOT_TOKEN`  
+  - `HTTP_PROXY` / `HTTPS_PROXY` if needed  
+  - Symbols/intervals: `SYMBOLS_GROUPS`, `SYMBOLS_EXTRA`, `SYMBOLS_EXCLUDE`, `INTERVALS`, `KLINE_INTERVALS`, `FUTURES_INTERVALS`  
+  - Collection/compute: `BACKFILL_MODE`/`BACKFILL_DAYS`/`BACKFILL_ON_START`, `MAX_CONCURRENT`, `RATE_LIMIT_PER_MINUTE`  
+  - Compute backend: `COMPUTE_BACKEND`, `MAX_WORKERS`, `HIGH_PRIORITY_TOP_N`, `INDICATORS_ENABLED`/`INDICATORS_DISABLED`  
+  - Display/filter: `BINANCE_API_DISABLED`, `DISABLE_SINGLE_TOKEN_QUERY`, `SNAPSHOT_HIDDEN_FIELDS`, `BLOCKED_SYMBOLS`  
+  - AI/Trading: `AI_INDICATOR_TABLES`, `AI_INDICATOR_TABLES_DISABLED`, `BINANCE_API_KEY`, `BINANCE_API_SECRET`
 
 ### 📦 Download Historical Data (Optional)
 
@@ -154,22 +174,21 @@ Download pre-built datasets from HuggingFace to skip lengthy historical backfill
 🔗 **Dataset**: [huggingface.co/datasets/123olp/binance-futures-ohlcv-2018-2026](https://huggingface.co/datasets/123olp/binance-futures-ohlcv-2018-2026)
 
 ```bash
-# Import candlestick data (373M records)
+# 0. Load schema (TimescaleDB + continuous aggregates)
+for f in libs/database/db/schema/*.sql; do
+  psql -h localhost -p 5433 -U postgres -d market_data -f "$f"
+done
+
+# 1. Import candlesticks (373M)
 zstd -d candles_1m.bin.zst -c | psql -h localhost -p 5433 -U postgres -d market_data \
-    -c "COPY market_data.candles_1m FROM STDIN WITH (FORMAT binary)"
+  -c "COPY market_data.candles_1m FROM STDIN WITH (FORMAT binary)"
 
-# Import futures data (94M records)
+# 2. Import futures metrics (94M)
 zstd -d futures_metrics_5m.bin.zst -c | psql -h localhost -p 5433 -U postgres -d market_data \
-    -c "COPY market_data.binance_futures_metrics_5m FROM STDIN WITH (FORMAT binary)"
+  -c "COPY market_data.binance_futures_metrics_5m FROM STDIN WITH (FORMAT binary)"
 ```
 
-### 🎬 Start Services
-
-```bash
-cd ~/.projects/tradecat
-./scripts/start.sh start     # Start
-./scripts/start.sh status    # Check status
-```
+> Port note: ops scripts `scripts/export_timescaledb.sh` / `scripts/timescaledb_compression.sh` default to port 5433, while `config/.env.example` uses 5434. Align them to one port (recommend set `.env` to 5433 or edit scripts accordingly).<!-- TODO: if keeping 5434, update all scripts and examples -->
 
 ### ✅ Verify Installation
 
