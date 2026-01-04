@@ -1,0 +1,67 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: tradecat-telegram\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: zh_CN\n"
+
+msgid "help.body"
+msgstr "📖 使用帮助\n/start - 开始使用\n/data - 数据面板\n/help - 帮助信息\n\n点击下方按钮查看数据："
+
+msgid "menu.home"
+msgstr "🏠 主菜单"
+
+msgid "menu.data"
+msgstr "📊 数据面板"
+
+msgid "start.initializing"
+msgstr "🚀 机器人正在初始化中，请稍等..."
+
+msgid "start.greet"
+msgstr "你好👋"
+
+msgid "start.fallback"
+msgstr "⚡️欢迎使用交易猫"
+
+msgid "start.error"
+msgstr "❌ 启动时发生错误，请稍后重试。\n\n错误信息: {error}"
+
+msgid "lang.zh"
+msgstr "简体中文"
+
+msgid "lang.en"
+msgstr "English"
+
+msgid "lang.prompt"
+msgstr "🌐 请选择语言"
+
+msgid "lang.set"
+msgstr "语言已切换为 {lang_name}"
+
+msgid "ai.not_installed"
+msgstr "🤖 AI分析模块未安装\n\n请联系管理员配置 ai-service"
+
+msgid "ai.failed"
+msgstr "❌ AI分析启动失败: {error}"
+
+# 键盘
+msgid "kb.data"
+msgstr "📊 数据面板"
+
+msgid "kb.query"
+msgstr "🔍 币种查询"
+
+msgid "kb.ai"
+msgstr "🤖 AI分析"
+
+msgid "kb.signal"
+msgstr "🔔 信号"
+
+msgid "kb.home"
+msgstr "🏠 主菜单"
+
+msgid "kb.help"
+msgstr "ℹ️ 帮助"
+
+msgid "kb.lang"
+msgstr "🌐 语言"

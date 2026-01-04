@@ -23,7 +23,7 @@ echo "DDL Dir: $DDL_DIR"
 echo "=============================================="
 
 # 检查连接
-echo "[1/9] 检查数据库连接..."
+echo "[1/10] 检查数据库连接..."
 PGPASSWORD=$PASSWORD psql -h $HOST -p $PORT -U $USER -d $DATABASE -c "SELECT 1" > /dev/null 2>&1 || {
     echo "❌ 无法连接数据库"
     exit 1
@@ -31,11 +31,10 @@ PGPASSWORD=$PASSWORD psql -h $HOST -p $PORT -U $USER -d $DATABASE -c "SELECT 1" 
 echo "✅ 数据库连接正常"
 
 # 执行 DDL
-for i in 01 02 03 04 05 06 07 08; do
-    SQL_FILE="$DDL_DIR/${i}_*.sql"
-    SQL_FILE=$(ls $SQL_FILE 2>/dev/null | head -1)
+for i in 01 02 03 04 05 06 07 08 09; do
+    SQL_FILE=$(ls $DDL_DIR/${i}_*.sql 2>/dev/null | head -1)
     if [ -f "$SQL_FILE" ]; then
-        echo "[$(($i+1))/9] 执行 $(basename $SQL_FILE)..."
+        echo "[执行] $(basename $SQL_FILE)..."
         PGPASSWORD=$PASSWORD psql -h $HOST -p $PORT -U $USER -d $DATABASE -f "$SQL_FILE" > /dev/null 2>&1 || {
             echo "❌ 执行失败: $SQL_FILE"
             PGPASSWORD=$PASSWORD psql -h $HOST -p $PORT -U $USER -d $DATABASE -f "$SQL_FILE" 2>&1 | tail -20
@@ -52,19 +51,15 @@ echo "=============================================="
 
 # 验证
 echo ""
-echo "验证结果:"
+echo "表统计:"
 PGPASSWORD=$PASSWORD psql -h $HOST -p $PORT -U $USER -d $DATABASE -c "
-SELECT 
-    schemaname as schema,
-    count(*) as tables
+SELECT schemaname as schema, count(*) as tables
 FROM pg_tables 
 WHERE schemaname IN ('reference', 'raw', 'fundamental', 'alternative', 'agg', 'indicators', 'quality')
-GROUP BY schemaname
-ORDER BY schemaname;
+GROUP BY schemaname ORDER BY schemaname;
 "
 
-echo ""
-echo "连续聚合视图:"
+echo "连续聚合物化视图:"
 PGPASSWORD=$PASSWORD psql -h $HOST -p $PORT -U $USER -d $DATABASE -c "
 SELECT view_name FROM timescaledb_information.continuous_aggregates ORDER BY view_name;
 "

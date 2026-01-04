@@ -6,6 +6,17 @@
 
 # 🐱 TradeCat
 
+感谢社区ca给我的资金，让我去完成我的梦想！！！真心感谢你们！！！
+<p>
+sol：Gysp4iZ6uNuAksAPR37fQwLDRFU9Rz255UjExhiwpump
+</p>
+
+<p>
+bsc：0x8a99b8d53eff6bc331af529af74ad267f3167777
+</p>
+
+本项目为永久开源项目，目前接受且只接受SOL(CA) / BSC(CA) 两个社群的捐赠。交易市场风云变幻，投资请谨慎。
+
 **Toy-level Data Analysis / Trading Data Platform**
 
 *All markets, all data, all methods - analyze everything, trade everything, monitor everything*

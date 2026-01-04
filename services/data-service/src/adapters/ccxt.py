@@ -19,6 +19,11 @@ _symbols: Dict[str, List[str]] = {}
 DEFAULT_PROXY = os.getenv("HTTP_PROXY") or os.getenv("HTTPS_PROXY")
 
 
+def _parse_list(raw: str) -> List[str]:
+    """将逗号分隔的币种字符串解析为大写列表，过滤空项。"""
+    return [item.strip().upper() for item in raw.split(",") if item.strip()]
+
+
 def get_client(exchange: str = "binance") -> ccxt.Exchange:
     if exchange not in _clients:
         cls = getattr(ccxt, exchange, None)

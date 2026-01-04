@@ -487,6 +487,9 @@ docs: 更新 README 快速开始指南
 | `DATABASE_URL` | TimescaleDB 连接串 | `postgresql://postgres:postgres@localhost:5433/market_data` |
 | `BOT_TOKEN` | Telegram Bot Token | `123456:ABC...` |
 | `HTTP_PROXY` | HTTP 代理 | `http://127.0.0.1:9910` |
+| `DEFAULT_LOCALE` | 默认语言 | `zh-CN` |
+| `SUPPORTED_LOCALES` | 支持语言列表 | `zh-CN,en` |
+| `FALLBACK_LOCALE` | 翻译回退语言 | `zh-CN` |
 
 ### 10.2 币种管理
 

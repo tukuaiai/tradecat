@@ -87,6 +87,9 @@ cd /path/to/tradecat
 | `HTTP_PROXY` | - | HTTP 代理地址 |
 | `HTTPS_PROXY` | - | HTTPS 代理地址 |
 | `BINANCE_API_DISABLED` | - | 禁用 Binance API (1=禁用) |
+| `DEFAULT_LOCALE` | - | 默认语言（zh-CN / en） |
+| `SUPPORTED_LOCALES` | - | 支持的语言列表，逗号分隔 |
+| `FALLBACK_LOCALE` | - | 翻译缺失时回退语言 |
 
 ### .env.example
 
@@ -96,7 +99,16 @@ DATABASE_URL=postgresql://user:pass@localhost:5432/market_data
 HTTP_PROXY=http://127.0.0.1:7890
 HTTPS_PROXY=http://127.0.0.1:7890
 BINANCE_API_DISABLED=1
+DEFAULT_LOCALE=zh-CN
+SUPPORTED_LOCALES=zh-CN,en
+FALLBACK_LOCALE=zh-CN
 ```
+
+## 多语言
+
+- 运行中使用 `/lang` 命令弹出语言切换菜单（当前提供 简体中文 / English）。
+- 用户语言偏好保存在 `services/telegram-service/data/user_locale.json`。
+- 翻译文件位于 `services/telegram-service/locales/<lang>/LC_MESSAGES/bot.po`，使用 `msgfmt bot.po -o bot.mo` 编译。
 
 ## 卡片列表
 

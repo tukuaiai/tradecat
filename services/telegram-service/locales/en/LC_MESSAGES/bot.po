@@ -1,0 +1,67 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: tradecat-telegram\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: en\n"
+
+msgid "help.body"
+msgstr "📖 Help\n/start - Start\n/data - Data panel\n/help - Help\n\nTap a button below to view data:"
+
+msgid "menu.home"
+msgstr "🏠 Main menu"
+
+msgid "menu.data"
+msgstr "📊 Data panel"
+
+msgid "start.initializing"
+msgstr "🚀 Bot is initializing, please wait..."
+
+msgid "start.greet"
+msgstr "Hello 👋"
+
+msgid "start.fallback"
+msgstr "⚡️ Welcome to TradeCat"
+
+msgid "start.error"
+msgstr "❌ Failed to start, please retry later.\n\nDetails: {error}"
+
+msgid "lang.zh"
+msgstr "简体中文"
+
+msgid "lang.en"
+msgstr "English"
+
+msgid "lang.prompt"
+msgstr "🌐 Choose your language"
+
+msgid "lang.set"
+msgstr "Language switched to {lang_name}"
+
+msgid "ai.not_installed"
+msgstr "🤖 AI analysis module is not installed\n\nPlease contact the admin to configure ai-service"
+
+msgid "ai.failed"
+msgstr "❌ Failed to start AI analysis: {error}"
+
+# Keyboard
+msgid "kb.data"
+msgstr "📊 Data panel"
+
+msgid "kb.query"
+msgstr "🔍 Coin query"
+
+msgid "kb.ai"
+msgstr "🤖 AI analysis"
+
+msgid "kb.signal"
+msgstr "🔔 Signals"
+
+msgid "kb.home"
+msgstr "🏠 Main menu"
+
+msgid "kb.help"
+msgstr "ℹ️ Help"
+
+msgid "kb.lang"
+msgstr "🌐 Language"

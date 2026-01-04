@@ -16,6 +16,7 @@ from telegram.ext import ContextTypes
 from src.prompt import PromptRegistry
 from src.pipeline import run_analysis
 from src.config import PROJECT_ROOT
+from libs.common.i18n import normalize_locale
 
 logger = logging.getLogger(__name__)
 
@@ -257,10 +258,13 @@ class AIAnalysisHandler:
 
     # -------- 分析执行 --------
     async def _run_analysis(self, update: Update, context: ContextTypes.DEFAULT_TYPE, 
-                           symbol: str, interval: str, prompt: str):
+                            symbol: str, interval: str, prompt: str):
         """执行 AI 分析"""
         try:
-            result = await run_analysis(symbol, interval, prompt)
+            user_lang = None
+            if update.effective_user and update.effective_user.language_code:
+                user_lang = normalize_locale(update.effective_user.language_code)
+            result = await run_analysis(symbol, interval, prompt, lang=user_lang)
             analysis_text = result.get("analysis", "未生成 AI 分析结果")
             
             # Telegram 消息限制 4096 字符
