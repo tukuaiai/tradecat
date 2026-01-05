@@ -26,24 +26,24 @@ class Candle(BaseModel):
     exchange: str = Field(..., description="交易所")
     symbol: str = Field(..., description="标的代码")
     interval: str = Field(..., description="K线周期")
-    
+
     # 时间
     timestamp: datetime = Field(..., description="K线时间 (UTC)")
-    
+
     # OHLCV
     open: Decimal
     high: Decimal
     low: Decimal
     close: Decimal
     volume: Decimal = Field(default=Decimal(0))
-    
+
     # 可选字段
     quote_volume: Optional[Decimal] = Field(default=None, description="成交额")
     trade_count: Optional[int] = Field(default=None, description="成交笔数")
     open_interest: Optional[Decimal] = Field(default=None, description="持仓量 (衍生品)")
-    
+
     # 元数据
     source: str = Field(default="", description="数据来源")
-    
+
     class Config:
         json_encoders = {Decimal: str}

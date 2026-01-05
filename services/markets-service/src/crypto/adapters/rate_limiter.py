@@ -26,7 +26,7 @@ MAX_CONCURRENT = min(int(os.getenv("MAX_CONCURRENT", "5")), 20)
 class GlobalLimiter:
     _instance = None
     _lock = threading.Lock()
-    
+
     def __new__(cls):
         if cls._instance is None:
             with cls._lock:
@@ -34,7 +34,7 @@ class GlobalLimiter:
                     cls._instance = super().__new__(cls)
                     cls._instance._init()
         return cls._instance
-    
+
     def _init(self):
         self.capacity = float(RATE_PER_MINUTE)
         self.rate = RATE_PER_MINUTE / 60.0
@@ -43,14 +43,14 @@ class GlobalLimiter:
         self._ban_lock = threading.Lock()
         _BASE_DIR.mkdir(parents=True, exist_ok=True)
         self._load_ban()
-    
+
     def _load_ban(self):
         try:
             if _BAN_FILE.exists():
                 self._ban_until = float(_BAN_FILE.read_text().strip())
         except Exception:
             pass
-    
+
     def _save_ban(self):
         try:
             tmp = _BAN_FILE.with_suffix('.tmp')
@@ -58,14 +58,14 @@ class GlobalLimiter:
             tmp.rename(_BAN_FILE)
         except Exception:
             pass
-    
+
     def set_ban(self, until: float):
         with self._ban_lock:
             if until > self._ban_until:
                 self._ban_until = until
                 self._save_ban()
                 logger.warning("IP ban 至 %s", time.strftime('%H:%M:%S', time.localtime(until)))
-    
+
     def _wait_ban(self):
         self._load_ban()
         with self._ban_lock:
@@ -73,7 +73,7 @@ class GlobalLimiter:
                 wait = self._ban_until - time.time() + 5
                 logger.warning("等待 ban 解除 %.0fs", wait)
                 time.sleep(wait)
-    
+
     def _acquire_tokens(self, weight: int):
         while True:
             with open(_LOCK_FILE, "w") as f:
@@ -90,7 +90,7 @@ class GlobalLimiter:
                 finally:
                     fcntl.flock(f, fcntl.LOCK_UN)
             time.sleep(max(0.05, wait))
-    
+
     def _read_state(self):
         try:
             if _STATE_FILE.exists():
@@ -99,7 +99,7 @@ class GlobalLimiter:
         except Exception:
             pass
         return self.capacity, time.time()
-    
+
     def _write_state(self, tokens, last):
         try:
             tmp = _STATE_FILE.with_suffix('.tmp')
@@ -107,7 +107,7 @@ class GlobalLimiter:
             tmp.rename(_STATE_FILE)
         except Exception:
             pass
-    
+
     def acquire(self, weight: int = 1):
         """获取许可：等ban -> 获取信号量 -> 获取令牌"""
         self._wait_ban()
@@ -117,11 +117,11 @@ class GlobalLimiter:
         except Exception:
             self._sem.release()
             raise
-    
+
     def release(self):
         """释放信号量"""
         self._sem.release()
-    
+
     def parse_ban(self, msg: str) -> float:
         m = re.search(r'banned until (\d+)', str(msg))
         return int(m.group(1)) / 1000 if m else 0

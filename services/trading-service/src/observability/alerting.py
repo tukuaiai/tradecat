@@ -6,7 +6,6 @@
 - 文件告警
 - Webhook（可扩展 Telegram/钉钉/飞书）
 """
-import os
 import json
 import logging
 import threading
@@ -15,7 +14,7 @@ from enum import Enum
 from pathlib import Path
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, List, Callable
+from typing import Optional, Dict, Any, List
 from urllib.request import urlopen, Request
 from urllib.error import URLError
 
@@ -38,7 +37,7 @@ class Alert:
     source: str = "indicator_service"
     timestamp: float = field(default_factory=time.time)
     tags: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "level": self.level.value,
@@ -52,14 +51,14 @@ class Alert:
 
 class AlertChannel:
     """告警通道基类"""
-    
+
     def send(self, alert: Alert) -> bool:
         raise NotImplementedError
 
 
 class LogChannel(AlertChannel):
     """日志告警通道"""
-    
+
     def send(self, alert: Alert) -> bool:
         level_map = {
             AlertLevel.INFO: logging.INFO,
@@ -77,11 +76,11 @@ class LogChannel(AlertChannel):
 
 class FileChannel(AlertChannel):
     """文件告警通道"""
-    
+
     def __init__(self, path: Path):
         self.path = path
         self._lock = threading.Lock()
-    
+
     def send(self, alert: Alert) -> bool:
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -96,11 +95,11 @@ class FileChannel(AlertChannel):
 
 class WebhookChannel(AlertChannel):
     """Webhook 告警通道"""
-    
+
     def __init__(self, url: str, headers: Dict[str, str] = None):
         self.url = url
         self.headers = headers or {"Content-Type": "application/json"}
-    
+
     def send(self, alert: Alert) -> bool:
         try:
             data = json.dumps(alert.to_dict(), ensure_ascii=False).encode("utf-8")
@@ -114,7 +113,7 @@ class WebhookChannel(AlertChannel):
 
 class AlertManager:
     """告警管理器"""
-    
+
     def __init__(self):
         self._channels: List[AlertChannel] = [LogChannel()]
         self._history: List[Alert] = []
@@ -123,10 +122,10 @@ class AlertManager:
         # 告警抑制：相同告警在 N 秒内不重复发送
         self._suppress_seconds = 60
         self._last_alerts: Dict[str, float] = {}
-    
+
     def add_channel(self, channel: AlertChannel):
         self._channels.append(channel)
-    
+
     def _should_suppress(self, alert: Alert) -> bool:
         """检查是否应该抑制告警"""
         key = f"{alert.level.value}:{alert.title}"
@@ -136,16 +135,16 @@ class AlertManager:
             return True
         self._last_alerts[key] = now
         return False
-    
+
     def send(self, alert: Alert) -> bool:
         if self._should_suppress(alert):
             return False
-        
+
         with self._lock:
             self._history.append(alert)
             if len(self._history) > self._max_history:
                 self._history.pop(0)
-        
+
         success = True
         for channel in self._channels:
             try:
@@ -155,7 +154,7 @@ class AlertManager:
                 LOG.error(f"告警通道异常: {e}")
                 success = False
         return success
-    
+
     def get_history(self, limit: int = 50) -> List[Dict]:
         with self._lock:
             return [a.to_dict() for a in self._history[-limit:]]

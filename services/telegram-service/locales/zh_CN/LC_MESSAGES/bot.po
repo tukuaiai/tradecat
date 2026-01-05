@@ -553,3 +553,255 @@ msgstr "⚖️ 卡片已下线"
 
 msgid "ui.system_reloading"
 msgstr "系统正在重新加载，请稍后重试"
+
+# 卡片通用词条
+msgid "card.common.update_time"
+msgstr "⏰ 更新 {time}"
+
+msgid "card.common.last_update"
+msgstr "⏰ 最后更新 {time}"
+
+msgid "card.common.sort_info"
+msgstr "📊 排序 {period} {field}({symbol})"
+
+# CVD 卡片
+msgid "card.cvd.title"
+msgstr "🌊 CVD数据"
+
+msgid "card.cvd.hint"
+msgstr "💡 CVD = 主动买额 - 主动卖额，正为多头，负为空头"
+
+# MFI 卡片
+msgid "card.mfi.title"
+msgstr "💧 资金流量数据"
+
+msgid "card.mfi.hint"
+msgstr "💡 MFI 结合价量的超买超卖指标，>80 超买，<20 超卖"
+
+# OBV 卡片
+msgid "card.obv.title"
+msgstr "📊 OBV数据"
+
+msgid "card.obv.hint"
+msgstr "💡 OBV斜率刻画量价累积动能，强度越高动能越集中"
+
+# RSI谐波 卡片
+msgid "card.rsi_harmonic.title"
+msgstr "📊 RSI谐波数据"
+
+msgid "card.rsi_harmonic.hint"
+msgstr "💡 RSI2-33 全谐波信号，谐波值越高信号越显著"
+
+# 主动买卖比 卡片
+msgid "card.taker_ratio.title"
+msgstr "🧾 主动买卖比数据"
+
+msgid "card.taker_ratio.hint"
+msgstr "💡 买卖比 = 主动买成交额 ÷ 总成交额，越高代表买盘越强"
+
+# VWAP 卡片
+msgid "card.vwap.title"
+msgstr "📏 VWAP数据"
+
+msgid "card.vwap.hint"
+msgstr "💡 偏离>0 表示价格高于VWAP，偏离<0 表示低于VWAP"
+
+# 资金流向 卡片
+msgid "card.flow.title"
+msgstr "💧 资金流向数据"
+
+msgid "card.flow.hint"
+msgstr "💡 净流=流入-流出；可切换净流/成交额/流入/流出/价格等维度"
+
+# 资金费率 卡片
+msgid "card.funding.title"
+msgstr "💱 资金费率数据"
+
+msgid "card.funding.hint"
+msgstr "💡 可切换资金费率/加权费率及通用列"
+
+# VPVR 卡片
+msgid "card.vpvr.title"
+msgstr "📊 VPVR数据"
+
+msgid "card.vpvr.hint"
+msgstr "💡 宽度%= (上沿-下沿)/VPVR价"
+
+# 布林带 卡片
+msgid "card.bb.title"
+msgstr "📊 布林带数据"
+
+msgid "card.bb.hint"
+msgstr "💡 带宽衡量波动，百分比描述价格在通道内的位置"
+
+# 超级趋势 卡片
+msgid "card.supertrend.title"
+msgstr "📈 超级趋势数据"
+
+msgid "card.supertrend.hint"
+msgstr "💡 强度 = (价格-趋势带)/带宽；方向 1=多 -1=空"
+
+# EMA 卡片
+msgid "card.ema.title"
+msgstr "📈 EMA数据"
+
+msgid "card.ema.hint"
+msgstr "💡 强度基于 EMA 面积收敛/发散计算"
+
+# K线形态 卡片
+msgid "card.pattern.title"
+msgstr "📊 K线形态数据"
+
+msgid "card.pattern.hint"
+msgstr "💡 强度来源形态数量与权重（形态名已中文化）"
+
+# MACD 卡片
+msgid "card.macd.title"
+msgstr "📊 MACD数据"
+
+msgid "card.macd.hint"
+msgstr "💡 强度综合柱值与趋势，柱值>0 偏多，<0 偏空"
+
+# 持仓 卡片
+msgid "card.oi.title"
+msgstr "🐋 持仓量数据"
+
+msgid "card.oi.hint"
+msgstr "💡 持仓占比按多空拆分，可切换字段/排序"
+
+# 流动性 卡片
+msgid "card.liquidity.title"
+msgstr "💧 流动性数据"
+
+msgid "card.liquidity.hint"
+msgstr "💡 指数综合 Amihud/Kyle 与波动/成交量，数值越高代表流动性风险越高"
+
+# 市场深度 卡片
+msgid "card.depth.title"
+msgstr "🧊 市场深度数据"
+
+msgid "card.depth.hint"
+msgstr "💡 深度比=买卖盘量对比，搭配价差/买墙/卖墙查看流动性质量"
+
+# 支撑阻力 卡片
+msgid "card.sr.title"
+msgstr "📊 支撑阻力数据"
+
+msgid "card.sr.hint"
+msgstr "💡 结合 VPVR+Swing+聚类，识别关键支撑阻力位"
+
+# 成交量 卡片
+msgid "card.volume.title"
+msgstr "📊 成交量数据"
+
+msgid "card.volume.hint"
+msgstr "💡 量比=当前成交量/20期均量，>2 放量，<0.5 缩量"
+
+# Fallback entries
+msgid "card.atr.fallback"
+msgstr "📊 ATR 数据加载中..."
+
+msgid "card.bb.fallback"
+msgstr "📊 布林带数据加载中..."
+
+msgid "card.big_sentiment.fallback"
+msgstr "📊 大户情绪数据加载中..."
+
+msgid "card.crowding.fallback"
+msgstr "📊 风险拥挤度数据加载中..."
+
+msgid "card.cvd.fallback"
+msgstr "🌊 CVD 数据加载中..."
+
+msgid "card.depth.fallback"
+msgstr "🧊 市场深度数据加载中..."
+
+msgid "card.ema.fallback"
+msgstr "📈 EMA 数据加载中..."
+
+msgid "card.flow.fallback"
+msgstr "💧 资金流向数据加载中..."
+
+msgid "card.funding.fallback"
+msgstr "💱 资金费率数据加载中..."
+
+msgid "card.futures_sentiment.fallback"
+msgstr "📊 期货情绪数据加载中..."
+
+msgid "card.liquidity.fallback"
+msgstr "💧 流动性数据加载中..."
+
+msgid "card.macd.fallback"
+msgstr "📊 MACD 数据加载中..."
+
+msgid "card.market_sentiment.fallback"
+msgstr "📊 市场情绪数据加载中..."
+
+msgid "card.mfi.fallback"
+msgstr "💧 MFI 数据加载中..."
+
+msgid "card.obv.fallback"
+msgstr "📊 OBV 数据加载中..."
+
+msgid "card.oi.fallback"
+msgstr "🐋 持仓数据加载中..."
+
+msgid "card.oi_alert.fallback"
+msgstr "📊 OI 极值数据加载中..."
+
+msgid "card.oi_speed.fallback"
+msgstr "📊 OI 增减速数据加载中..."
+
+msgid "card.oi_streak.fallback"
+msgstr "📊 OI 连续性数据加载中..."
+
+msgid "card.oi_trend.fallback"
+msgstr "📊 OI 趋势数据加载中..."
+
+msgid "card.pattern.fallback"
+msgstr "📊 K线形态数据加载中..."
+
+msgid "card.reversal.fallback"
+msgstr "📊 翻转雷达数据加载中..."
+
+msgid "card.rsi_harmonic.fallback"
+msgstr "📊 RSI 谐波数据加载中..."
+
+msgid "card.sentiment_mom.fallback"
+msgstr "📊 情绪动量数据加载中..."
+
+msgid "card.sr.fallback"
+msgstr "📊 支撑阻力数据加载中..."
+
+msgid "card.supertrend.fallback"
+msgstr "📈 超级趋势数据加载中..."
+
+msgid "card.taker_dir.fallback"
+msgstr "📊 主动成交方向数据加载中..."
+
+msgid "card.taker_jump.fallback"
+msgstr "📊 主动跳变数据加载中..."
+
+msgid "card.taker_ratio.fallback"
+msgstr "🧾 主动买卖比数据加载中..."
+
+msgid "card.taker_streak.fallback"
+msgstr "📊 主动连续性数据加载中..."
+
+msgid "card.volatility.fallback"
+msgstr "📊 波动度数据加载中..."
+
+msgid "card.volume.fallback"
+msgstr "📊 成交量数据加载中..."
+
+msgid "card.volume_ratio.fallback"
+msgstr "📊 成交量比率数据加载中..."
+
+msgid "card.vpvr.fallback"
+msgstr "📊 VPVR 数据加载中..."
+
+msgid "card.vwap.fallback"
+msgstr "📏 VWAP 数据加载中..."
+
+msgid "card.liquidation.fallback"
+msgstr "📊 爆仓数据加载中..."

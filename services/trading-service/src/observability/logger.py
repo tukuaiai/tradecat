@@ -12,7 +12,7 @@ import sys
 import time
 from pathlib import Path
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
+from typing import Optional
 from contextlib import contextmanager
 from functools import wraps
 
@@ -22,7 +22,7 @@ _JSON_FORMAT = True
 
 class JsonFormatter(logging.Formatter):
     """JSON格式日志"""
-    
+
     def format(self, record: logging.LogRecord) -> str:
         log_data = {
             "ts": datetime.now(timezone.utc).isoformat(),
@@ -30,25 +30,25 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "msg": record.getMessage(),
         }
-        
+
         # 添加额外上下文
         if hasattr(record, "ctx") and record.ctx:
             log_data["ctx"] = record.ctx
-        
+
         # 添加异常信息
         if record.exc_info:
             log_data["exc"] = self.formatException(record.exc_info)
-        
+
         # 添加位置信息（仅DEBUG）
         if record.levelno <= logging.DEBUG:
             log_data["loc"] = f"{record.filename}:{record.lineno}"
-        
+
         return json.dumps(log_data, ensure_ascii=False, default=str)
 
 
 class PlainFormatter(logging.Formatter):
     """简洁文本格式"""
-    
+
     def format(self, record: logging.LogRecord) -> str:
         ts = datetime.now().strftime("%H:%M:%S")
         ctx_str = ""
@@ -59,7 +59,7 @@ class PlainFormatter(logging.Formatter):
 
 class ContextLogger(logging.LoggerAdapter):
     """带上下文的Logger"""
-    
+
     def process(self, msg, kwargs):
         extra = kwargs.get("extra", {})
         ctx = {**self.extra, **extra.get("ctx", {})}
@@ -76,21 +76,21 @@ def setup_logging(
     global _LOG_LEVEL, _JSON_FORMAT
     _LOG_LEVEL = getattr(logging, level.upper(), logging.INFO)
     _JSON_FORMAT = json_format
-    
+
     root = logging.getLogger()
     root.setLevel(_LOG_LEVEL)
-    
+
     # 清除已有handler
     root.handlers.clear()
-    
+
     # 选择格式
     formatter = JsonFormatter() if json_format else PlainFormatter()
-    
+
     # 控制台输出
     console = logging.StreamHandler(sys.stdout)
     console.setFormatter(formatter)
     root.addHandler(console)
-    
+
     # 文件输出
     if log_file:
         log_path = Path(log_file)
@@ -116,7 +116,7 @@ def log_context(logger: logging.Logger, operation: str, **ctx):
     """
     start = time.perf_counter()
     ctx["op"] = operation
-    
+
     try:
         yield
         elapsed_ms = (time.perf_counter() - start) * 1000

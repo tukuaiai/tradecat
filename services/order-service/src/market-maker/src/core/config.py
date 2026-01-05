@@ -3,7 +3,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 # 加载全局 config/.env
 _SERVICE_ROOT = Path(__file__).parents[4]  # src/core/config.py -> core -> src -> market-maker -> src -> order-service
@@ -45,7 +45,7 @@ class StrategyConfig:
     order_ttl_seconds: float = 0.0  # 挂单生存时间，0 表示关闭刷新
     order_price_deviation_bps: float = 0.0  # 挂单价格偏离触发撤单的 bps，0 关闭
     cancel_cooldown_seconds: float = 0.0  # 撤单最短间隔，避免过度撤单
-    
+
     def __post_init__(self):
         if self.symbols is None:
             self.symbols = ["BTC/USDT:USDT", "ETH/USDT:USDT"]
@@ -67,12 +67,12 @@ class Config:
     exchange: ExchangeConfig = None
     strategy: StrategyConfig = None
     risk: RiskConfig = None
-    
+
     def __post_init__(self):
         self.exchange = self.exchange or ExchangeConfig()
         self.strategy = self.strategy or StrategyConfig()
         self.risk = self.risk or RiskConfig()
-    
+
     @classmethod
     def from_file(cls, path: str) -> "Config":
         with open(path) as f:
@@ -82,7 +82,7 @@ class Config:
             strategy=StrategyConfig(**data.get("strategy", {})),
             risk=RiskConfig(**data.get("risk", {})),
         )
-    
+
     @classmethod
     def from_env(cls) -> "Config":
         return cls(

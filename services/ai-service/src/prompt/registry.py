@@ -47,7 +47,7 @@ class PromptRegistry:
         # 自动检测文件变化
         if auto_reload:
             self._auto_reload()
-        
+
         items = []
         for name, meta in self.cache.items():
             group, title = self._split_group_title(name)

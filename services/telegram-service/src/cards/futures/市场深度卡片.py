@@ -10,14 +10,14 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.base import RankingCard
 from cards.data_provider import format_symbol
-from cards.i18n import btn_auto as _btn_auto
+from cards.i18n import btn_auto as _btn_auto, gettext as _t
 from cards.排行榜服务 import DEFAULT_PERIODS, get_market_depth_service, normalize_period
 
 
 class MarketDepthCard(RankingCard):
     """🔬 市场深度排行 - 市场深度排行榜"""
 
-    FALLBACK = "📊 市场深度数据加载中，请稍后重试..."
+    FALLBACK = "card.depth.fallback"
 
     def __init__(self) -> None:
         super().__init__(
@@ -154,7 +154,7 @@ class MarketDepthCard(RankingCard):
             fields_state,
         )
 
-        aligned = user_handler.dynamic_align_format(rows) if rows else "暂无数据"
+        aligned = user_handler.dynamic_align_format(rows) if rows else _t("data.no_data")
         time_info = user_handler.get_current_time_display()
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         text = (

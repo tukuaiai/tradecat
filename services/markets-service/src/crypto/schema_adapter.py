@@ -14,7 +14,7 @@ from .config import settings, validate_table_name
 
 class KlineAdapter:
     """K线字段适配: market_data.candles_1m ↔ raw.crypto_kline_1m"""
-    
+
     # 旧字段 → 新字段
     FIELD_MAP = {
         "bucket_ts": "open_time",
@@ -22,7 +22,7 @@ class KlineAdapter:
     }
     # 新字段 → 旧字段
     REVERSE_MAP = {v: k for k, v in FIELD_MAP.items()}
-    
+
     @classmethod
     def to_new_schema(cls, rows: Sequence[dict], batch_id: int) -> List[dict]:
         """旧格式 → 新格式 (写入 raw.crypto_kline_1m)"""
@@ -39,7 +39,7 @@ class KlineAdapter:
                 new_row["close_time"] = new_row["open_time"] + timedelta(minutes=1)
             result.append(new_row)
         return result
-    
+
     @classmethod
     def to_legacy_schema(cls, rows: Sequence[dict]) -> List[dict]:
         """新格式 → 旧格式 (兼容下游)"""
@@ -58,10 +58,10 @@ class KlineAdapter:
 
 class MetricsAdapter:
     """期货指标字段适配: binance_futures_metrics_5m ↔ raw.crypto_metrics_5m
-    
+
     注意: raw.crypto_metrics_5m 使用驼峰命名 (与 Binance API 一致)
     """
-    
+
     # 旧字段 → 新字段 (raw 表使用驼峰)
     FIELD_MAP = {
         "create_time": "timestamp",
@@ -73,10 +73,10 @@ class MetricsAdapter:
         "sum_taker_long_short_vol_ratio": "takerBuySellRatio",
     }
     REVERSE_MAP = {v: k for k, v in FIELD_MAP.items()}
-    
+
     # 新表不支持的字段 (丢弃)
     DROPPED_FIELDS = {"is_closed"}
-    
+
     @classmethod
     def to_new_schema(cls, rows: Sequence[dict], batch_id: int) -> List[dict]:
         """旧格式 → 新格式 (写入 raw.crypto_metrics_5m)"""
@@ -91,7 +91,7 @@ class MetricsAdapter:
             new_row["ingest_batch_id"] = batch_id
             result.append(new_row)
         return result
-    
+
     @classmethod
     def to_legacy_schema(cls, rows: Sequence[dict]) -> List[dict]:
         """新格式 → 旧格式"""

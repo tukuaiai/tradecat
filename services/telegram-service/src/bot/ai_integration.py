@@ -27,7 +27,7 @@ try:
     )
     from src.bot.handler import match_ai_trigger
     AI_SERVICE_AVAILABLE = True
-except ImportError as e:
+except ImportError:
     AI_SERVICE_AVAILABLE = False
     AIAnalysisHandler = None
     get_ai_handler = None

@@ -13,8 +13,8 @@ from typing import Dict, Optional, Tuple
 import aiohttp
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+from adapters.rate_limiter import acquire, parse_ban, release, set_ban
 from config import settings
-from adapters.rate_limiter import acquire, release, set_ban, parse_ban
 
 logger = logging.getLogger(__name__)
 

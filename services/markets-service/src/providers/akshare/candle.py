@@ -7,32 +7,32 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
+from config import settings
 from core.fetcher import BaseFetcher
 from core.registry import register_fetcher
 from models.candle import Candle, CandleQuery
-from config import settings
 
 
 @register_fetcher("akshare", "candle")
 class AKShareCandleFetcher(BaseFetcher[CandleQuery, Candle]):
     """AKShare K线获取器 - A股/港股/期货/债券"""
-    
+
     def __init__(self, market: str = "cn_stock"):
         self.market = market
         # akshare 通过 requests 使用代理
         if settings.http_proxy:
             os.environ.setdefault("HTTP_PROXY", settings.http_proxy)
             os.environ.setdefault("HTTPS_PROXY", settings.http_proxy)
-    
+
     def transform_query(self, params: dict[str, Any]) -> CandleQuery:
         return CandleQuery(**params)
-    
+
     async def extract(self, query: CandleQuery) -> list[dict[str, Any]]:
         import akshare as ak
-        
+
         start_str = query.start.strftime("%Y%m%d") if query.start else "20200101"
         end_str = query.end.strftime("%Y%m%d") if query.end else datetime.now().strftime("%Y%m%d")
-        
+
         # 根据市场类型调用不同接口
         if self.market == "cn_stock":
             df = await asyncio.to_thread(
@@ -59,9 +59,9 @@ class AKShareCandleFetcher(BaseFetcher[CandleQuery, Candle]):
             )
         else:
             return []
-        
+
         return df.to_dict("records") if df is not None and not df.empty else []
-    
+
     def transform_data(self, raw: list[dict[str, Any]]) -> list[Candle]:
         results = []
         for r in raw:
@@ -69,7 +69,7 @@ class AKShareCandleFetcher(BaseFetcher[CandleQuery, Candle]):
             ts = r.get("日期") or r.get("date")
             if isinstance(ts, str):
                 ts = datetime.strptime(ts, "%Y-%m-%d")
-            
+
             results.append(Candle(
                 market=self.market,
                 asset_type="spot",

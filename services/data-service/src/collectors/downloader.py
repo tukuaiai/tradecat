@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional, Dict, Protocol
+from typing import Dict, Optional, Protocol
 
 import requests
 
@@ -17,7 +17,7 @@ class Downloader:
     """
     一个健壮的文件下载器，支持代理和自动重试。
     """
-    
+
     def __init__(
         self,
         rate_limiter: RateLimiterProtocol,
@@ -59,10 +59,10 @@ class Downloader:
             return True
 
         self._limiter.acquire(weight)
-        
+
         # 定义尝试顺序：直连/主代理 -> 备用代理
         attempts = [self._proxies, self._fallback_proxies]
-        
+
         for i, proxies in enumerate(attempts):
             if i > 0 and attempts[i-1] == proxies:  # 如果代理配置相同，则不重复尝试
                 continue
@@ -74,22 +74,22 @@ class Downloader:
                     if r.status_code == 404:
                         logger.warning("资源未找到 (404): %s", url)
                         return False  # 404 是确定性失败，无需重试
-                    
+
                     r.raise_for_status()  # 对其他错误状态码抛出异常
-                    
+
                     # 确保目标目录存在
                     destination.parent.mkdir(parents=True, exist_ok=True)
-                    
+
                     with open(destination, 'wb') as f:
                         for chunk in r.iter_content(chunk_size=8192):
                             f.write(chunk)
-                    
+
                     logger.debug("下载成功 (%s): %s", proxy_name, url)
                     return True
 
             except requests.RequestException as e:
                 logger.warning("下载失败 (%s) - %s: %s", proxy_name, url, e)
-        
+
         logger.error("所有下载尝试均失败: %s", url)
         return False
 

@@ -1,5 +1,4 @@
 """WebSocket 数据源 - 使用 cryptofeed 订阅行情与成交"""
-import asyncio
 import threading
 from decimal import Decimal
 from typing import Callable, Dict, List, Optional

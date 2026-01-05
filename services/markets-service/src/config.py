@@ -29,13 +29,13 @@ class Settings:
     db_schema: str = field(default_factory=lambda: os.getenv("MARKET_DB_SCHEMA", "market_data"))
     raw_schema: str = field(default_factory=lambda: os.getenv("RAW_DB_SCHEMA", "raw"))
     quality_schema: str = field(default_factory=lambda: os.getenv("QUALITY_DB_SCHEMA", "quality"))
-    
+
     # 代理
     http_proxy: Optional[str] = field(default_factory=lambda: os.getenv("HTTP_PROXY") or os.getenv("HTTPS_PROXY"))
-    
+
     # 目录
     log_dir: Path = field(default_factory=lambda: SERVICE_ROOT / "logs")
-    
+
     def __post_init__(self):
         self.log_dir.mkdir(parents=True, exist_ok=True)
 

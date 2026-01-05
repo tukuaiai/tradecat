@@ -1,7 +1,7 @@
 """风控模块"""
 import time
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict
 from pathlib import Path
 
@@ -16,7 +16,7 @@ class RiskState:
 
 class RiskManager:
     """风控管理器"""
-    
+
     def __init__(self, per_symbol_limit: float = 200, global_limit: float = 2000,
                  flat_threshold: float = 400, cooldown: float = 10, risk_log_details: bool = False):
         self.per_symbol_limit = per_symbol_limit
@@ -27,7 +27,7 @@ class RiskManager:
         self.global_state = RiskState()
         self._alerts_path = Path("logs/alerts.log")
         self.risk_log_details = risk_log_details
-    
+
     def check(self, symbol: str, notional: float, total_notional: float, details: dict | None = None) -> str:
         """检查风控
         
@@ -35,32 +35,32 @@ class RiskManager:
         """
         now = time.time()
         state = self.state.setdefault(symbol, RiskState())
-        
+
         # 全局熔断
         if now < self.global_state.paused_until:
             return "global_pause"
-        
+
         if total_notional > self.global_limit:
             self.global_state.paused_until = now + self.cooldown
             self._alert("GLOBAL_PAUSE", f"total={total_notional:.2f}", details)
             return "global_pause"
-        
+
         # 单品种检查
         if now < state.paused_until:
             return "pause"
-        
+
         if notional > self.flat_threshold:
             state.paused_until = now + self.cooldown * 3
             self._alert("FORCE_FLAT", f"{symbol} notional={notional:.2f}", details)
             return "flat"
-        
+
         if notional > self.per_symbol_limit:
             state.paused_until = now + self.cooldown
             self._alert("RISK_PAUSE", f"{symbol} notional={notional:.2f}", details)
             return "pause"
-        
+
         return "ok"
-    
+
     def _alert(self, level: str, msg: str, details: dict | None = None):
         ts = time.strftime("%Y-%m-%d %H:%M:%S")
         detail_str = ""

@@ -34,10 +34,10 @@ class Scheduler:
         self._running = True
         signal.signal(signal.SIGTERM, lambda *_: setattr(self, "_running", False))
         signal.signal(signal.SIGINT, lambda *_: setattr(self, "_running", False))
-        
+
         for name, info in self._procs.items():
             self._start(name, info)
-        
+
         while self._running:
             for name, info in self._procs.items():
                 if info["proc"] and info["proc"].poll() is not None:
@@ -47,7 +47,7 @@ class Scheduler:
                         time.sleep(min(5 * info["restarts"], 60))
                         self._start(name, info)
             time.sleep(5)
-        
+
         for info in self._procs.values():
             if info["proc"]:
                 info["proc"].terminate()
@@ -66,23 +66,23 @@ def main() -> None:
     parser.add_argument("--backfill", action="store_true", help="历史补齐")
     parser.add_argument("--all", action="store_true", help="全部启动")
     args = parser.parse_args()
-    
+
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-    
+
     py = sys.executable
     sched = Scheduler()
-    
+
     if args.all or args.ws:
         sched.add("ws", [py, "collectors/ws.py"])
     if args.all or args.metrics:
         sched.add("metrics", [py, "collectors/metrics.py"])
     if args.backfill:
         sched.add("backfill", [py, "collectors/backfill.py"])
-    
+
     if not sched._procs:
         print("用法: python src/__main__.py --ws|--metrics|--backfill|--all")
         sys.exit(1)
-    
+
     sched.run()
 
 

@@ -7,10 +7,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Sequence, Optional
+from typing import Optional, Sequence
 
-from psycopg_pool import ConnectionPool
 from psycopg import sql
+from psycopg_pool import ConnectionPool
 
 from config import settings
 

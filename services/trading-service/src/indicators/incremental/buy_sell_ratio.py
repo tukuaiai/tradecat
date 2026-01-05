@@ -6,7 +6,7 @@ from ..base import Indicator, IndicatorMeta, register
 @register
 class BuySellRatio(Indicator):
     meta = IndicatorMeta(name="主动买卖比扫描器.py", lookback=1, is_incremental=True)
-    
+
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         if df.empty or "taker_buy_volume" not in df.columns:
             return pd.DataFrame()

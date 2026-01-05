@@ -553,3 +553,255 @@ msgstr "⚖️ Card offline"
 
 msgid "ui.system_reloading"
 msgstr "System reloading, please try again later"
+
+# Card common entries
+msgid "card.common.update_time"
+msgstr "⏰ Updated {time}"
+
+msgid "card.common.last_update"
+msgstr "⏰ Last update {time}"
+
+msgid "card.common.sort_info"
+msgstr "📊 Sort {period} {field}({symbol})"
+
+# CVD card
+msgid "card.cvd.title"
+msgstr "🌊 CVD Data"
+
+msgid "card.cvd.hint"
+msgstr "💡 CVD = Buy Volume - Sell Volume, positive = bullish, negative = bearish"
+
+# MFI card
+msgid "card.mfi.title"
+msgstr "💧 MFI Data"
+
+msgid "card.mfi.hint"
+msgstr "💡 MFI combines price and volume, >80 overbought, <20 oversold"
+
+# OBV card
+msgid "card.obv.title"
+msgstr "📊 OBV Data"
+
+msgid "card.obv.hint"
+msgstr "💡 OBV slope measures volume momentum, higher = stronger momentum"
+
+# RSI Harmonic card
+msgid "card.rsi_harmonic.title"
+msgstr "📊 RSI Harmonic Data"
+
+msgid "card.rsi_harmonic.hint"
+msgstr "💡 RSI2-33 full harmonic signal, higher value = stronger signal"
+
+# Taker Ratio card
+msgid "card.taker_ratio.title"
+msgstr "🧾 Taker Buy/Sell Ratio"
+
+msgid "card.taker_ratio.hint"
+msgstr "💡 Ratio = Taker Buy Volume ÷ Total Volume, higher = stronger buying"
+
+# VWAP card
+msgid "card.vwap.title"
+msgstr "📏 VWAP Data"
+
+msgid "card.vwap.hint"
+msgstr "💡 Deviation>0 = price above VWAP, <0 = below VWAP"
+
+# Flow card
+msgid "card.flow.title"
+msgstr "💧 Fund Flow Data"
+
+msgid "card.flow.hint"
+msgstr "💡 Net flow = Inflow - Outflow; switch between net/volume/inflow/outflow/price"
+
+# Funding card
+msgid "card.funding.title"
+msgstr "💱 Funding Rate Data"
+
+msgid "card.funding.hint"
+msgstr "💡 Switch between funding rate/weighted rate and common columns"
+
+# VPVR card
+msgid "card.vpvr.title"
+msgstr "📊 VPVR Data"
+
+msgid "card.vpvr.hint"
+msgstr "💡 Width% = (Upper - Lower) / VPVR Price"
+
+# Bollinger Bands card
+msgid "card.bb.title"
+msgstr "📊 Bollinger Bands Data"
+
+msgid "card.bb.hint"
+msgstr "💡 Bandwidth measures volatility, %B shows position within bands"
+
+# SuperTrend card
+msgid "card.supertrend.title"
+msgstr "📈 SuperTrend Data"
+
+msgid "card.supertrend.hint"
+msgstr "💡 Strength = (Price - Trend Band) / Bandwidth; Direction 1=Long -1=Short"
+
+# EMA card
+msgid "card.ema.title"
+msgstr "📈 EMA Data"
+
+msgid "card.ema.hint"
+msgstr "💡 Strength based on EMA area convergence/divergence"
+
+# Pattern card
+msgid "card.pattern.title"
+msgstr "📊 Candlestick Pattern Data"
+
+msgid "card.pattern.hint"
+msgstr "💡 Strength from pattern count and weight (pattern names localized)"
+
+# MACD card
+msgid "card.macd.title"
+msgstr "📊 MACD Data"
+
+msgid "card.macd.hint"
+msgstr "💡 Strength combines histogram and trend, >0 bullish, <0 bearish"
+
+# OI card
+msgid "card.oi.title"
+msgstr "🐋 Open Interest Data"
+
+msgid "card.oi.hint"
+msgstr "💡 OI ratio split by long/short, switch fields/sorting"
+
+# Liquidity card
+msgid "card.liquidity.title"
+msgstr "💧 Liquidity Data"
+
+msgid "card.liquidity.hint"
+msgstr "💡 Index combines Amihud/Kyle with volatility/volume, higher = higher liquidity risk"
+
+# Depth card
+msgid "card.depth.title"
+msgstr "🧊 Market Depth Data"
+
+msgid "card.depth.hint"
+msgstr "💡 Depth ratio = bid/ask volume comparison, check spread/bid wall/ask wall"
+
+# Support/Resistance card
+msgid "card.sr.title"
+msgstr "📊 Support/Resistance Data"
+
+msgid "card.sr.hint"
+msgstr "💡 Combines VPVR+Swing+Clustering to identify key S/R levels"
+
+# Volume card
+msgid "card.volume.title"
+msgstr "📊 Volume Data"
+
+msgid "card.volume.hint"
+msgstr "💡 Volume ratio = current/20-period avg, >2 high volume, <0.5 low volume"
+
+# Fallback entries
+msgid "card.atr.fallback"
+msgstr "📊 Loading ATR data..."
+
+msgid "card.bb.fallback"
+msgstr "📊 Loading Bollinger Bands data..."
+
+msgid "card.big_sentiment.fallback"
+msgstr "📊 Loading whale sentiment data..."
+
+msgid "card.crowding.fallback"
+msgstr "📊 Loading crowding risk data..."
+
+msgid "card.cvd.fallback"
+msgstr "🌊 Loading CVD data..."
+
+msgid "card.depth.fallback"
+msgstr "🧊 Loading market depth data..."
+
+msgid "card.ema.fallback"
+msgstr "📈 Loading EMA data..."
+
+msgid "card.flow.fallback"
+msgstr "💧 Loading fund flow data..."
+
+msgid "card.funding.fallback"
+msgstr "💱 Loading funding rate data..."
+
+msgid "card.futures_sentiment.fallback"
+msgstr "📊 Loading futures sentiment data..."
+
+msgid "card.liquidity.fallback"
+msgstr "💧 Loading liquidity data..."
+
+msgid "card.macd.fallback"
+msgstr "📊 Loading MACD data..."
+
+msgid "card.market_sentiment.fallback"
+msgstr "📊 Loading market sentiment data..."
+
+msgid "card.mfi.fallback"
+msgstr "💧 Loading MFI data..."
+
+msgid "card.obv.fallback"
+msgstr "📊 Loading OBV data..."
+
+msgid "card.oi.fallback"
+msgstr "🐋 Loading open interest data..."
+
+msgid "card.oi_alert.fallback"
+msgstr "📊 Loading OI alert data..."
+
+msgid "card.oi_speed.fallback"
+msgstr "📊 Loading OI speed data..."
+
+msgid "card.oi_streak.fallback"
+msgstr "📊 Loading OI streak data..."
+
+msgid "card.oi_trend.fallback"
+msgstr "📊 Loading OI trend data..."
+
+msgid "card.pattern.fallback"
+msgstr "📊 Loading candlestick pattern data..."
+
+msgid "card.reversal.fallback"
+msgstr "📊 Loading reversal radar data..."
+
+msgid "card.rsi_harmonic.fallback"
+msgstr "📊 Loading RSI harmonic data..."
+
+msgid "card.sentiment_mom.fallback"
+msgstr "📊 Loading sentiment momentum data..."
+
+msgid "card.sr.fallback"
+msgstr "📊 Loading support/resistance data..."
+
+msgid "card.supertrend.fallback"
+msgstr "📈 Loading SuperTrend data..."
+
+msgid "card.taker_dir.fallback"
+msgstr "📊 Loading taker direction data..."
+
+msgid "card.taker_jump.fallback"
+msgstr "📊 Loading taker jump data..."
+
+msgid "card.taker_ratio.fallback"
+msgstr "🧾 Loading taker ratio data..."
+
+msgid "card.taker_streak.fallback"
+msgstr "📊 Loading taker streak data..."
+
+msgid "card.volatility.fallback"
+msgstr "📊 Loading volatility data..."
+
+msgid "card.volume.fallback"
+msgstr "📊 Loading volume data..."
+
+msgid "card.volume_ratio.fallback"
+msgstr "📊 Loading volume ratio data..."
+
+msgid "card.vpvr.fallback"
+msgstr "📊 Loading VPVR data..."
+
+msgid "card.vwap.fallback"
+msgstr "📏 Loading VWAP data..."
+
+msgid "card.liquidation.fallback"
+msgstr "📊 Loading liquidation data..."

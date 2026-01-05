@@ -10,7 +10,7 @@ from typing import Dict, List, Optional
 
 import ccxt
 
-from .rate_limiter import acquire, release, set_ban, parse_ban
+from .rate_limiter import acquire, parse_ban, release, set_ban
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,7 @@ def get_client(exchange: str = "binance") -> ccxt.Exchange:
 # 使用共享模块
 import sys
 from pathlib import Path
+
 # crypto/adapters/ccxt.py -> markets-service/src/crypto/adapters -> tradecat/libs
 _libs_path = str(Path(__file__).parents[5] / "libs")
 if _libs_path not in sys.path:
@@ -78,14 +79,14 @@ def load_symbols(exchange: str = "binance") -> List[str]:
     return _symbols[key]
 
 
-def fetch_ohlcv(exchange: str, symbol: str, interval: str = "1m", 
+def fetch_ohlcv(exchange: str, symbol: str, interval: str = "1m",
                since_ms: Optional[int] = None, limit: int = 1000) -> List[List]:
     symbol = symbol.upper()
     if not symbol.endswith("USDT"):
         return []
-    
+
     ccxt_sym = f"{symbol[:-4]}/USDT:USDT"
-    
+
     for attempt in range(3):
         acquire(2)
         try:
@@ -116,7 +117,7 @@ def to_rows(exchange: str, symbol: str, candles: List[List], source: str = "ccxt
     return [{
         "exchange": exchange, "symbol": symbol.upper(),
         "bucket_ts": datetime.fromtimestamp(c[0] / 1000, tz=timezone.utc),
-        "open": float(c[1]), "high": float(c[2]), "low": float(c[3]), 
+        "open": float(c[1]), "high": float(c[2]), "low": float(c[3]),
         "close": float(c[4]), "volume": float(c[5]),
         "quote_volume": None, "trade_count": None, "is_closed": True, "source": source,
         "taker_buy_volume": None, "taker_buy_quote_volume": None,
@@ -132,7 +133,8 @@ def normalize_symbol(symbol: str) -> Optional[str]:
 class _CompatLimiter:
     def acquire(self, w=1): acquire(w)
 _limiter = _CompatLimiter()
-_check_and_wait_ban = lambda: None
+def _check_and_wait_ban():
+    return None
 _parse_ban_time = parse_ban
 _ban_until = 0
 _ban_lock = None

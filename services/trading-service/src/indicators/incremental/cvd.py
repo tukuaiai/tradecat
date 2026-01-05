@@ -6,7 +6,7 @@ from ..base import Indicator, IndicatorMeta, register
 @register
 class CVD(Indicator):
     meta = IndicatorMeta(name="CVD信号排行榜.py", lookback=400, is_incremental=True)
-    
+
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         if "taker_buy_volume" not in df.columns or len(df) < 2:
             return pd.DataFrame()

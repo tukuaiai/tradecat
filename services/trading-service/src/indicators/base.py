@@ -12,7 +12,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional, Dict, Any
 import pandas as pd
-import numpy as np
 
 
 # 默认最小数据量
@@ -30,9 +29,9 @@ class IndicatorMeta:
 
 class Indicator(ABC):
     """指标基类"""
-    
+
     meta: IndicatorMeta
-    
+
     @abstractmethod
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         """
@@ -47,13 +46,13 @@ class Indicator(ABC):
             DataFrame，必须包含: 交易对, 周期, 数据时间, ...指标字段
         """
         pass
-    
+
     def _check_data(self, df: pd.DataFrame, min_required: int = None) -> bool:
         """检查数据是否充足"""
         min_req = min_required or getattr(self.meta, 'min_data', DEFAULT_MIN_DATA)
         return len(df) >= min_req
-    
-    def _make_insufficient_result(self, df: pd.DataFrame, symbol: str, interval: str, 
+
+    def _make_insufficient_result(self, df: pd.DataFrame, symbol: str, interval: str,
                                    fields: Dict[str, Any]) -> pd.DataFrame:
         """生成数据不足时的结果（所有值为None，状态标记为数据不足）"""
         data = {k: None for k in fields}
@@ -61,13 +60,13 @@ class Indicator(ABC):
             key = "信号" if "信号" in fields else "信号概述"
             data[key] = "数据不足"
         return self._make_result(df, symbol, interval, data)
-    
+
     def _make_result(self, df: pd.DataFrame, symbol: str, interval: str, data: dict, timestamp=None) -> pd.DataFrame:
         """构建标准输出格式，前3列固定为: 交易对, 周期, 数据时间"""
         if timestamp is None:
             timestamp = df.index[-1] if not df.empty else None
         ts_str = timestamp.isoformat() if hasattr(timestamp, "isoformat") else str(timestamp)
-        
+
         # 固定前3列顺序
         row = {"交易对": symbol, "周期": interval, "数据时间": ts_str, **data}
         result = pd.DataFrame([row])
@@ -91,7 +90,7 @@ def _filter_indicators(indicators: dict) -> dict:
     import os
     enabled = [i.strip().lower() for i in os.environ.get("INDICATORS_ENABLED", "").split(",") if i.strip()]
     disabled = [i.strip().lower() for i in os.environ.get("INDICATORS_DISABLED", "").split(",") if i.strip()]
-    
+
     def match(name: str) -> bool:
         name_lower = name.lower()
         # 检查是否匹配（支持部分匹配）
@@ -104,7 +103,7 @@ def _filter_indicators(indicators: dict) -> dict:
                     return True
             return False
         return True
-    
+
     return {k: v for k, v in indicators.items() if match(k)}
 
 

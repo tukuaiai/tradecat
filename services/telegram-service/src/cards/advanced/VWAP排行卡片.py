@@ -13,13 +13,13 @@ from typing import Dict, List, Tuple
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.data_provider import get_ranking_provider, format_symbol
-from cards.i18n import btn_auto as _btn_auto
+from cards.i18n import btn_auto as _btn_auto, gettext as _t
 
 from cards.base import RankingCard
 
 
 class VWAP排行卡片(RankingCard):
-    FALLBACK = "🔄 VWAP 数据正在准备，稍后再试"
+    FALLBACK = "card.vwap.fallback"
     provider = get_ranking_provider()
 
     def __init__(self) -> None:
@@ -128,7 +128,7 @@ class VWAP排行卡片(RankingCard):
             handler.user_states.get("vwap_sort_field", "deviation"),
             fields_state,
         )
-        aligned = handler.dynamic_align_format(rows) if rows else "暂无数据"
+        aligned = handler.dynamic_align_format(rows) if rows else _t("data.no_data")
         time_info = handler.get_current_time_display()
         sort_order = handler.user_states.get("vwap_sort", "desc")
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"

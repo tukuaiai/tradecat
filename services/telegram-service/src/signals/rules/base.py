@@ -4,7 +4,7 @@
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Callable, Any
+from typing import Dict, List, Optional, Any
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class SignalRule:
         """检查条件是否满足"""
         if not self.enabled:
             return False
-        
+
         try:
             ct = self.condition_type
             cfg = self.condition_config

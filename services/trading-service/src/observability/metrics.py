@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Any
 from collections import defaultdict
 
 
@@ -29,22 +29,22 @@ class MetricValue:
 
 class Counter:
     """计数器 - 只增不减"""
-    
+
     def __init__(self, name: str, help_text: str = ""):
         self.name = name
         self.help = help_text
         self._values: Dict[tuple, float] = defaultdict(float)
         self._lock = threading.Lock()
-    
+
     def inc(self, value: float = 1, **labels):
         key = tuple(sorted(labels.items()))
         with self._lock:
             self._values[key] += value
-    
+
     def get(self, **labels) -> float:
         key = tuple(sorted(labels.items()))
         return self._values.get(key, 0)
-    
+
     def collect(self) -> List[MetricValue]:
         with self._lock:
             return [
@@ -55,30 +55,30 @@ class Counter:
 
 class Gauge:
     """仪表盘 - 可增可减"""
-    
+
     def __init__(self, name: str, help_text: str = ""):
         self.name = name
         self.help = help_text
         self._values: Dict[tuple, float] = {}
         self._lock = threading.Lock()
-    
+
     def set(self, value: float, **labels):
         key = tuple(sorted(labels.items()))
         with self._lock:
             self._values[key] = value
-    
+
     def inc(self, value: float = 1, **labels):
         key = tuple(sorted(labels.items()))
         with self._lock:
             self._values[key] = self._values.get(key, 0) + value
-    
+
     def dec(self, value: float = 1, **labels):
         self.inc(-value, **labels)
-    
+
     def get(self, **labels) -> float:
         key = tuple(sorted(labels.items()))
         return self._values.get(key, 0)
-    
+
     def collect(self) -> List[MetricValue]:
         with self._lock:
             return [
@@ -89,9 +89,9 @@ class Gauge:
 
 class Histogram:
     """直方图 - 分布统计"""
-    
+
     DEFAULT_BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, float("inf"))
-    
+
     def __init__(self, name: str, help_text: str = "", buckets: tuple = None):
         self.name = name
         self.help = help_text
@@ -100,7 +100,7 @@ class Histogram:
         self._sums: Dict[tuple, float] = defaultdict(float)
         self._totals: Dict[tuple, int] = defaultdict(int)
         self._lock = threading.Lock()
-    
+
     def observe(self, value: float, **labels):
         key = tuple(sorted(labels.items()))
         with self._lock:
@@ -109,7 +109,7 @@ class Histogram:
             for bucket in self.buckets:
                 if value <= bucket:
                     self._counts[key][bucket] += 1
-    
+
     def collect(self) -> List[MetricValue]:
         results = []
         with self._lock:
@@ -127,29 +127,29 @@ class Histogram:
 
 class MetricsCollector:
     """指标收集器"""
-    
+
     def __init__(self):
         self._metrics: Dict[str, Any] = {}
         self._lock = threading.Lock()
-    
+
     def counter(self, name: str, help_text: str = "") -> Counter:
         with self._lock:
             if name not in self._metrics:
                 self._metrics[name] = Counter(name, help_text)
             return self._metrics[name]
-    
+
     def gauge(self, name: str, help_text: str = "") -> Gauge:
         with self._lock:
             if name not in self._metrics:
                 self._metrics[name] = Gauge(name, help_text)
             return self._metrics[name]
-    
+
     def histogram(self, name: str, help_text: str = "", buckets: tuple = None) -> Histogram:
         with self._lock:
             if name not in self._metrics:
                 self._metrics[name] = Histogram(name, help_text, buckets)
             return self._metrics[name]
-    
+
     def collect_all(self) -> Dict[str, List[MetricValue]]:
         """收集所有指标"""
         result = {}
@@ -157,7 +157,7 @@ class MetricsCollector:
             for name, metric in self._metrics.items():
                 result[name] = metric.collect()
         return result
-    
+
     def to_prometheus(self) -> str:
         """导出为 Prometheus 格式"""
         lines = []
@@ -173,7 +173,7 @@ class MetricsCollector:
                 else:
                     lines.append(f"{name} {mv.value}")
         return "\n".join(lines)
-    
+
     def to_json(self) -> str:
         """导出为 JSON 格式"""
         data = {
@@ -186,7 +186,7 @@ class MetricsCollector:
                 for mv in values
             ]
         return json.dumps(data, ensure_ascii=False)
-    
+
     def save(self, path: Path):
         """保存指标到文件"""
         path.parent.mkdir(parents=True, exist_ok=True)

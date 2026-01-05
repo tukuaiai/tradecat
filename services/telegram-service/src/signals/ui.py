@@ -5,10 +5,10 @@ import os
 import json
 import sqlite3
 import logging
-from typing import Dict, Set
+from typing import Dict
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from cards.i18n import btn as _btn, gettext as _t, resolve_lang
+from cards.i18n import btn as _btn, resolve_lang
 
 from .rules import RULES_BY_TABLE
 
@@ -134,7 +134,7 @@ def get_menu_text(uid: int) -> str:
     status = "✅ 开启" if sub["enabled"] else "❌ 关闭"
     enabled = len(sub["tables"])
     total = len(ALL_TABLES)
-    
+
     # 只显示已开启的
     enabled_list = []
     for table in ALL_TABLES:
@@ -142,20 +142,20 @@ def get_menu_text(uid: int) -> str:
             name = get_short_name(table)
             count = len(RULES_BY_TABLE[table])
             enabled_list.append(f"{name} ({count}条)")
-    
+
     if enabled_list:
         content = "\n".join(enabled_list)
     else:
         content = "暂无开启的信号"
-    
+
     return f"🔔 信号\n<pre>{content}</pre>\n推送: {status} 已选: {enabled}/{total}"
 
 
 def get_menu_kb(uid: int) -> InlineKeyboardMarkup:
     sub = get_sub(uid)
-    lang = resolve_lang()
+    resolve_lang()
     rows = []
-    
+
     # 表开关 每行3个，选中的有✅，未选的只有文字
     for i in range(0, len(ALL_TABLES), 3):
         row = []
@@ -168,7 +168,7 @@ def get_menu_kb(uid: int) -> InlineKeyboardMarkup:
             else:
                 row.append(InlineKeyboardButton(name, callback_data=f"sig_t_{table}"))
         rows.append(row)
-    
+
     # 开启/关闭
     if sub["enabled"]:
         rows.append([
@@ -180,9 +180,9 @@ def get_menu_kb(uid: int) -> InlineKeyboardMarkup:
             _btn(None, "signal.push.on", "sig_toggle"),
             _btn(None, "signal.push.off", "sig_nop", active=True),
         ])
-    
+
     rows.append([_btn(None, "btn.back_home", "main_menu")])
-    
+
     return InlineKeyboardMarkup(rows)
 
 
@@ -191,13 +191,13 @@ async def handle(update, context) -> bool:
     q = update.callback_query
     data = q.data
     uid = q.from_user.id
-    
+
     if not data.startswith("sig_"):
         return False
-    
+
     await q.answer()
     sub = get_sub(uid)
-    
+
     if data == "sig_toggle":
         sub["enabled"] = not sub["enabled"]
         _save_sub(uid, sub)
@@ -221,7 +221,7 @@ async def handle(update, context) -> bool:
         pass
     else:
         return False
-    
+
     await q.edit_message_text(get_menu_text(uid), reply_markup=get_menu_kb(uid), parse_mode='HTML')
     return True
 
@@ -239,6 +239,6 @@ def get_signal_push_kb(symbol: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton(f"🔍 {coin}分析", callback_data=f"single_query_{symbol}"),
-            InlineKeyboardButton(f"🤖 AI分析", callback_data=f"ai_coin_{symbol}"),
+            InlineKeyboardButton("🤖 AI分析", callback_data=f"ai_coin_{symbol}"),
         ]
     ])

@@ -73,37 +73,37 @@ class Settings:
         "MARKETS_SERVICE_DATABASE_URL",
         os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/market_data")
     ))
-    
+
     # 写入模式: "raw" = raw.*, "legacy" = market_data.*
     write_mode: str = field(default_factory=lambda: os.getenv("CRYPTO_WRITE_MODE", "raw"))
-    
+
     # Schema 配置
     db_schema: str = field(default_factory=lambda: os.getenv("KLINE_DB_SCHEMA", "market_data"))
     raw_schema: str = field(default_factory=lambda: os.getenv("RAW_DB_SCHEMA", "raw"))
     quality_schema: str = field(default_factory=lambda: os.getenv("QUALITY_DB_SCHEMA", "quality"))
-    
+
     # 交易所配置
     db_exchange: str = field(default_factory=lambda: os.getenv("BINANCE_WS_DB_EXCHANGE", "binance_futures_um"))
     ccxt_exchange: str = field(default_factory=lambda: os.getenv("BINANCE_WS_CCXT_EXCHANGE", "binance"))
-    
+
     # 代理
     http_proxy: Optional[str] = field(default_factory=lambda: os.getenv("HTTP_PROXY") or os.getenv("HTTPS_PROXY"))
-    
+
     # 目录
     log_dir: Path = field(default_factory=lambda: SERVICE_ROOT / "logs")
     data_dir: Path = field(default_factory=lambda: PROJECT_ROOT / "libs" / "database" / "csv")
-    
+
     # WebSocket 配置
     ws_gap_interval: int = field(default_factory=lambda: _int_env("BINANCE_WS_GAP_INTERVAL", 600))
     ws_gap_lookback: int = field(default_factory=lambda: _int_env("BINANCE_WS_GAP_LOOKBACK", 10080))
     ws_source: str = field(default_factory=lambda: os.getenv("BINANCE_WS_SOURCE", "binance_ws"))
-    
+
     def __post_init__(self):
         """初始化后验证配置"""
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self._validate()
-    
+
     def _validate(self) -> None:
         """验证配置有效性"""
         # 验证 write_mode
@@ -113,20 +113,20 @@ class Settings:
                 f"Invalid CRYPTO_WRITE_MODE: '{self.write_mode}'. "
                 f"Must be one of: {sorted(valid_modes)}"
             )
-        
+
         # 验证 database_url
         if not self.database_url:
             raise ValueError(
                 "Database URL not configured. "
                 "Set MARKETS_SERVICE_DATABASE_URL or DATABASE_URL in config/.env"
             )
-        
+
         if not self.database_url.startswith("postgresql://"):
             raise ValueError(
                 f"Invalid DATABASE_URL format: must start with 'postgresql://', "
                 f"got: '{self.database_url[:30]}...'"
             )
-        
+
         # R2-02: 警告默认密码
         if "postgres:postgres@" in self.database_url:
             import logging
@@ -134,12 +134,12 @@ class Settings:
                 "Using default database credentials (postgres:postgres). "
                 "Consider setting a secure password in production."
             )
-    
+
     @property
     def active_schema(self) -> str:
         """当前写入的 schema"""
         return self.raw_schema if self.write_mode == WriteMode.RAW.value else self.db_schema
-    
+
     @property
     def is_raw_mode(self) -> bool:
         """是否为 raw 模式"""

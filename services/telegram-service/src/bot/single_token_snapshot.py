@@ -14,8 +14,7 @@ from __future__ import annotations
 import math
 import os
 import unicodedata
-from pathlib import Path
-from typing import Dict, Iterable, List, Literal, Sequence, Tuple
+from typing import Dict, List, Literal, Sequence, Tuple
 
 from cards.data_provider import format_symbol, get_ranking_provider
 from cards.i18n import gettext as _t, resolve_lang
@@ -447,7 +446,7 @@ class SingleTokenSnapshot:
     def _get_row(self, table: str, period: str, panel: PanelType) -> Dict:
         """获取指定表/周期/币种的首行，用于字段探测。"""
         base_table = TABLE_ALIAS.get(panel, {}).get(table, table)
-        data = self._get_table_data(base_table, period)
+        self._get_table_data(base_table, period)
         return self._index_cache.get((base_table, period), {}).get(self._target_sym, {})
 
     def _get_table_data(self, base_table: str, period: str) -> list[dict]:
@@ -507,16 +506,16 @@ def render_pattern_panel(symbol: str, enabled_periods: Dict[str, bool] | None = 
     sym = format_symbol(symbol)
     if not sym:
         return "❌ 未提供有效币种"
-    
+
     sym_full = sym + "USDT" if not sym.endswith("USDT") else sym
-    
+
     # 默认周期开关：15m/1h/4h 开启，其他关闭
     if enabled_periods is None:
         enabled_periods = {"1m": False, "5m": False, "15m": True, "1h": True, "4h": True, "1d": False, "1w": False}
-    
+
     periods = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"]
     lines = [f"🕯️ {sym} K线形态分析"]
-    
+
     for p in periods:
         if not enabled_periods.get(p, False):
             continue
@@ -527,15 +526,15 @@ def render_pattern_panel(symbol: str, enabled_periods: Dict[str, bool] | None = 
         count = row.get("检测数量", 0)
         if not patterns:
             continue
-        
+
         # 分类形态
         bullish = []  # 看涨
         bearish = []  # 看跌
         neutral = []  # 中性
-        
+
         bullish_kw = ["锤子", "晨星", "吞没", "孕线", "头肩底", "双底", "三底", "上升", "看涨"]
         bearish_kw = ["上吊", "黄昏", "乌鸦", "头肩顶", "双顶", "三顶", "下降", "看跌", "墓碑"]
-        
+
         for pat in patterns.split(","):
             pat = pat.strip()
             if not pat:
@@ -546,7 +545,7 @@ def render_pattern_panel(symbol: str, enabled_periods: Dict[str, bool] | None = 
                 bearish.append(pat)
             else:
                 neutral.append(pat)
-        
+
         lines.append(f"📊 {p} ({count}个形态)")
         lines.append("```")
         if bullish:
@@ -556,10 +555,10 @@ def render_pattern_panel(symbol: str, enabled_periods: Dict[str, bool] | None = 
         if neutral:
             lines.append(f"⚪ {', '.join(neutral)}")
         lines.append("```")
-    
+
     if len(lines) == 1:  # 只有标题
         return f"🕯️ {sym} K线形态分析\n```\n暂无形态数据\n```"
-    
+
     return "\n".join(lines)
 
 

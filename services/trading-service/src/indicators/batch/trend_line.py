@@ -32,7 +32,7 @@ def _add_to_array(vals: List, poss: List, val: float, bar_index: int, keep: int)
         poss.pop()
 
 
-def _build_lines(bvals: List, bpos: List, tvals: List, tpos: List, 
+def _build_lines(bvals: List, bpos: List, tvals: List, tpos: List,
                  prd: int, maxline: int, bar_index: int, closes: np.ndarray
                  ) -> Tuple[List, List]:
     """完整复刻 Pine 的 line 检测循环"""
@@ -143,7 +143,7 @@ class TrendLine(Indicator):
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         prd = 20
         PPnum = 3
-        
+
         if not self._check_data(df):
             return self._make_insufficient_result(df, symbol, interval, {"信号": None})
 

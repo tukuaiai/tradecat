@@ -54,7 +54,7 @@ from .batch import futures_gap_monitor
 
 __all__ = [
     "Indicator",
-    "IndicatorMeta", 
+    "IndicatorMeta",
     "register",
     "get_indicator",
     "get_all_indicators",

@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class Ticker(BaseModel):
@@ -14,17 +14,17 @@ class Ticker(BaseModel):
     exchange: str
     symbol: str
     timestamp: datetime
-    
+
     bid: Optional[Decimal] = None
     ask: Optional[Decimal] = None
     last: Decimal
-    
+
     volume_24h: Optional[Decimal] = None
     quote_volume_24h: Optional[Decimal] = None
     change_24h: Optional[Decimal] = None
     change_pct_24h: Optional[Decimal] = None
-    
+
     high_24h: Optional[Decimal] = None
     low_24h: Optional[Decimal] = None
-    
+
     source: str = ""

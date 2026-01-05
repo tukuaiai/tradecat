@@ -10,7 +10,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.base import RankingCard
 from cards.data_provider import get_ranking_provider, format_symbol
-from cards.i18n import btn_auto as _btn_auto
+from cards.i18n import btn_auto as _btn_auto, gettext as _t
 from cards.排行榜服务 import (
     DEFAULT_PERIODS,
     MONEY_FLOW_FUTURES_PERIODS,
@@ -22,7 +22,7 @@ from cards.排行榜服务 import (
 class MoneyFlowCard(RankingCard):
     """🌊 资金流向排行 - 资金流向排行榜"""
 
-    FALLBACK = "💰 资金流向数据加载中，请稍后重试..."
+    FALLBACK = "card.flow.fallback"
     SHOW_MARKET_SWITCH = False  # 当前仅期货，隐藏市场切换行
 
     def __init__(self) -> None:
@@ -175,7 +175,7 @@ class MoneyFlowCard(RankingCard):
             fields_state,
         )
 
-        aligned = user_handler.dynamic_align_format(rows) if rows else "暂无数据"
+        aligned = user_handler.dynamic_align_format(rows) if rows else _t("data.no_data")
         time_info = user_handler.get_current_time_display()
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         display_sort_field = flow_type.replace("_", "\\_")

@@ -11,13 +11,11 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import Dict, List, Sequence
 
 from cards.data_provider import get_ranking_provider, format_symbol
 from cards.i18n import btn_auto as _btn_auto
 
-from cards.数据库行情服务 import 获取数据库行情服务
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 

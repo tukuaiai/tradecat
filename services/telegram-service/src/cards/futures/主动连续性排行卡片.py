@@ -12,13 +12,13 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.base import RankingCard
 from cards.data_provider import get_ranking_provider, format_symbol
-from cards.i18n import btn_auto as _btn_auto
+from cards.i18n import btn_auto as _btn_auto, gettext as _t, resolve_lang
 
 
 class FuturesTakerStreakCard(RankingCard):
     """↕️ 主动连续性榜"""
 
-    FALLBACK = "↕️ 主动连续性数据加载中，请稍后重试..."
+    FALLBACK = "card.taker_streak.fallback"
     provider = get_ranking_provider()
     SHOW_MARKET_SWITCH = False
     DEFAULT_MARKET = "futures"
@@ -112,11 +112,14 @@ class FuturesTakerStreakCard(RankingCard):
         return False
 
     async def _reply(self, query, h, ensure):
-        text, kb = await self._build_payload(h, ensure)
+        await query.answer()
+        lang = resolve_lang(query)
+        text, kb = await self._build_payload(h, ensure, lang, query)
         await query.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
     async def _edit(self, query, h, ensure):
-        text, kb = await self._build_payload(h, ensure)
+        lang = resolve_lang(query)
+        text, kb = await self._build_payload(h, ensure, lang, query)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
 
     async def _build_payload(self, h, ensure):
@@ -127,7 +130,7 @@ class FuturesTakerStreakCard(RankingCard):
         fields_state = self._ensure_field_state(h)
 
         rows, header = self._load_rows(period, sort_order, limit, sort_field, fields_state)
-        aligned = h.dynamic_align_format(rows) if rows else "暂无数据"
+        aligned = h.dynamic_align_format(rows) if rows else _t("data.no_data")
 
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         display_sort_field = sort_field.replace("_", "\\_")
@@ -145,7 +148,7 @@ class FuturesTakerStreakCard(RankingCard):
             f"⏰ 最后更新 {time_info['full']}"
         )
         if callable(ensure):
-            text = ensure(text, self.FALLBACK)
+            text = ensure(text, _t(self.FALLBACK, update, lang=lang))
         kb = self._build_keyboard(h)
         return text, kb
 

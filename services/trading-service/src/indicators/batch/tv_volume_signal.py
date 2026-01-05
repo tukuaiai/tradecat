@@ -16,9 +16,9 @@ def calculate_ribbon(df: pd.DataFrame) -> Dict:
     ma100 = ma_last[100]
     current = close.iloc[-1]
 
-    bullish_count = sum(1 for period in MA_PERIODS 
+    bullish_count = sum(1 for period in MA_PERIODS
                         if ma_last[period] > ma100 and ma_lines[period].diff().iloc[-1] > 0)
-    bearish_count = sum(1 for period in MA_PERIODS 
+    bearish_count = sum(1 for period in MA_PERIODS
                         if ma_last[period] < ma100 and ma_lines[period].diff().iloc[-1] < 0)
 
     bullish_ratio = bullish_count / len(MA_PERIODS)

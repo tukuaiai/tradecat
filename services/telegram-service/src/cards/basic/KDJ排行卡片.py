@@ -14,7 +14,6 @@ from cards.data_provider import get_ranking_provider, format_symbol
 from cards.i18n import btn_auto as _btn_auto, gettext as _t, resolve_lang
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from cards.排行榜服务 import build_standard_keyboard, GENERAL_FIELDS
 
 
 class KDJ排行卡片(RankingCard):
@@ -141,6 +140,7 @@ class KDJ排行卡片(RankingCard):
         await query.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
     async def _edit(self, query, h, ensure):
+        lang = resolve_lang(query)
         await query.answer()
         lang = resolve_lang(query)
         text, kb = await self._build_payload(h, ensure, lang, query)
@@ -159,7 +159,7 @@ class KDJ排行卡片(RankingCard):
         sort_field = h.user_states.get("kdj_sort_field", "quote_volume")
         fields_state = self._ensure_field_state(h)
         rows, header = self._load_rows(period, sort_order, limit, sort_field, fields_state)
-        aligned = h.dynamic_align_format(rows) if rows else _t("data.no_data", update, lang=lang)
+        aligned = h.dynamic_align_format(rows) if rows else _t("data.no_data")
         display_sort_field = sort_field.replace("_", "\\_")
         time_info = h.get_current_time_display()
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
@@ -184,7 +184,7 @@ class KDJ排行卡片(RankingCard):
         sort_field = h.user_states.get("kdj_sort_field", "quote_volume")
         fields_state = self._ensure_field_state(h)
         rows, header = self._load_rows(period, sort_order, limit, sort_field, fields_state)
-        aligned = h.dynamic_align_format(rows) if rows else _t("data.no_data", update, lang=lang)
+        aligned = h.dynamic_align_format(rows) if rows else _t("data.no_data")
         display_sort_field = sort_field.replace("_", "\\_")
         time_info = h.get_current_time_display()
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
@@ -203,7 +203,7 @@ class KDJ排行卡片(RankingCard):
 
     def _build_keyboard(self, h):
         # 状态
-        fields_state = self._ensure_field_state(h)
+        self._ensure_field_state(h)
         period = h.user_states.get("kdj_period", "15m")
         sort_order = h.user_states.get("kdj_sort", "desc")
         current_limit = h.user_states.get("kdj_limit", 10)

@@ -14,45 +14,45 @@ from models.candle import Candle, CandleQuery
 @register_fetcher("baostock", "candle")
 class BaoStockCandleFetcher(BaseFetcher[CandleQuery, Candle]):
     """BaoStock K线获取器 - A股完全免费历史数据"""
-    
+
     def __init__(self):
         self._logged_in = False
-    
+
     def _ensure_login(self):
         if not self._logged_in:
             import baostock as bs
             bs.login()
             self._logged_in = True
-    
+
     def transform_query(self, params: dict[str, Any]) -> CandleQuery:
         return CandleQuery(**params)
-    
+
     async def extract(self, query: CandleQuery) -> list[dict[str, Any]]:
         import baostock as bs
-        
+
         await asyncio.to_thread(self._ensure_login)
-        
+
         # 转换 symbol: 000001 -> sh.000001 或 sz.000001
         symbol = query.symbol
         if not symbol.startswith(("sh.", "sz.")):
             prefix = "sh" if symbol.startswith("6") else "sz"
             symbol = f"{prefix}.{symbol}"
-        
+
         start = query.start.strftime("%Y-%m-%d") if query.start else "2015-01-01"
         end = query.end.strftime("%Y-%m-%d") if query.end else datetime.now().strftime("%Y-%m-%d")
-        
+
         rs = await asyncio.to_thread(
             bs.query_history_k_data_plus,
             symbol, "date,open,high,low,close,volume,amount",
             start_date=start, end_date=end,
             frequency="d", adjustflag="2"  # 前复权
         )
-        
+
         data = []
         while rs.error_code == "0" and rs.next():
             data.append(dict(zip(rs.fields, rs.get_row_data())))
         return data
-    
+
     def transform_data(self, raw: list[dict[str, Any]]) -> list[Candle]:
         results = []
         for r in raw:

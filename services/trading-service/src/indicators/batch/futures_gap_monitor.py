@@ -9,7 +9,7 @@ def get_metrics_times(symbol: str, limit: int = 240, interval: str = "5m") -> Li
     """从 PostgreSQL 获取时间戳列表"""
     import psycopg
     from ...config import config
-    
+
     # 根据周期选择表和列名
     if interval == "5m":
         table = "binance_futures_metrics_5m"
@@ -17,7 +17,7 @@ def get_metrics_times(symbol: str, limit: int = 240, interval: str = "5m") -> Li
     else:
         table = f"binance_futures_metrics_{interval}_last"
         time_col = "bucket"
-    
+
     try:
         with psycopg.connect(config.db_url) as conn:
             with conn.cursor() as cur:
@@ -37,7 +37,7 @@ def detect_gaps(times: List[datetime], interval_sec: int = 300) -> Dict:
     """检测时间序列中的缺口"""
     if not times:
         return {"已加载根数": 0, "最新时间": None, "缺失根数": None, "首缺口起": None, "首缺口止": None}
-    
+
     times = sorted(set(times))
     missing_segments = []
     for i in range(1, len(times)):
@@ -47,10 +47,10 @@ def detect_gaps(times: List[datetime], interval_sec: int = 300) -> Dict:
             gap_start = times[i-1] + timedelta(seconds=interval_sec)
             gap_end = times[i] - timedelta(seconds=interval_sec)
             missing_segments.append((gap_start, gap_end, miss))
-    
+
     total_missing = sum(seg[2] for seg in missing_segments)
     first_gap = missing_segments[0] if missing_segments else (None, None, 0)
-    
+
     return {
         "已加载根数": len(times),
         "最新时间": times[-1].isoformat(),
@@ -63,15 +63,15 @@ def detect_gaps(times: List[datetime], interval_sec: int = 300) -> Dict:
 @register
 class FuturesGapMonitor(Indicator):
     meta = IndicatorMeta(name="期货情绪缺口监控.py", lookback=1, is_incremental=False, min_data=1)
-    
+
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         # 只监控 5m 周期
         if interval != "5m":
             return self._make_insufficient_result(df, symbol, interval, {"信号": "仅支持5m周期"})
-        
+
         times = get_metrics_times(symbol, 240, interval)
         gap_info = detect_gaps(times, 300)
-        
+
         # 不使用 _make_result，直接构建（因为没有数据时间字段）
         row = {"交易对": symbol, **gap_info}
         return pd.DataFrame([row])

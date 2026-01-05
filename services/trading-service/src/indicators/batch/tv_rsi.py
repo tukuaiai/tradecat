@@ -1,9 +1,9 @@
 """智能RSI扫描器 - 多周期RSI与背离检测完整复刻"""
 import numpy as np
 import pandas as pd
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 from ..base import Indicator, IndicatorMeta, register
-from ..safe_calc import safe_rsi, safe_ema, safe_atr
+from ..safe_calc import safe_rsi, safe_atr
 
 RSI_PERIODS = [7, 14, 21]
 EMA_TREND_PERIOD = 34
@@ -53,7 +53,7 @@ def detect_divergence(df: pd.DataFrame, rsi: pd.Series, lookback: int = 50) -> T
     return "无背离", 0.0
 
 
-def evaluate_rsi_state(df: pd.DataFrame, rsi_7: pd.Series, rsi_14: pd.Series, 
+def evaluate_rsi_state(df: pd.DataFrame, rsi_7: pd.Series, rsi_14: pd.Series,
                        rsi_21: pd.Series, overbought: float, oversold: float) -> Dict:
     current_rsi_7 = rsi_7.iloc[-1]
     current_rsi_14 = rsi_14.iloc[-1]
@@ -95,7 +95,7 @@ def evaluate_rsi_state(df: pd.DataFrame, rsi_7: pd.Series, rsi_14: pd.Series,
         strength = abs(50 - rsi_avg) / 50 * 100
     strength = max(0.0, min(100.0, abs(strength)))
 
-    return {"signal": signal, "direction": direction, "strength": strength, 
+    return {"signal": signal, "direction": direction, "strength": strength,
             "rsi_avg": round(rsi_avg, 2), "trend": trend, "position": position}
 
 
@@ -105,8 +105,8 @@ class TvRSI(Indicator):
 
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         # 动态最小数据量：至少需要最大RSI周期+5
-        min_required = max(RSI_PERIODS) + 5
-        
+        max(RSI_PERIODS) + 5
+
         if len(df) < MIN_DATA:
             # 数据太少，返回带状态的空结果
             return self._make_result(df, symbol, interval, {
@@ -124,14 +124,14 @@ class TvRSI(Indicator):
             })
 
         high, low, close = df["high"], df["low"], df["close"]
-        
+
         # 使用安全计算 ATR
         atr, atr_status = safe_atr(high, low, close, ATR_PERIOD, min_period=3)
         if atr_status == "数据不足":
             atr_normalized = pd.Series([0.5] * len(df), index=df.index)
         else:
             atr_normalized = (atr - atr.min()) / (atr.max() - atr.min() + 1e-10)
-        
+
         current_atr_norm = atr_normalized.iloc[-1] if not np.isnan(atr_normalized.iloc[-1]) else 0.5
         overbought, oversold = calc_dynamic_threshold(current_atr_norm)
 
@@ -141,7 +141,7 @@ class TvRSI(Indicator):
         rsi_21, status_21 = safe_rsi(close, RSI_PERIODS[2], min_period=3)
 
         rsi_state = evaluate_rsi_state(df, rsi_7, rsi_14, rsi_21, overbought, oversold)
-        
+
         # 背离检测需要更多数据
         if len(df) >= 50:
             divergence_type, divergence_strength = detect_divergence(df, rsi_14, lookback=50)

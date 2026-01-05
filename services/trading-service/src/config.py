@@ -37,34 +37,34 @@ class Config:
         "DATABASE_URL",
         "postgresql://postgres:postgres@localhost:5433/market_data"
     ))
-    
+
     # SQLite（写入指标结果）
     sqlite_path: Path = field(default_factory=lambda: Path(os.getenv(
         "INDICATOR_SQLITE_PATH",
         str(PROJECT_ROOT / "libs/database/services/telegram-service/market_data.db")
     )))
-    
+
     # 计算参数
     default_lookback: int = 300
     max_workers: int = field(default_factory=lambda: int(os.getenv("MAX_WORKERS", "6")))
     exchange: str = "binance_futures_um"
     # 计算后端: thread | process | hybrid（IO用线程，CPU用进程）
     compute_backend: str = field(default_factory=lambda: os.getenv("COMPUTE_BACKEND", "thread").lower())
-    
+
     # IO/CPU 拆分执行器配置
     max_io_workers: int = field(default_factory=lambda: int(os.getenv("MAX_IO_WORKERS", "8")))
     max_cpu_workers: int = field(default_factory=lambda: int(os.getenv("MAX_CPU_WORKERS", "4")))
-    
+
     # K线指标周期
     kline_intervals: List[str] = field(default_factory=lambda: _parse_intervals(
         "KLINE_INTERVALS", "1m,5m,15m,1h,4h,1d,1w"
     ))
-    
+
     # 期货情绪周期
     futures_intervals: List[str] = field(default_factory=lambda: _parse_intervals(
         "FUTURES_INTERVALS", "5m,15m,1h,4h,1d,1w"
     ))
-    
+
     # 兼容旧代码
     @property
     def intervals(self) -> List[str]:

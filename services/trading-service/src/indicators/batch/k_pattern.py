@@ -1,7 +1,6 @@
 """K线形态指标 - 蜡烛形态 + 价格图形形态"""
 import logging
 import pandas as pd
-import numpy as np
 from ..base import Indicator, IndicatorMeta, register
 
 logger = logging.getLogger(__name__)
@@ -98,7 +97,7 @@ def _detect_tradingpatterns(ohlcv: pd.DataFrame) -> dict:
             if col in df.columns:
                 df[col.capitalize()] = df[col]
         pivot_df = tp.find_pivots(df)
-        
+
         detectors = [
             (tp.detect_head_shoulder, {"Head and Shoulder": -1.5, "Inverse Head and Shoulder": 1.5}),
             (tp.detect_double_top_bottom, {"Double Top": -1.2, "Double Bottom": 1.2}),
@@ -139,7 +138,7 @@ def _detect_patternpy(df: pd.DataFrame) -> dict:
             if need not in ohlcv:
                 ohlcv[need] = ohlcv["Close"]
         pivot_df = calculate_support_resistance(ohlcv)
-        
+
         detectors = [
             (detect_head_shoulder, {"Head and Shoulder": ("head_and_shoulder", -1.5), "Inverse Head and Shoulder": ("inverse_head_and_shoulder", 1.5)}),
             (detect_double_top_bottom, {"Double Top": ("double_top", -1.2), "Double Bottom": ("double_bottom", 1.2)}),
@@ -209,30 +208,30 @@ class KPattern(Indicator):
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         if not self._check_data(df):
             return self._make_insufficient_result(df, symbol, interval, {"形态": None})
-        
+
         # 准备 OHLCV 数据
         ohlcv = df.copy()
         for col in ["open", "high", "low", "close", "volume"]:
             if col in ohlcv.columns:
                 ohlcv[col.capitalize()] = ohlcv[col]
-        
+
         # 检测所有形态
         all_patterns = {}
         all_patterns.update(_detect_talib(df))
         all_patterns.update(_detect_tradingpatterns(ohlcv))
         all_patterns.update(_detect_patternpy(df))
         all_patterns.update(_detect_trendln(df))
-        
+
         # 转中文
         cn_patterns = [_to_chinese(k) for k in all_patterns.keys()]
         pattern_str = ",".join(cn_patterns) if cn_patterns else "无形态"
-        
+
         # 计算强度
         strength = sum(abs(v) for v in all_patterns.values())
-        
+
         quote = df.get("quote_volume", df["volume"] * df["close"])
         turnover = float(quote.iloc[-1]) if not pd.isna(quote.iloc[-1]) else 0
-        
+
         return self._make_result(df, symbol, interval, {
             "形态类型": pattern_str,
             "检测数量": len(all_patterns),

@@ -2,20 +2,17 @@
 
 from __future__ import annotations
 
-import asyncio
 import re
-from typing import Dict, Tuple
+from typing import Dict
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.base import RankingCard
-from cards.排行榜服务 import LIQUIDATION_PERIODS, get_liquidation_service, normalize_period
 
 
 class LiquidationRankingCard(RankingCard):
     """🕷️ 爆仓排行 - 爆仓排行榜"""
 
-    FALLBACK = "📊 爆仓数据加载中，请稍后重试..."
+    FALLBACK = "card.liquidation.fallback"
 
     def __init__(self) -> None:
         # 暂时关闭该卡片：移除菜单入口/回调，防止展示

@@ -29,7 +29,7 @@ class Order:
 
 class Engine:
     """做市引擎"""
-    
+
     def __init__(self, exchange: str, api_key: str, api_secret: str,
                  testnet: bool = True, proxy: str = None, hedge_mode: bool = False,
                  strict_no_rest_markets: bool = False, markets_path: str = "config/markets.json",
@@ -43,23 +43,23 @@ class Engine:
         }
         if proxy:
             config["proxies"] = {"http": proxy, "https": proxy}
-        
+
         self.exchange = getattr(ccxt, exchange)(config)
         self.exchange.has["fetchCurrencies"] = False
         self.strict_no_rest_markets = strict_no_rest_markets
         self.markets_path = Path(markets_path)
         self.markets_sha256_path = Path(markets_sha256_path) if markets_sha256_path else None
-        
+
         if testnet and exchange == "binanceusdm":
             self._setup_testnet()
         if self.strict_no_rest_markets:
             self._preload_markets()
-        
+
         self.orders: Dict[str, Order] = {}
         self.orders_by_symbol: Dict[str, List[Order]] = {}
         self._last_cancel_ts: Dict[str, float] = {}
         self.cancel_rate_limited = 0
-        
+
         # 持仓模式由配置决定，避免额外 REST 探测
         self.hedge_mode = hedge_mode
         self.user_stream = None
@@ -90,18 +90,18 @@ class Engine:
         self.exchange.load_markets = lambda *a, **k: markets
         self.exchange.has["loadMarkets"] = False
         self.exchange.has["fetchMarkets"] = False
-    
+
     def _setup_testnet(self):
         self.exchange.set_sandbox_mode(True)
         base = "https://testnet.binancefuture.com"
         for key in ["fapiPublic", "fapiPrivate", "fapiPublicV2", "fapiPrivateV2", "fapi"]:
             if key in self.exchange.urls.get("api", {}):
                 self.exchange.urls["api"][key] = f"{base}/fapi/v1"
-    
+
     def get_mid_price(self, symbol: str) -> float:
         """保留兼容接口（不再调用 REST）"""
         return 0.0
-    
+
     def place_quote(self, symbol: str, quote: Quote) -> tuple:
         params = self._order_params
         bid_order = ask_order = None
@@ -116,7 +116,7 @@ class Engine:
             self.orders_by_symbol.setdefault(symbol, []).append(bid_order)
         except Exception as e:
             print(f"买单失败: {e}")
-        
+
         try:
             res = self.exchange.create_limit_order(
                 symbol, "sell", quote.ask_qty, quote.ask_price, params=params("sell"))
@@ -125,9 +125,9 @@ class Engine:
             self.orders_by_symbol.setdefault(symbol, []).append(ask_order)
         except Exception as e:
             print(f"卖单失败: {e}")
-        
+
         return bid_order, ask_order
-    
+
     def cancel_all(self, symbol: str):
         try:
             self.exchange.cancel_all_orders(symbol)
@@ -170,7 +170,7 @@ class Engine:
             self._last_cancel_ts[symbol] = now
             return True
         return False
-    
+
     def get_position(self, symbol: str) -> float:
         # 优先使用用户数据流缓存
         if self.user_stream:
@@ -178,7 +178,7 @@ class Engine:
             if pos is not None:
                 return pos
         return 0
-    
+
     def flat_position(self, symbol: str):
         """平仓，支持重试，返回是否全部提交成功"""
         if not self.user_stream:
@@ -218,7 +218,7 @@ class Engine:
             "flat_failure_count": self.flat_failure_count,
             "cancel_rate_limited": self.cancel_rate_limited,
         }
-    
+
     def _order_params(self, side: str) -> Dict:
         if self.hedge_mode:
             return {"positionSide": "LONG" if side == "buy" else "SHORT"}

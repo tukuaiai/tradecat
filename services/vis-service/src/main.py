@@ -9,7 +9,7 @@ vis-service 入口。
 
 import logging
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from api.routes import router

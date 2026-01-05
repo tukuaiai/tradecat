@@ -146,30 +146,30 @@ def _query_futures_priority(top_n: int = 30) -> set:
                     ORDER BY symbol, create_time DESC
                 """)
                 rows = cur.fetchall()
-                
+
                 oi_value_rank = []
                 taker_extreme = set()
                 ls_extreme = set()
-                
+
                 for row in rows:
                     sym, oi_val, taker, ls = row
-                    
+
                     # 持仓价值 Top N
                     if oi_val:
                         oi_value_rank.append((sym, float(oi_val)))
-                    
+
                     # 主动买卖比极端 (<0.2 或 >5.0)
                     if taker:
                         t = float(taker)
                         if t < 0.2 or t > 5.0:
                             taker_extreme.add(sym)
-                    
+
                     # 多空比极端 (<0.5 或 >4.0)
                     if ls:
                         l = float(ls)
                         if l < 0.5 or l > 4.0:
                             ls_extreme.add(sym)
-                
+
                 top_oi_value = {s for s, _ in sorted(oi_value_rank, key=lambda x: x[1], reverse=True)[:top_n]}
                 result = top_oi_value | taker_extreme | ls_extreme
     except Exception as e:
@@ -180,7 +180,7 @@ def _query_futures_priority(top_n: int = 30) -> set:
 def get_high_priority_symbols_fast(top_n: int = 30) -> set:
     """快速获取高优先级币种 - K线+期货并行查询"""
     result = set()
-    
+
     with ThreadPoolExecutor(max_workers=2) as executor:
         futures = [
             executor.submit(_query_kline_priority, top_n),
@@ -191,7 +191,7 @@ def get_high_priority_symbols_fast(top_n: int = 30) -> set:
                 result.update(f.result())
             except Exception as e:
                 log(f"优先级查询失败: {e}")
-    
+
     return result
 
 
@@ -228,23 +228,23 @@ def get_indicator_latest(interval: str) -> datetime:
 def check_need_calc() -> list:
     """对比数据源和指标库，返回需要计算的周期"""
     need_calc = []
-    
+
     for interval in INTERVALS:
         try:
             source_ts = get_source_latest(interval)
             indicator_ts = get_indicator_latest(interval)
-            
+
             if source_ts is None:
                 continue
-            
+
             if indicator_ts is None or source_ts > indicator_ts:
                 need_calc.append(interval)
-            
+
             last_computed[interval] = source_ts
         except Exception as e:
             log(f"检查 {interval} 需要计算失败: {e}")
             need_calc.append(interval)
-    
+
     return need_calc
 
 
@@ -252,16 +252,16 @@ def run_calculation(intervals: list, symbols: list):
     """执行指标计算"""
     if not intervals or not symbols:
         return
-    
+
     import subprocess
-    
+
     env = os.environ.copy()
     env["PYTHONPATH"] = "src"
     env["TEST_SYMBOLS"] = ",".join(symbols)
-    
+
     interval_str = ",".join(intervals)
     log(f"计算 {interval_str} ({len(symbols)}币种)")
-    
+
     result = subprocess.run(
         ["python3", "-m", "src", "--intervals", interval_str],
         cwd=TRADING_SERVICE_DIR,
@@ -269,7 +269,7 @@ def run_calculation(intervals: list, symbols: list):
         capture_output=True,
         text=True,
     )
-    
+
     if result.returncode == 0:
         for line in result.stdout.split("\n"):
             if "计算完成" in line or "rows" in line.lower():
@@ -281,10 +281,10 @@ def run_calculation(intervals: list, symbols: list):
 def update_priority():
     """更新币种列表"""
     global high_priority_symbols, last_priority_update
-    
+
     t0 = time.time()
     configured = get_configured_symbols()
-    
+
     if configured:
         # 使用配置的分组
         symbols = configured
@@ -297,41 +297,41 @@ def update_priority():
         exclude = {s.strip().upper() for s in os.environ.get("SYMBOLS_EXCLUDE", "").split(",") if s.strip()}
         symbols = sorted((set(symbols) | set(extra)) - exclude)
         log(f"自动高优先级: {len(symbols)} 币种")
-    
+
     high_priority_symbols = symbols
     last_priority_update = time.time()
     log(f"币种更新完成, 耗时 {time.time()-t0:.1f}s")
-    
+
     if high_priority_symbols:
         log(f"前10: {high_priority_symbols[:10]}")
 
 
 def main():
     global last_priority_update
-    
+
     log("=" * 50)
     log("简单定时计算服务启动")
     log("=" * 50)
-    
+
     # 1. 识别高优先级币种
     update_priority()
-    
+
     if not high_priority_symbols:
         log("无高优先级币种，退出")
         return
-    
+
     # 2. 启动时强制计算全部周期（确保表里有全周期数据）
     log(f"首次启动，计算全部周期: {INTERVALS}")
     run_calculation(INTERVALS, high_priority_symbols)
-    
+
     log("-" * 50)
     log("进入轮询检查 (每10秒检查新数据, 每小时更新优先级)...")
-    
+
     while True:
         # 每小时更新优先级
         if time.time() - last_priority_update > 3600:
             update_priority()
-        
+
         # 检查新数据
         to_calc = []
         for interval in INTERVALS:
@@ -342,10 +342,10 @@ def main():
                     last_computed[interval] = latest
             except Exception as e:
                 log(f"检查 {interval} 失败: {e}")
-        
+
         if to_calc:
             run_calculation(to_calc, high_priority_symbols)
-        
+
         time.sleep(10)
 
 

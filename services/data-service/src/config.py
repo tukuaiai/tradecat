@@ -35,7 +35,7 @@ class Settings:
         "DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/market_data"
     ))
     http_proxy: Optional[str] = field(default_factory=lambda: os.getenv("HTTP_PROXY") or os.getenv("HTTPS_PROXY"))
-    
+
     # 日志和数据目录改为项目内
     log_dir: Path = field(default_factory=lambda: Path(os.getenv(
         "DATA_SERVICE_LOG_DIR", str(PROJECT_ROOT / "services" / "data-service" / "logs")
@@ -43,15 +43,15 @@ class Settings:
     data_dir: Path = field(default_factory=lambda: Path(os.getenv(
         "DATA_SERVICE_DATA_DIR", str(PROJECT_ROOT / "libs" / "database" / "csv")
     )))
-    
+
     ws_gap_interval: int = field(default_factory=lambda: _int_env("BINANCE_WS_GAP_INTERVAL", 600))
     ws_gap_lookback: int = field(default_factory=lambda: _int_env("BINANCE_WS_GAP_LOOKBACK", 10080))
     ws_source: str = field(default_factory=lambda: os.getenv("BINANCE_WS_SOURCE", "binance_ws"))
-    
+
     db_schema: str = field(default_factory=lambda: os.getenv("KLINE_DB_SCHEMA", "market_data"))
     db_exchange: str = field(default_factory=lambda: os.getenv("BINANCE_WS_DB_EXCHANGE", "binance_futures_um"))
     ccxt_exchange: str = field(default_factory=lambda: os.getenv("BINANCE_WS_CCXT_EXCHANGE", "binance"))
-    
+
     def __post_init__(self):
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)

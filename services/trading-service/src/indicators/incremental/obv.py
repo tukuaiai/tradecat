@@ -7,7 +7,7 @@ from ..base import Indicator, IndicatorMeta, register
 @register
 class OBV(Indicator):
     meta = IndicatorMeta(name="OBV能量潮扫描器.py", lookback=50, is_incremental=True)
-    
+
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         if len(df) < 32:
             return pd.DataFrame()

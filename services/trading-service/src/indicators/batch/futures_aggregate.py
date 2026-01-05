@@ -1,9 +1,8 @@
 """期货情绪聚合表 - 完整复刻原代码"""
-import os
 import statistics
 import pandas as pd
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List
 from ..base import Indicator, IndicatorMeta, register
 
 
@@ -75,7 +74,7 @@ def get_metrics_history(symbol: str, limit: int = 100, interval: str = "5m") -> 
     """从 PostgreSQL 读取期货情绪历史数据"""
     import psycopg
     from ...config import config
-    
+
     # 根据周期选择表和列名（期货只有 5m/15m/1h/4h/1d/1w）
     if interval == "5m":
         table = "binance_futures_metrics_5m"
@@ -85,7 +84,7 @@ def get_metrics_history(symbol: str, limit: int = 100, interval: str = "5m") -> 
         table = f"binance_futures_metrics_{interval}_last"
         time_col = "bucket"
         closed_col = "complete"
-    
+
     try:
         with psycopg.connect(config.db_url) as conn:
             with conn.cursor() as cur:
@@ -117,7 +116,7 @@ def get_metrics_history(symbol: str, limit: int = 100, interval: str = "5m") -> 
 @register
 class FuturesAggregate(Indicator):
     meta = IndicatorMeta(name="期货情绪聚合表.py", lookback=1, is_incremental=False, min_data=1)
-    
+
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         # 期货数据只有 5m/15m/1h/4h/1d/1w，跳过1m
         if interval == "1m":
@@ -125,12 +124,12 @@ class FuturesAggregate(Indicator):
         history = get_metrics_history(symbol, 240, interval)
         if not history:
             return self._make_insufficient_result(df, symbol, interval, {"信号": None})
-        
+
         latest = history[-1]
         prev = history[-2] if len(history) >= 2 else None
         ts = latest.get("datetime")
         now_ts = datetime.now(timezone.utc)
-        
+
         # 基础数据
         oi = _f(latest.get("oi"))
         oiv = _f(latest.get("oiv"))
@@ -138,50 +137,50 @@ class FuturesAggregate(Indicator):
         lsr = _f(latest.get("lsr"))     # 全体多空比
         tlsvr = _f(latest.get("tlsvr")) # 主动成交多空比
         is_closed = 1 if latest.get("x", False) else 0
-        
+
         # 数据新鲜秒
         freshness = (now_ts - ts).total_seconds() if ts else None
-        
+
         # 持仓变动
         prev_oiv = _f(prev.get("oiv")) if prev else None
         oi_change = oiv - prev_oiv if oiv and prev_oiv else None
         oi_change_pct = oi_change / prev_oiv if oi_change and prev_oiv else None
-        
+
         # 偏离度 (距离1的绝对值)
         top_dev = abs(tlsr - 1) if tlsr else None
         retail_dev = abs(lsr - 1) if lsr else None
         taker_dev = abs(tlsvr - 1) if tlsvr else None
-        
+
         # 情绪差值
         bias_diff = tlsr - lsr if tlsr and lsr else None
         bias_spread = abs(bias_diff) if bias_diff else None
-        
+
         # 窗口统计
         oi_series = [_f(h.get("oiv")) for h in history if _f(h.get("oiv"))]
         top_series = [_f(h.get("tlsr")) for h in history if _f(h.get("tlsr"))]
         retail_series = [_f(h.get("lsr")) for h in history if _f(h.get("lsr"))]
         taker_series = [_f(h.get("tlsvr")) for h in history if _f(h.get("tlsvr"))]
-        
+
         volatility = _std_over_mean(oi_series)
         oi_slope = _linreg_slope_pct(oi_series)  # 改用百分比斜率
         oi_z = _z_score(oiv, oi_series) if oiv else None
         stability_pct = _percentile_rank(oi_series, volatility) if volatility else None
-        
+
         # OI连续根数
         oi_deltas = []
         for a, b in zip(oi_series[:-1], oi_series[1:]):
             diff = b - a if a and b else 0
             oi_deltas.append(0 if diff == 0 else (1 if diff > 0 else -1))
         oi_streak = _尾部连续根数(oi_deltas)
-        
+
         # 主动连续根数
         taker_signs = [0 if abs(v - 1) < 1e-9 else (1 if v > 1 else -1) for v in taker_series]
         taker_streak = _尾部连续根数(taker_signs)
-        
+
         # 波动率
         top_vol = _std_over_mean(top_series)
         retail_vol = _std_over_mean(retail_series)
-        
+
         # 风险分 (Z分数之和)
         delta_pct_series = [(b - a) / a for a, b in zip(oi_series[:-1], oi_series[1:]) if a and b and a != 0]
         z_delta = _z_score(oi_change_pct, delta_pct_series) if oi_change_pct else None
@@ -191,27 +190,27 @@ class FuturesAggregate(Indicator):
         z_taker = _z_score(taker_dev, taker_dev_series) if taker_dev else None
         components = [z for z in (z_delta, z_top, z_taker) if z is not None]
         risk_score = sum(components) if components else None
-        
+
         # 情绪动量
         prev_tlsr = _f(prev.get("tlsr")) if prev else None
         prev_tlsvr = _f(prev.get("tlsvr")) if prev else None
         top_momentum = tlsr - prev_tlsr if tlsr and prev_tlsr else None
         taker_momentum = tlsvr - prev_tlsvr if tlsvr and prev_tlsvr else None
-        
+
         # 翻转信号
         flip_signal = 0
         if prev_tlsr and tlsr:
             if prev_tlsr < 1 < tlsr: flip_signal = 1
             elif prev_tlsr > 1 > tlsr: flip_signal = -1
-        
+
         # 主动跳变幅度
         taker_jump = abs(tlsvr - prev_tlsvr) if tlsvr and prev_tlsvr else None
-        
+
         # 陈旧标记
         period_seconds = {"5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800}
         threshold = period_seconds.get(interval, 600) * 3
         stale = 1 if (freshness is None or freshness > threshold) else 0
-        
+
         return self._make_result(df, symbol, interval, {
             "是否闭合": is_closed,
             "数据新鲜秒": freshness,

@@ -647,7 +647,7 @@ def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
     required_cols = {"symbol", "price", "value_area_low", "value_area_high"}
     if not required_cols.issubset(df.columns):
         raise ValueError("data 需包含 symbol, price, value_area_low, value_area_high")
-    
+
     df = df.dropna(subset=["price", "value_area_low", "value_area_high"])
     df["span"] = (df["value_area_high"] - df["value_area_low"]).astype(float)
     df = df[df["span"] > 0]
@@ -661,16 +661,16 @@ def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
 
     n = len(df)
     fig_height = min(14, max(10, n * 0.028))
-    
+
     sns.set_theme(style="white")
     fig, ax = plt.subplots(1, 1, figsize=(16, fig_height), dpi=150)
-    
+
     # 更丰富的背景色带
     band_colors = ["#4a148c", "#1a237e", "#006064", "#1b5e20", "#f9a825", "#ff6f00"]
     if bands != 6:
         cmap = plt.cm.viridis
         band_colors = [cmap(i / max(1, bands - 1)) for i in range(bands)]
-    
+
     for i in range(bands):
         y0 = i / bands
         ax.add_patch(plt.Rectangle((0.0, y0), 1.0, 1/bands, facecolor=band_colors[i], alpha=0.85, edgecolor="none"))
@@ -699,7 +699,7 @@ def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
     df = df.sort_values("y").reset_index(drop=True)
     y_bins = pd.cut(df["y"], bins=25, labels=False)
     df["y_bin"] = y_bins.fillna(0).astype(int)
-    
+
     x_positions = []
     for bin_id in range(25):
         bin_mask = df["y_bin"] == bin_id
@@ -711,33 +711,32 @@ def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
                 x = (i + 0.5) / bin_count * 0.88 + 0.06
                 x += rng.uniform(-0.015, 0.015)  # 小抖动
                 x_positions.append((idx, x))
-    
+
     for idx, x in x_positions:
         df.loc[idx, "x"] = x
     df["x"] = df["x"].clip(0.03, 0.97)
 
-    # 绘制圆圈
-    base_size = 280
-    base_font = 3.6
+    # 绘制圆圈 - 参数调大
+    base_font = 5.0  # 基础字号放大
     texts = []
-    
+
     # 成交量排序映射颜色：深红 -> 橙 -> 黄 -> 浅黄
-    vol_cmap = plt.cm.YlOrRd_r  # 黄-橙-红 反转 = 红->橙->黄
-    
+    vol_cmap = plt.cm.YlOrRd_r
+
     for _, row in df.iterrows():
         label = str(row["symbol"]).replace("USDT", "")
         if len(label) > 6:
             label = label[:6] + ".."
-        
-        # 市值决定大小
+
+        # 市值决定大小 - 放大系数
         size_factor = row.get("size_factor", 1.0)
-        font_size = base_font * (0.7 + size_factor * 0.4)
-        
-        # 成交量决定填充颜色（深红到浅黄渐变）
+        font_size = base_font * (0.8 + size_factor * 0.7)  # 更大范围
+
+        # 成交量决定填充颜色
         vol_factor = row.get("vol_factor", 0.5)
         rgba = vol_cmap(1 - vol_factor)
         point_color = f"#{int(rgba[0]*255):02x}{int(rgba[1]*255):02x}{int(rgba[2]*255):02x}"
-        
+
         # 涨跌决定边框颜色
         chg = row.get("price_change")
         if chg is not None and chg > 0.005:
@@ -746,7 +745,10 @@ def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
             edge_color = "#d73027"  # 红
         else:
             edge_color = "#ffffff"  # 白
-        
+
+        # 边框宽度随大小变化 - 更粗
+        edge_width = 2.0 + size_factor * 2.5
+
         txt = ax.text(
             row["x"], row["y"], label,
             ha="center", va="center",
@@ -754,23 +756,27 @@ def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
             color="#1a1a1a",
             fontweight="bold",
             zorder=4,
-            bbox=dict(boxstyle="circle,pad=0.25", facecolor=point_color, edgecolor=edge_color, linewidth=2.5, alpha=0.9),
+            bbox=dict(boxstyle="circle,pad=0.4", facecolor=point_color, edgecolor=edge_color, linewidth=edge_width, alpha=0.92),
         )
         texts.append(txt)
 
-    # adjustText 微调
-    adjust_text(
-        texts,
-        x=df["x"].tolist(),
-        y=df["y"].tolist(),
-        ax=ax,
-        expand=(1.15, 1.25),
-        force_text=(0.5, 0.7),
-        force_static=(0.2, 0.3),
-        force_pull=(0.003, 0.003),
-        arrowprops=dict(arrowstyle="-", color="#666666", lw=0.3, alpha=0.4),
-        time_lim=3,
-    )
+    # adjustText 微调 - 更紧凑，限制迭代
+    try:
+        adjust_text(
+            texts,
+            x=df["x"].tolist(),
+            y=df["y"].tolist(),
+            ax=ax,
+            expand=(1.03, 1.05),  # 更紧凑
+            force_text=(0.2, 0.3),  # 减小推力
+            force_static=(0.05, 0.08),
+            force_pull=(0.02, 0.02),  # 增加回拉力
+            arrowprops=dict(arrowstyle="-", color="#666666", lw=0.3, alpha=0.4),
+            time_lim=1.5,
+            only_move={"text": "xy"},
+        )
+    except Exception as e:
+        logger.warning("adjustText failed: %s", e)
 
     # 样式
     for spine in ["top", "right", "bottom"]:
@@ -783,22 +789,22 @@ def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
     ax.set_yticklabels(["0%", "20%", "40%", "60%", "80%", "100%"], fontsize=9, color="#333333")
     ax.set_ylabel("Position in Value Area", fontsize=10, color="#333333", labelpad=8)
 
-    # 右下角图例
+    # 右下角图例 - 放大
     legend_y_start = 0.32
     legend_x = 0.88
     legend_items = [
-        ("Overbought", band_colors[-1], 50, "#333"),
-        ("POC Zone", band_colors[len(band_colors)//2], 50, "#333"),
-        ("Oversold", band_colors[0], 50, "#333"),
-        ("High Vol", "#b71c1c", 60, "#333"),
-        ("Low Vol", "#ffffcc", 40, "#333"),
-        ("Up", "#ffcc80", 50, "#1a9850"),
-        ("Down", "#ffcc80", 50, "#d73027"),
+        ("Overbought", band_colors[-1], 80, "#333"),
+        ("POC Zone", band_colors[len(band_colors)//2], 80, "#333"),
+        ("Oversold", band_colors[0], 80, "#333"),
+        ("High Vol", "#b71c1c", 90, "#333"),
+        ("Low Vol", "#ffffcc", 60, "#333"),
+        ("Up", "#ffcc80", 80, "#1a9850"),
+        ("Down", "#ffcc80", 80, "#d73027"),
     ]
     for i, (lbl, color, size, edge) in enumerate(legend_items):
-        y_pos = legend_y_start - i * 0.04
-        ax.scatter([legend_x], [y_pos], s=size, c=[color], edgecolors=edge, linewidths=1.5, transform=ax.transAxes, zorder=9)
-        ax.text(legend_x + 0.025, y_pos, lbl, fontsize=7, va="center", ha="left", transform=ax.transAxes, color="#333333", zorder=9)
+        y_pos = legend_y_start - i * 0.045
+        ax.scatter([legend_x], [y_pos], s=size, c=[color], edgecolors=edge, linewidths=2, transform=ax.transAxes, zorder=9)
+        ax.text(legend_x + 0.03, y_pos, lbl, fontsize=9, va="center", ha="left", transform=ax.transAxes, color="#333333", zorder=9)
 
     ax.set_xlim(-0.01, 1.01)
     ax.set_ylim(-0.02, 1.02)
@@ -811,8 +817,8 @@ def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
             {
                 "title": params.get("title", "VPVR Zone Distribution"),
                 "bands": bands,
-                "points": [{"symbol": row["symbol"], "position": float(row["y_raw"]), "x": float(row["x"]), 
-                           "size_factor": float(row.get("size_factor", 1)), "vol_factor": float(row.get("vol_factor", 0.5))} 
+                "points": [{"symbol": row["symbol"], "position": float(row["y_raw"]), "x": float(row["x"]),
+                           "size_factor": float(row.get("size_factor", 1)), "vol_factor": float(row.get("vol_factor", 0.5))}
                           for _, row in df.iterrows()],
             },
             "application/json",

@@ -9,14 +9,14 @@ from typing import Dict, Tuple
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.base import RankingCard
-from cards.i18n import btn_auto as _btn_auto
+from cards.i18n import btn_auto as _btn_auto, gettext as _t
 from cards.排行榜服务 import DEFAULT_PERIODS, get_funding_service, normalize_period
 
 
 class FundingRateCard(RankingCard):
     """🎯 资金费率排行 - 资金费率排行榜"""
 
-    FALLBACK = "💲 资金费率数据加载中，请稍后重试..."
+    FALLBACK = "card.funding.fallback"
 
     def __init__(self) -> None:
         super().__init__(
@@ -143,7 +143,7 @@ class FundingRateCard(RankingCard):
         rows, header = await loop.run_in_executor(
             None, self._load_rows, service, limit, sort_order, sort_type, period, fields_state
         )
-        aligned = user_handler.dynamic_align_format(rows) if rows else "暂无数据"
+        aligned = user_handler.dynamic_align_format(rows) if rows else _t("data.no_data")
         time_info = user_handler.get_current_time_display()
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         text = (
@@ -164,7 +164,7 @@ class FundingRateCard(RankingCard):
         sort_order = h.user_states.get('funding_sort', 'desc')
         current_limit = h.user_states.get('funding_limit', 10)
         sort_type = h.user_states.get('funding_sort_type', 'funding_rate')
-        period = h.user_states.get('funding_period', '24h')
+        h.user_states.get('funding_period', '24h')
 
         def b(label: str, data: str, active: bool = False, disabled: bool = False):
 

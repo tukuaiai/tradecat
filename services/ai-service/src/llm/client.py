@@ -22,7 +22,7 @@ LLM_BACKEND = os.getenv("LLM_BACKEND", "cli")
 
 
 async def call_llm(
-    messages: List[Dict[str, str]], 
+    messages: List[Dict[str, str]],
     model: str = "gemini-2.5-flash",
     backend: str = None,
 ) -> Tuple[str, str]:
@@ -38,7 +38,7 @@ async def call_llm(
         (content, raw_response): 回复内容和原始响应
     """
     backend = backend or LLM_BACKEND
-    
+
     if backend == "cli":
         return await _call_gemini_cli(messages, model)
     else:
@@ -49,7 +49,7 @@ async def _call_api(messages: List[Dict[str, str]], model: str) -> Tuple[str, st
     """通过 API 网关调用"""
     try:
         from libs.common.utils.LLM客户端 import 创建LLM客户端
-        
+
         if HTTP_PROXY:
             os.environ["HTTP_PROXY"] = HTTP_PROXY
             os.environ["HTTPS_PROXY"] = HTTP_PROXY
@@ -74,14 +74,14 @@ async def _call_api(messages: List[Dict[str, str]], model: str) -> Tuple[str, st
 async def _call_gemini_cli(messages: List[Dict[str, str]], model: str) -> Tuple[str, str]:
     """通过 Gemini CLI 无头模式调用"""
     import asyncio
-    
+
     try:
         from libs.common.utils.gemini_client import call_gemini_with_system
-        
+
         # 提取 system 和 user 消息
         system_prompt = None
         user_content = ""
-        
+
         for msg in messages:
             role = msg.get("role", "")
             content = msg.get("content", "")
@@ -89,9 +89,9 @@ async def _call_gemini_cli(messages: List[Dict[str, str]], model: str) -> Tuple[
                 system_prompt = content
             elif role == "user":
                 user_content += content + "\n"
-        
+
         user_content = user_content.strip()
-        
+
         # 调用 Gemini CLI（同步转异步）
         loop = asyncio.get_event_loop()
         success, result = await loop.run_in_executor(
@@ -104,12 +104,12 @@ async def _call_gemini_cli(messages: List[Dict[str, str]], model: str) -> Tuple[
                 use_proxy=True,  # 使用代理
             )
         )
-        
+
         if success:
             return result, json.dumps({"source": "gemini_cli", "model": model}, ensure_ascii=False)
         else:
             return f"[CLI_ERROR] {result}", json.dumps({"error": result}, ensure_ascii=False)
-            
+
     except ImportError as e:
         return f"[CLI_ERROR] gemini_client 未安装: {e}", json.dumps({"error": str(e)}, ensure_ascii=False)
     except Exception as e:

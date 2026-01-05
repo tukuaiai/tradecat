@@ -13,12 +13,12 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.base import RankingCard
 from cards.data_provider import get_ranking_provider, format_symbol
-from cards.i18n import btn_auto as _btn_auto
+from cards.i18n import btn_auto as _btn_auto, gettext as _t, resolve_lang
 from cards.排行榜服务 import DEFAULT_PERIODS, normalize_period
 
 
 class VolumeRankingCard(RankingCard):
-    FALLBACK = "📈 交易量数据加载中，请稍后重试..."
+    FALLBACK = "card.volume.fallback"
     provider = get_ranking_provider()
 
     def __init__(self) -> None:
@@ -108,14 +108,17 @@ class VolumeRankingCard(RankingCard):
         return False
 
     async def _reply(self, query, h, ensure):
-        text, kb = await self._build_payload(h, ensure)
+        await query.answer()
+        lang = resolve_lang(query)
+        text, kb = await self._build_payload(h, ensure, lang, query)
         await query.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
     async def _edit(self, query, h, ensure):
-        text, kb = await self._build_payload(h, ensure)
+        lang = resolve_lang(query)
+        text, kb = await self._build_payload(h, ensure, lang, query)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
 
-    async def _build_payload(self, h, ensure) -> Tuple[str, object]:
+    async def _build_payload(self, h, ensure, lang: str = "zh_CN", update=None) -> Tuple[str, object]:
         period = h.user_states.get("volume_period", "15m")
         sort_order = h.user_states.get("volume_sort", "desc")
         limit = h.user_states.get("volume_limit", 10)
@@ -170,7 +173,7 @@ class VolumeRankingCard(RankingCard):
                     row.append(str(val) if val not in (None, "") else "-")
             rows.append(row)
 
-        aligned = h.dynamic_align_format(rows) if rows else "暂无数据"
+        aligned = h.dynamic_align_format(rows) if rows else _t("data.no_data")
         time_info = h.get_current_time_display()
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         # Markdown 模式下需转义下划线，避免出现“Can't parse entities”错误
@@ -186,7 +189,7 @@ class VolumeRankingCard(RankingCard):
             f"⏰ 最后更新 {time_info['full']}"
         )
         if callable(ensure):
-            text = ensure(text, self.FALLBACK)
+            text = ensure(text, _t(self.FALLBACK, update, lang=lang))
         kb = self._build_keyboard(h)
         return text, kb
 

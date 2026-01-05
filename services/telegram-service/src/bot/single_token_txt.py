@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import unicodedata
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Dict, List, Any, Optional
 
 from cards.data_provider import format_symbol, get_ranking_provider
 from cards.i18n import gettext as _t
@@ -51,35 +51,35 @@ def format_psql_table(headers: List[str], rows: List[List[str]], title: str = No
     """
     if not headers:
         return ""
-    
+
     # 计算每列最大宽度
     col_count = len(headers)
     widths = [_disp_width(h) for h in headers]
-    
+
     for row in rows:
         for i, cell in enumerate(row[:col_count]):
             widths[i] = max(widths[i], _disp_width(str(cell)))
-    
+
     # 构建表格
     lines = []
-    
+
     # 标题
     if title:
         lines.append(f"=== {title} ===")
         lines.append("")
-    
+
     # 表头
     header_parts = []
     for i, h in enumerate(headers):
         header_parts.append(_pad(h, widths[i], "center" if i == 0 else "center"))
     lines.append(" " + " | ".join(header_parts))
-    
+
     # 分隔线
     sep_parts = []
     for w in widths:
         sep_parts.append("-" * w)
     lines.append("-" + "-+-".join(sep_parts) + "-")
-    
+
     # 数据行
     for row in rows:
         row_parts = []
@@ -88,7 +88,7 @@ def format_psql_table(headers: List[str], rows: List[List[str]], title: str = No
             align = "left" if i == 0 else "right"
             row_parts.append(_pad(str(cell), widths[i], align))
         lines.append(" " + " | ".join(row_parts))
-    
+
     return "\n".join(lines)
 
 
@@ -237,32 +237,32 @@ PANEL_CONFIG = {
 
 class SingleTokenTxtExporter:
     """单币种完整 TXT 导出器"""
-    
+
     def __init__(self):
         self.provider = get_ranking_provider()
-    
+
     def _get_data(self, table: str, symbol: str, period: str) -> Optional[Dict]:
         """获取指定表/币种/周期的数据"""
         try:
             return self.provider.fetch_row(table, period, symbol)
         except Exception:
             return None
-    
+
     def _render_panel(self, panel_name: str, symbol: str) -> str:
         """渲染单个面板"""
         config = PANEL_CONFIG.get(panel_name)
         if not config:
             return ""
-        
+
         periods = config.get("periods", ALL_PERIODS)
-        
+
         # K线形态用竖表（周期作为行）
         if panel_name == "pattern":
             return self._render_pattern_vertical(symbol, periods, config)
-        
+
         headers = ["指标\\周期"] + list(periods)
         rows = []
-        
+
         for table_name, fields in config["tables"].items():
             for field_id, display_name, formatter in fields:
                 row = [display_name]
@@ -274,14 +274,14 @@ class SingleTokenTxtExporter:
                     else:
                         row.append("-")
                 rows.append(row)
-        
+
         return format_psql_table(headers, rows, config["title"])
-    
+
     def _render_pattern_vertical(self, symbol: str, periods: tuple, config: dict) -> str:
         """渲染 K线形态竖表（周期作为行）"""
         headers = ["周期", "形态", "数量", "强度"]
         rows = []
-        
+
         for period in periods:
             data = self._get_data("K线形态扫描器", symbol, period)
             if data:
@@ -294,29 +294,29 @@ class SingleTokenTxtExporter:
                 rows.append([period, str(pattern) if pattern else "-", count, strength])
             else:
                 rows.append([period, "-", "-", "-"])
-        
+
         return format_psql_table(headers, rows, config["title"])
-    
+
     def export_full(self, symbol: str, lang: str = "zh_CN") -> str:
         """导出完整的 4 面板 TXT"""
         sym = format_symbol(symbol)
         if not sym:
             return _t("snapshot.error.no_symbol", lang=lang)
-        
+
         sections = [
             f"{'='*50}",
             f"  {_t('export.title', lang=lang, symbol=sym)}",
             f"{'='*50}",
             "",
         ]
-        
+
         # 4 个面板
         for panel in ["basic", "futures", "advanced", "pattern"]:
             panel_text = self._render_panel(panel, sym)
             if panel_text:
                 sections.append(panel_text)
                 sections.append("")
-        
+
         return "\n".join(sections)
 
 

@@ -17,7 +17,7 @@ def calc_atr(df: pd.DataFrame) -> pd.Series:
 @register
 class ATR(Indicator):
     meta = IndicatorMeta(name="ATR波幅扫描器.py", lookback=60, is_incremental=True)
-    
+
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         if len(df) < 60:
             return pd.DataFrame()

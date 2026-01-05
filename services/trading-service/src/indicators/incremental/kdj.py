@@ -30,7 +30,7 @@ def get_signal(k: pd.Series, d: pd.Series, j: pd.Series) -> str:
 @register
 class KDJ(Indicator):
     meta = IndicatorMeta(name="KDJ随机指标扫描器.py", lookback=50, is_incremental=True)
-    
+
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         if len(df) < 40:
             return pd.DataFrame()

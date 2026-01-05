@@ -141,7 +141,7 @@ class 趋势线排行卡片(RankingCard):
         fields_state = self._ensure_field_state(h)
 
         rows, header = self._load_rows(period, sort_order, limit, sort_field, fields_state, lang)
-        aligned = h.dynamic_align_format(rows) if rows else _t("data.no_data", update, lang=lang)
+        aligned = h.dynamic_align_format(rows) if rows else _t("data.no_data")
         time_info = h.get_current_time_display()
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         display_sort_field = sort_field.replace("_", "\\_")

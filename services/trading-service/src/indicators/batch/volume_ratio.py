@@ -7,7 +7,7 @@ from ..base import Indicator, IndicatorMeta, register
 @register
 class VolumeRatio(Indicator):
     meta = IndicatorMeta(name="成交量比率扫描器.py", lookback=30, is_incremental=False, min_data=25)
-    
+
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         if not self._check_data(df):
             return self._make_insufficient_result(df, symbol, interval, {"量比": None, "信号概述": None})

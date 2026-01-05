@@ -1,6 +1,5 @@
 """大资金操盘扫描器 - Smart Money Concepts 完整复刻"""
 import pandas as pd
-import numpy as np
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence
 from ..base import Indicator, IndicatorMeta, register
@@ -35,20 +34,20 @@ def identify_swing_points(df: pd.DataFrame, pivot: int) -> List[Dict]:
     n = len(df)
     if n < pivot * 2 + 1:
         return points
-    
+
     high = df["high"].values
     low = df["low"].values
-    
+
     # 使用滚动窗口找局部极值
     for idx in range(pivot, n - pivot):
         window_high = high[idx - pivot : idx + pivot + 1]
         window_low = low[idx - pivot : idx + pivot + 1]
-        
+
         if high[idx] >= window_high.max():
             points.append({"index": idx, "price": float(high[idx]), "type": "high"})
         if low[idx] <= window_low.min():
             points.append({"index": idx, "price": float(low[idx]), "type": "low"})
-    
+
     return points
 
 

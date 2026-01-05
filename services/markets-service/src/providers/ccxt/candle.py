@@ -8,21 +8,21 @@ from typing import Any
 
 import ccxt
 
+from config import settings
 from core.fetcher import BaseFetcher
 from core.registry import register_fetcher
 from models.candle import Candle, CandleQuery
-from config import settings
 
 
 @register_fetcher("ccxt", "candle")
 class CCXTCandleFetcher(BaseFetcher[CandleQuery, Candle]):
     """CCXT K线获取器 - 支持 100+ 加密货币交易所"""
-    
+
     def __init__(self, exchange: str = "binance", market_type: str = "swap"):
         self.exchange_id = exchange
         self.market_type = market_type
         self._client = None
-    
+
     @property
     def client(self) -> ccxt.Exchange:
         if self._client is None:
@@ -34,10 +34,10 @@ class CCXTCandleFetcher(BaseFetcher[CandleQuery, Candle]):
                 "options": {"defaultType": self.market_type},
             })
         return self._client
-    
+
     def transform_query(self, params: dict[str, Any]) -> CandleQuery:
         return CandleQuery(**params)
-    
+
     async def extract(self, query: CandleQuery) -> list[dict[str, Any]]:
         # 转换 symbol 格式: BTCUSDT -> BTC/USDT:USDT
         symbol = query.symbol.upper()
@@ -46,17 +46,17 @@ class CCXTCandleFetcher(BaseFetcher[CandleQuery, Candle]):
             ccxt_symbol = f"{base}/USDT:USDT"
         else:
             ccxt_symbol = f"{symbol[:-4]}/USDT" if symbol.endswith("USDT") else symbol
-        
+
         since_ms = int(query.start.timestamp() * 1000) if query.start else None
-        
+
         # 异步执行同步方法
         ohlcv = await asyncio.to_thread(
             self.client.fetch_ohlcv,
             ccxt_symbol, query.interval, since=since_ms, limit=query.limit
         )
-        
+
         return [{"ts": c[0], "o": c[1], "h": c[2], "l": c[3], "c": c[4], "v": c[5]} for c in ohlcv]
-    
+
     def transform_data(self, raw: list[dict[str, Any]]) -> list[Candle]:
         return [Candle(
             market="crypto",

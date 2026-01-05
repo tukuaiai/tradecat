@@ -9,7 +9,6 @@
 """
 import argparse
 import os
-import sys
 import warnings
 from pathlib import Path
 
@@ -41,36 +40,36 @@ def main():
     parser.add_argument("--log-level", type=str, default="INFO", help="日志级别")
     parser.add_argument("--json-log", action="store_true", help="使用JSON格式日志")
     parser.add_argument("--metrics-file", type=str, help="指标输出文件路径")
-    
+
     args = parser.parse_args()
-    
+
     # 初始化可观测性
     from .observability import setup_logging, metrics
     from .observability.alerting import setup_alerting
-    
+
     setup_logging(
         level=args.log_level,
         log_file=args.log_file,
         json_format=args.json_log,
     )
-    
+
     # 配置告警文件
     if args.log_file:
         alert_file = Path(args.log_file).parent / "alerts.jsonl"
         setup_alerting(file_path=alert_file)
-    
+
     from . import indicators  # noqa - 触发指标注册
-    
+
     # 优先读 --symbols 参数，其次读 TEST_SYMBOLS 环境变量
     symbols = args.symbols.split(",") if args.symbols else None
     if not symbols:
         test_symbols = os.environ.get("TEST_SYMBOLS")
         if test_symbols:
             symbols = test_symbols.split(",")
-    
+
     intervals = args.intervals.split(",") if args.intervals else None
     indicator_list = args.indicators.split(",") if args.indicators else None
-    
+
     try:
         if args.full_async:
             from .core.async_full_engine import run_async_full

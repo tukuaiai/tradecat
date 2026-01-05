@@ -13,7 +13,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.base import RankingCard
-from cards.i18n import btn as _btn, gettext as _t, resolve_lang
+from cards.i18n import btn as _btn
 
 
 # 从环境变量读取卡片配置

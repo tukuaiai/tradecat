@@ -3,20 +3,19 @@ from __future__ import annotations
 
 import asyncio
 import os
-from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
+from config import settings
 from core.fetcher import BaseFetcher
 from core.registry import register_fetcher
 from models.candle import Candle, CandleQuery
-from config import settings
 
 
 @register_fetcher("openbb", "candle")
 class OpenBBFetcher(BaseFetcher[CandleQuery, Candle]):
     """OpenBB 聚合器 - 100+ 数据源，作为降级备份"""
-    
+
     def __init__(self, provider: str = "yfinance"):
         """
         Args:
@@ -28,21 +27,21 @@ class OpenBBFetcher(BaseFetcher[CandleQuery, Candle]):
         if settings.http_proxy:
             os.environ.setdefault("HTTP_PROXY", settings.http_proxy)
             os.environ.setdefault("HTTPS_PROXY", settings.http_proxy)
-    
+
     @property
     def obb(self):
         if self._obb is None:
             from openbb import obb
             self._obb = obb
         return self._obb
-    
+
     def transform_query(self, params: dict[str, Any]) -> CandleQuery:
         return CandleQuery(**params)
-    
+
     async def extract(self, query: CandleQuery) -> list[dict[str, Any]]:
         start = query.start.strftime("%Y-%m-%d") if query.start else None
         end = query.end.strftime("%Y-%m-%d") if query.end else None
-        
+
         result = await asyncio.to_thread(
             self.obb.equity.price.historical,
             symbol=query.symbol,
@@ -50,19 +49,19 @@ class OpenBBFetcher(BaseFetcher[CandleQuery, Candle]):
             end_date=end,
             provider=self.provider
         )
-        
+
         if result and hasattr(result, "to_df"):
             df = result.to_df()
             return df.reset_index().to_dict("records")
         return []
-    
+
     def transform_data(self, raw: list[dict[str, Any]]) -> list[Candle]:
         results = []
         for r in raw:
             ts = r.get("date") or r.get("index")
             if hasattr(ts, "to_pydatetime"):
                 ts = ts.to_pydatetime()
-            
+
             results.append(Candle(
                 market="us_stock",
                 asset_type="spot",

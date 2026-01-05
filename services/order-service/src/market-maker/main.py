@@ -11,7 +11,6 @@ import argparse
 import logging
 import signal
 import sys
-import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -32,11 +31,11 @@ logger = logging.getLogger(__name__)
 
 class MarketMaker:
     """做市主程序"""
-    
+
     def __init__(self, config: Config):
         self.config = config
         self.running = True
-        
+
         # 初始化引擎
         self.engine = Engine(
             exchange=config.exchange.name,
@@ -73,7 +72,7 @@ class MarketMaker:
             symbols=config.strategy.symbols,
             proxy=config.exchange.proxy,
         )
-        
+
         # 初始化策略
         self.strategies = {}
         for symbol in config.strategy.symbols:
@@ -85,7 +84,7 @@ class MarketMaker:
                 order_size=config.strategy.order_size,
                 min_spread_bps=getattr(config.strategy, "min_spread_bps", None),
             ))
-        
+
         # 注册成交回调：市场成交流喂给策略强度估计
         def _make_trade_cb(sym):
             def _cb(symbol_ccxt, side, position_side, amount, price):
@@ -107,7 +106,7 @@ class MarketMaker:
             self.feed.register_trade_listener(_make_public_trade_cb(sym))
             self.user_stream.register_trade_listener(_make_trade_cb(sym))
             self.user_stream.register_position_listener(_make_position_cb(sym))
-        
+
         # 风控
         self.risk = RiskManager(
             per_symbol_limit=config.risk.per_symbol_limit,
@@ -119,19 +118,19 @@ class MarketMaker:
         self._mid_none_count = {s: 0 for s in config.strategy.symbols}
         self._quote_blocked = {s: False for s in config.strategy.symbols}
         self._account_stale_logged = False
-    
+
     async def run(self):
         """主循环"""
         logger.info("🚀 Market Maker V2 启动")
         logger.info(f"   交易对: {self.config.strategy.symbols}")
         logger.info(f"   测试网: {self.config.exchange.testnet}")
-        
+
         # 启动清理
         await self._startup_clean()
         # 启动 WS feed
         self.feed.start()
         await self.user_stream.start()
-        
+
         try:
             while self.running:
                 await self._tick()
@@ -140,11 +139,11 @@ class MarketMaker:
             logger.info("收到退出信号")
         finally:
             await self._shutdown_clean()
-    
+
     async def _tick(self):
         """单次循环"""
         total_notional = 0
-        
+
         for symbol, strategy in self.strategies.items():
             try:
                 # 获取中间价
@@ -175,12 +174,12 @@ class MarketMaker:
                     self._account_stale_logged = False
                 strategy.update_price(mid)
                 strategy.tick()
-                
+
                 # 计算名义价值
                 pending_notional = self.engine.pending_notional(symbol, mid)
                 notional = abs(strategy.inventory * mid) + pending_notional
                 total_notional += notional
-                
+
                 # 风控检查
                 details = {
                     "inventory": round(strategy.inventory, 6),
@@ -189,7 +188,7 @@ class MarketMaker:
                     "orders": len(self.engine.orders_by_symbol.get(symbol, [])),
                 }
                 action = self.risk.check(symbol, notional, total_notional, details=details)
-                
+
                 if action == "flat":
                     self.engine.cancel_all(symbol)
                     flat_ok = self.engine.flat_position(symbol)
@@ -200,16 +199,16 @@ class MarketMaker:
                         stats = self.engine.flat_stats()
                         logger.warning(f"{symbol} 平仓失败，已重试 {self.config.risk.flat_retries} 次，flat_failure_count={stats['flat_failure_count']}，保留本地持仓等待用户流修正")
                     continue
-                
+
                 if action in ("pause", "global_pause"):
                     continue
-                
+
                 # 获取报价
                 if not strategy.should_update():
                     continue
-                
+
                 bid, bid_qty, ask, ask_qty = strategy.get_quotes(mid)
-                
+
                 if bid_qty <= 0 and ask_qty <= 0:
                     continue
 
@@ -221,23 +220,23 @@ class MarketMaker:
                     self.engine.cancel_all(symbol)
                 else:
                     self.engine.cancel_stale_orders(symbol, mid, ttl, deviation_bps, min_interval=min_cancel)
-                
+
                 quote = Quote(bid, bid_qty, ask, ask_qty)
                 self.engine.place_quote(symbol, quote)
-                
+
                 spread_bps = (ask - bid) / mid * 10000
                 logger.info(f"{symbol} | mid={mid:,.2f} | spread={spread_bps:.1f}bps | inv={strategy.inventory:.4f}")
-                
+
             except Exception as e:
                 logger.error(f"{symbol} 错误: {e}")
-    
+
     async def _startup_clean(self):
         """启动清理"""
         logger.info("启动清理...")
         for symbol in self.strategies:
             self.engine.cancel_all(symbol)
             self.engine.flat_position(symbol)
-    
+
     async def _shutdown_clean(self):
         """退出清理"""
         logger.info("退出清理...")
@@ -249,7 +248,7 @@ class MarketMaker:
             logger.warning(f"退出统计: flat_failure_count={stats['flat_failure_count']} cancel_rate_limited={stats['cancel_rate_limited']}")
         await self.user_stream.stop()
         logger.info("✅ 清理完成")
-    
+
     def stop(self):
         self.running = False
 
@@ -258,21 +257,21 @@ def main():
     parser = argparse.ArgumentParser(description="Market Maker V2")
     parser.add_argument("--config", "-c", help="配置文件路径")
     args = parser.parse_args()
-    
+
     if args.config:
         config = Config.from_file(args.config)
     else:
         config = Config.from_env()
-    
+
     mm = MarketMaker(config)
-    
+
     # 信号处理
     def handle_signal(sig, frame):
         mm.stop()
-    
+
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
-    
+
     asyncio.run(mm.run())
 
 

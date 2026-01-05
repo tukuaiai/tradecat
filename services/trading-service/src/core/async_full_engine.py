@@ -27,7 +27,6 @@ import pandas as pd
 
 from ..config import config
 from ..indicators.base import get_all_indicators
-from ..utils.precision import trim_dataframe
 
 LOG = logging.getLogger("indicator_service.async_full")
 
@@ -57,11 +56,10 @@ def get_high_priority_symbols_fast(top_n: int = 30) -> Set[str]:
     快速获取高优先级币种 - 合并SQL + 并行查询
     """
     import psycopg
-    from concurrent.futures import ThreadPoolExecutor, as_completed
     from ..config import config
-    
+
     result = set()
-    
+
     def query_kline_priority():
         """K线维度优先级 - 单SQL合并查询"""
         symbols = set()
@@ -112,11 +110,11 @@ def get_high_priority_symbols_fast(top_n: int = 30) -> Set[str]:
         except Exception as e:
             LOG.warning(f"K线优先级查询失败: {e}")
         return symbols
-    
+
     def query_futures_priority():
         """期货维度优先级"""
         return _get_futures_priority(top_n)[0]
-    
+
     # 并行执行K线和期货查询
     with ThreadPoolExecutor(max_workers=2) as executor:
         futures = [
@@ -128,7 +126,7 @@ def get_high_priority_symbols_fast(top_n: int = 30) -> Set[str]:
                 result.update(f.result())
             except Exception as e:
                 LOG.warning(f"优先级查询失败: {e}")
-    
+
     LOG.info(f"高优先级币种: {len(result)} 个")
     return result
 
@@ -157,14 +155,14 @@ def get_high_priority_symbols(cache, interval: str = "5m", top_n: int = 15) -> t
     klines = cache.get_klines(interval)
     if not klines:
         return set(), {}
-    
+
     turnover_rank = []    # 交易额
     cap_rank = []         # 市值
     volatility_rank = []  # 波动率
     change_rank = []      # 涨跌幅
     vol_spike = set()     # 量比异常
     breakout = set()      # 价格突破
-    
+
     for symbol, df in klines.items():
         if len(df) < 24:
             continue
@@ -175,58 +173,58 @@ def get_high_priority_symbols(cache, interval: str = "5m", top_n: int = 15) -> t
             vol = float(df['volume'].iloc[-1] or 0)
             high = float(df['high'].iloc[-1] or 0)
             low = float(df['low'].iloc[-1] or 0)
-            
+
             # 1. 交易额 (quote_volume)
             quote_vol = vol * close
             if 'quote_volume' in df.columns and df['quote_volume'].iloc[-1]:
                 quote_vol = float(df['quote_volume'].iloc[-1])
             turnover_rank.append((symbol, quote_vol))
-            
+
             # 2. 市值近似
             cap_rank.append((symbol, close * vol))
-            
+
             # 3. 波动率
             volatility = (high - low) / close
             volatility_rank.append((symbol, volatility))
-            
+
             # 4. 量比异常 (当前量 / MA20量 > 2)
             if len(df) >= 20:
                 ma20_vol = df['volume'].iloc[-20:].mean()
                 if ma20_vol > 0 and vol / ma20_vol > 2.0:
                     vol_spike.add(symbol)
-            
+
             # 5. 24h涨跌幅 (用最近24根K线)
             lookback = min(24, len(df) - 1)
             close_prev = float(df['close'].iloc[-lookback - 1] or close)
             if close_prev > 0:
                 change_pct = (close - close_prev) / close_prev
                 change_rank.append((symbol, abs(change_pct)))
-            
+
             # 6. 价格突破 (突破20周期高/低点)
             if len(df) >= 21:
                 high_20 = df['high'].iloc[-21:-1].max()
                 low_20 = df['low'].iloc[-21:-1].min()
                 if high > high_20 or low < low_20:
                     breakout.add(symbol)
-                    
+
         except (TypeError, ValueError):
             continue
-    
+
     # 各维度Top N
     top_turnover = {s for s, _ in sorted(turnover_rank, key=lambda x: x[1], reverse=True)[:top_n]}
     top_cap = {s for s, _ in sorted(cap_rank, key=lambda x: x[1], reverse=True)[:top_n]}
     top_volatility = {s for s, _ in sorted(volatility_rank, key=lambda x: x[1], reverse=True)[:top_n]}
     top_change = {s for s, _ in sorted(change_rank, key=lambda x: x[1], reverse=True)[:top_n]}
-    
+
     # K线维度并集
     kline_result = top_turnover | top_cap | top_volatility | top_change | vol_spike | breakout
-    
+
     # === 期货维度 ===
     futures_result, futures_debug = _get_futures_priority(top_n)
-    
+
     # 总并集
     result = kline_result | futures_result
-    
+
     debug = {
         "turnover": len(top_turnover), "cap": len(top_cap), "volatility": len(top_volatility),
         "change": len(top_change), "vol_spike": len(vol_spike), "breakout": len(breakout),
@@ -240,18 +238,17 @@ def get_high_priority_symbols(cache, interval: str = "5m", top_n: int = 15) -> t
              f"买卖比={debug.get('taker_extreme', 0)}, 多空比={debug.get('ls_extreme', 0)}, "
              f"大户变化={debug.get('top_ls_change', 0)}, 小计={debug.get('futures_total', 0)}")
     LOG.info(f"高优先级 总并集: {debug['total']}")
-    
+
     return result, debug
 
 
 def _get_futures_priority(top_n: int = 15) -> tuple[set, dict]:
     """获取期货维度的高优先级币种"""
     import psycopg
-    from ..config import config
-    
+
     result = set()
     debug = {"oi_value": 0, "oi_change": 0, "taker_extreme": 0, "ls_extreme": 0, "top_ls_change": 0, "futures_total": 0}
-    
+
     try:
         with psycopg.connect(config.db_url) as conn:
             with conn.cursor() as cur:
@@ -266,35 +263,35 @@ def _get_futures_priority(top_n: int = 15) -> tuple[set, dict]:
                     ORDER BY symbol, create_time DESC
                 """)
                 rows = cur.fetchall()
-                
+
                 oi_value_rank = []    # 持仓价值
                 taker_extreme = set() # 主动买卖比极端
                 ls_extreme = set()    # 多空比极端
-                
+
                 for row in rows:
                     sym, oi_val, taker, ls = row
-                    
+
                     # 7. 持仓价值 Top30
                     if oi_val:
                         oi_value_rank.append((sym, float(oi_val)))
-                    
+
                     # 9. 主动买卖比极端 (<0.2 或 >5.0)
                     if taker:
                         t = float(taker)
                         if t < 0.2 or t > 5.0:
                             taker_extreme.add(sym)
-                    
+
                     # 10. 多空比极端 (<0.5 或 >4.0)
                     if ls:
                         l = float(ls)
                         if l < 0.5 or l > 4.0:
                             ls_extreme.add(sym)
-                
+
                 # Top N
                 top_oi_value = {s for s, _ in sorted(oi_value_rank, key=lambda x: x[1], reverse=True)[:top_n]}
-                
+
                 result = top_oi_value | taker_extreme | ls_extreme
-                
+
                 debug = {
                     "oi_value": len(top_oi_value),
                     "oi_change": 0,  # 简化掉
@@ -305,35 +302,34 @@ def _get_futures_priority(top_n: int = 15) -> tuple[set, dict]:
                 }
     except Exception as e:
         LOG.warning(f"获取期货优先级失败: {e}")
-    
+
     return result, debug
 
 
 def _compute_indicator(indicator_name: str, klines_data: Dict[str, bytes], interval: str) -> tuple:
     """计算单个指标（子进程）- 使用 pickle 反序列化"""
-    import pickle
     import sys
     import os
-    
+
     # 确保能找到模块
     service_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     if service_root not in sys.path:
         sys.path.insert(0, service_root)
-    
+
     from src.indicators.base import get_all_indicators
     from src.utils.precision import trim_dataframe
-    
+
     indicators = get_all_indicators()
     if indicator_name not in indicators:
         return (indicator_name, interval, None)
-    
+
     cls = indicators[indicator_name]
     ind = cls()
-    
+
     results = []
     for symbol, df_bytes in klines_data.items():
         df = pickle.loads(df_bytes)
-        
+
         if len(df) < ind.meta.lookback // 2:
             continue
         try:
@@ -342,7 +338,7 @@ def _compute_indicator(indicator_name: str, klines_data: Dict[str, bytes], inter
                 results.append(result)
         except Exception:
             pass
-    
+
     if results:
         combined = pd.concat(results, ignore_index=True)
         return (indicator_name, interval, trim_dataframe(combined))
@@ -351,20 +347,20 @@ def _compute_indicator(indicator_name: str, klines_data: Dict[str, bytes], inter
 
 class AsyncWriter(Thread):
     """异步写入线程"""
-    
+
     def __init__(self, write_queue: queue.Queue):
         super().__init__(daemon=True, name="AsyncWriter")
         self.write_queue = write_queue
         self._stop_event = Event()
         self.write_count = 0
-    
+
     def stop(self):
         self._stop_event.set()
-    
+
     def run(self):
         from ..db import writer
         LOG.info("写入线程启动")
-        
+
         while not self._stop_event.is_set():
             batch = []
             try:
@@ -379,7 +375,7 @@ class AsyncWriter(Thread):
                         break
             except queue.Empty:
                 continue
-            
+
             # 过滤 None
             batch = [b for b in batch if b is not None]
             if batch:
@@ -388,7 +384,7 @@ class AsyncWriter(Thread):
                     if interval not in by_interval:
                         by_interval[interval] = {}
                     by_interval[interval][table] = df
-                
+
                 for interval, data in by_interval.items():
                     try:
                         writer.write_batch(data, interval)
@@ -399,7 +395,7 @@ class AsyncWriter(Thread):
 
 class FullAsyncEngine:
     """完全异步引擎 - 三层隔离"""
-    
+
     def __init__(
         self,
         symbols: List[str] = None,
@@ -411,21 +407,21 @@ class FullAsyncEngine:
         self.intervals = intervals or list(INTERVAL_CONFIG.keys())
         self.indicator_names = indicators
         self.workers = workers
-        
+
         self._running = False
         self._fast_executor: Optional[ProcessPoolExecutor] = None
         self._slow_executor: Optional[ProcessPoolExecutor] = None
         self._write_queue = queue.Queue(maxsize=2000)
         self._writer: Optional[AsyncWriter] = None
         self._cache = None
-        
+
         signal.signal(signal.SIGINT, self._handle_signal)
         signal.signal(signal.SIGTERM, self._handle_signal)
-    
+
     def _handle_signal(self, signum, frame):
         LOG.info(f"收到信号 {signum}，停止...")
         self.stop()
-    
+
     def _split_symbols(self, symbols: List[str], cache) -> tuple:
         """按优先级分割币种 - 动态计算"""
         # 用5m周期判断（数据更及时）
@@ -434,13 +430,13 @@ class FullAsyncEngine:
         high = [s for s in symbols if s in high_priority]
         low = [s for s in symbols if s not in high_priority]
         return high, low
-    
+
     def _split_indicators(self, indicators: List[str]) -> tuple:
         """分离快慢指标"""
         fast = [i for i in indicators if i not in SLOW_INDICATORS]
         slow = [i for i in indicators if i in SLOW_INDICATORS]
         return fast, slow
-    
+
     def _get_indicator_order(self, all_indicators: Dict) -> List[str]:
         indicator_names = set(all_indicators.keys())
         deps_first = set()
@@ -454,94 +450,93 @@ class FullAsyncEngine:
             if name not in deps_first:
                 order.append(name)
         return order
-    
+
     def run(self):
         from ..db import reader
         from ..db.cache import init_cache, stop_cache
-        
+
         symbols = self.symbols or reader.get_symbols()
         if not symbols:
             LOG.warning("无交易对")
             return
-        
+
         all_indicators = get_all_indicators()
         if self.indicator_names:
             all_indicators = {k: v for k, v in all_indicators.items() if k in self.indicator_names}
-        
+
         indicator_order = self._get_indicator_order(all_indicators)
         fast_indicators, slow_indicators = self._split_indicators(indicator_order)
         max_lookback = max(ind.meta.lookback for ind in all_indicators.values())
-        
+
         # 快速获取高优先级币种（直接查数据库）
         t0 = time.time()
         high_symbols = get_high_priority_symbols_fast(top_n=30)
         LOG.info(f"高优先级: {len(high_symbols)} 币种, {time.time()-t0:.1f}s")
-        
+
         # 只缓存高优先级币种
         t0 = time.time()
         self._cache = init_cache(list(high_symbols), self.intervals, max_lookback)
         LOG.info(f"缓存完成: {time.time()-t0:.1f}s")
-        
+
         LOG.info("=" * 60)
         LOG.info(f"指标计算引擎: {len(high_symbols)} 币种, {len(self.intervals)} 周期, {len(indicator_order)} 指标")
         LOG.info("=" * 60)
-        
+
         # 启动写入线程
         self._writer = AsyncWriter(self._write_queue)
         self._writer.start()
-        
+
         # 创建进程池
         self._fast_executor = ProcessPoolExecutor(max_workers=self.workers)
         self._slow_executor = ProcessPoolExecutor(max_workers=1)
-        
+
         self._running = True
-        
+
         # === 首次计算 ===
         LOG.info("=== 首次计算 ===")
         t_start = time.time()
-        
+
         LOG.info(f"计算 {len(high_symbols)} 币种, {len(self.intervals)} 周期")
         self._compute_priority(high_symbols, fast_indicators, slow_indicators, self.intervals)
-        
+
         LOG.info(f"首次计算完成: {time.time()-t_start:.1f}s")
-        
+
         # 进入定时触发模式
         LOG.info("进入定时触发模式...")
         self._run_daemon(high_symbols, fast_indicators, slow_indicators)
-        
+
         stop_cache()
         self._cleanup()
         LOG.info("引擎已停止")
-    
+
     def _compute_priority(self, symbols: List[str], fast_indicators: List[str], slow_indicators: List[str],
                           intervals: List[str] = None):
         """计算一个优先级的所有币种 - 快慢指标真正并行"""
-        import pickle
         if not symbols:
             return
-        
+
         intervals = intervals or self.intervals
         for interval in intervals:
             klines = self._cache.get_klines(interval)
             # 使用 pickle 序列化
             klines_data = {s: pickle.dumps(df, protocol=5)
                           for s, df in klines.items() if s in symbols}
-            
+
             if not klines_data:
                 continue
-            
+
             t0 = time.time()
-            
+
             # 快慢指标同时提交
             all_futures = []
             for indicator in fast_indicators:
                 future = self._fast_executor.submit(_compute_indicator, indicator, klines_data, interval)
                 all_futures.append(('fast', future))
-            
+
             for indicator in slow_indicators:
                 future = self._slow_executor.submit(_compute_indicator, indicator, klines_data, interval)
                 all_futures.append(('slow', future))
-            
+
             # 统一等待，完成一个处理一个
             fast_done = 0
             slow_done = 0
@@ -557,66 +552,65 @@ class FullAsyncEngine:
                         slow_done += 1
                 except Exception as e:
                     LOG.error(f"[{interval}] {tag}指标: {e}")
-            
+
             total_time = time.time() - t0
             LOG.info(f"[{interval}] {len(symbols)}币种 快={fast_done} 慢={slow_done} 耗时={total_time:.1f}s")
-    
-    def _run_daemon(self, high_symbols: List[str], 
+
+    def _run_daemon(self, high_symbols: List[str],
                     fast_indicators: List[str], slow_indicators: List[str]):
         """定时触发模式"""
         last_compute = {iv: 0 for iv in self.intervals}
         last_report = time.time()
-        
+
         while self._running:
             now = datetime.now(timezone.utc)
             ts = now.timestamp()
-            
+
             for interval in self.intervals:
                 period, wait = INTERVAL_CONFIG.get(interval, (60, 3))
                 close_ts = int(ts // period) * period
                 seconds_after = ts - close_ts
-                
+
                 if wait + 2 <= seconds_after < wait + 7 and close_ts > last_compute[interval]:
                     last_compute[interval] = close_ts
                     LOG.info(f"[{interval}] 触发")
                     self._compute_interval(high_symbols, interval, fast_indicators, slow_indicators)
-            
+
             if time.time() - last_report > 60:
                 LOG.info(f"状态: 队列={self._write_queue.qsize()}, 写入={self._writer.write_count}")
                 last_report = time.time()
-            
+
             time.sleep(1)
-            
+
             if time.time() - last_report > 60:
                 LOG.info(f"状态: 队列={self._write_queue.qsize()}, 写入={self._writer.write_count}")
                 last_report = time.time()
-            
+
             time.sleep(1)
-    
-    def _compute_interval(self, symbols: List[str], interval: str, 
+
+    def _compute_interval(self, symbols: List[str], interval: str,
                           fast_indicators: List[str], slow_indicators: List[str]):
         """计算单个周期 - 使用 pickle 序列化"""
-        import pickle
         if not symbols:
             return
-        
+
         klines = self._cache.get_klines(interval)
         klines_data = {s: pickle.dumps(df, protocol=5)
                       for s, df in klines.items() if s in symbols}
-        
+
         if not klines_data:
             return
-        
+
         # 快指标
         for indicator in fast_indicators:
             future = self._fast_executor.submit(_compute_indicator, indicator, klines_data, interval)
             future.add_done_callback(lambda f: self._on_complete(f))
-        
+
         # 慢指标
         for indicator in slow_indicators:
             future = self._slow_executor.submit(_compute_indicator, indicator, klines_data, interval)
             future.add_done_callback(lambda f: self._on_complete(f))
-    
+
     def _on_complete(self, future: Future):
         """计算完成回调"""
         try:
@@ -625,10 +619,10 @@ class FullAsyncEngine:
                 self._write_queue.put_nowait((ind_name, iv, result))
         except Exception:
             pass
-    
+
     def stop(self):
         self._running = False
-    
+
     def _cleanup(self):
         if self._writer:
             self._writer.stop()

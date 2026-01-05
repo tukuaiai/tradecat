@@ -72,10 +72,10 @@ class AIAnalysisHandler:
         """获取支持的币种列表"""
         import time
         now = time.time()
-        
+
         if self._cached_symbols and (now - self._cache_time) < 300:
             return self._cached_symbols
-        
+
         # 优先使用外部提供的币种列表
         if self._symbols_provider:
             try:
@@ -86,7 +86,7 @@ class AIAnalysisHandler:
                     return self._cached_symbols
             except Exception as e:
                 logger.warning(f"外部币种提供器失败: {e}")
-        
+
         # 回退到配置的币种
         self._cached_symbols = get_configured_symbols()
         self._cache_time = now
@@ -96,13 +96,13 @@ class AIAnalysisHandler:
     async def start_ai_analysis(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         """AI 分析入口 - 展示可分析币种列表"""
         context.user_data.setdefault("ai_prompt_name", self.default_prompt)
-        
+
         symbols = self.get_supported_symbols()
         # 去掉 USDT 后缀，每行一个
         coins = [s.replace("USDT", "") for s in symbols]
         coins_text = "\n".join(coins)
 
-        prompt_name = context.user_data.get("ai_prompt_name", self.default_prompt)
+        context.user_data.get("ai_prompt_name", self.default_prompt)
 
         text = (
             f"{self._t(update, context, 'ai.list.title')}\n"
@@ -114,19 +114,19 @@ class AIAnalysisHandler:
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton(self._t(update, context, "menu.home"), callback_data="main_menu")],
         ])
-        
+
         if update.callback_query:
             await update.callback_query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
         elif update.message:
             await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
-        
+
         return SELECTING_COIN
 
     # -------- 处理用户输入的币种 --------
     async def handle_coin_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE, coin: str) -> int:
         """处理用户输入的币种，进入周期选择"""
         symbol = coin.upper().replace("USDT", "") + "USDT"
-        
+
         # 验证币种是否支持
         symbols = self.get_supported_symbols()
         if symbol not in symbols:
@@ -135,7 +135,7 @@ class AIAnalysisHandler:
                 parse_mode='Markdown'
             )
             return SELECTING_COIN
-        
+
         context.user_data["ai_selected_symbol"] = symbol
         return await self._show_interval_selection(update, context, symbol)
 
@@ -153,7 +153,7 @@ class AIAnalysisHandler:
 
         if data == "ai_select_prompt":
             return await self._show_prompt_selection(update, context)
-        
+
         if data.startswith("ai_set_prompt_"):
             return await self._handle_prompt_selected(update, context)
 
@@ -161,7 +161,7 @@ class AIAnalysisHandler:
             interval = data.replace("ai_interval_", "")
             symbol = context.user_data.get("ai_selected_symbol")
             prompt_name = context.user_data.get("ai_prompt_name", self.default_prompt)
-            
+
             if not symbol:
                 await query.edit_message_text(self._t(update, context, "ai.no_symbol"), parse_mode='Markdown')
                 return SELECTING_COIN
@@ -190,7 +190,7 @@ class AIAnalysisHandler:
 
         if data == "ai_select_prompt":
             return await self._show_prompt_selection(update, context)
-        
+
         if data.startswith("ai_set_prompt_"):
             return await self._handle_prompt_selected(update, context)
 
@@ -204,7 +204,7 @@ class AIAnalysisHandler:
     async def _show_interval_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE, symbol: str) -> int:
         """显示周期选择界面"""
         current_prompt = context.user_data.get("ai_prompt_name", self.default_prompt)
-        
+
         # 周期按钮
         keyboard = [
             [
@@ -215,7 +215,7 @@ class AIAnalysisHandler:
                 InlineKeyboardButton("1d", callback_data="ai_interval_1d"),
             ],
         ]
-        
+
         # 提示词按钮（直接显示，选中的有 ✅）
         prompts = prompt_registry.list_prompts(grouped=False)
         prompt_row = []
@@ -241,12 +241,12 @@ class AIAnalysisHandler:
             f"{self._t(update, context, 'ai.interval.choose')}"
         )
         markup = InlineKeyboardMarkup(keyboard)
-        
+
         if update.callback_query:
             await update.callback_query.edit_message_text(text, reply_markup=markup, parse_mode='Markdown')
         elif update.message:
             await update.message.reply_text(text, reply_markup=markup, parse_mode='Markdown')
-        
+
         return SELECTING_INTERVAL
 
     async def _show_prompt_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -262,10 +262,10 @@ class AIAnalysisHandler:
         if not query or not query.data:
             return SELECTING_COIN
         await query.answer()
-        
+
         prompt_key = query.data.replace("ai_set_prompt_", "", 1)
         context.user_data["ai_prompt_name"] = prompt_key
-        
+
         # 刷新周期选择界面
         symbol = context.user_data.get("ai_selected_symbol")
         if symbol:
@@ -273,7 +273,7 @@ class AIAnalysisHandler:
         return await self.start_ai_analysis(update, context)
 
     # -------- 分析执行 --------
-    async def _run_analysis(self, update: Update, context: ContextTypes.DEFAULT_TYPE, 
+    async def _run_analysis(self, update: Update, context: ContextTypes.DEFAULT_TYPE,
                             symbol: str, interval: str, prompt: str):
         """执行 AI 分析"""
         try:
@@ -284,7 +284,7 @@ class AIAnalysisHandler:
                 preferred_lang = normalize_locale(update.effective_user.language_code)
             result = await run_analysis(symbol, interval, prompt, lang=preferred_lang)
             analysis_text = result.get("analysis", "未生成 AI 分析结果")
-            
+
             # Telegram 消息限制 4096 字符
             if len(analysis_text) > 4000:
                 parts = [analysis_text[i:i+4000] for i in range(0, len(analysis_text), 4000)]
@@ -304,7 +304,7 @@ class AIAnalysisHandler:
                     await update.callback_query.edit_message_text(analysis_text)
                 elif update.message:
                     await update.message.reply_text(analysis_text)
-                    
+
         except Exception as exc:
             logger.exception("AI 分析失败")
             error_msg = f"❌ AI 分析失败：{exc}"
@@ -328,7 +328,7 @@ def get_ai_handler(symbols_provider=None) -> AIAnalysisHandler:
 
 def register_ai_handlers(application, symbols_provider=None):
     """注册 AI 分析处理器（预留接口）"""
-    handler = get_ai_handler(symbols_provider)
+    get_ai_handler(symbols_provider)
     logger.info("✅ AI 分析模块已注册")
 
 

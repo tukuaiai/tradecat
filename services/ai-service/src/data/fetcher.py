@@ -34,10 +34,10 @@ def _get_ai_tables_config() -> Optional[Set[str]]:
     """从环境变量获取 AI 指标表配置"""
     enabled = os.getenv("AI_INDICATOR_TABLES", "").strip()
     disabled = os.getenv("AI_INDICATOR_TABLES_DISABLED", "").strip()
-    
+
     enabled_set = {t.strip() for t in enabled.split(",") if t.strip()} if enabled else None
     disabled_set = {t.strip() for t in disabled.split(",") if t.strip()} if disabled else set()
-    
+
     return enabled_set, disabled_set
 
 AI_TABLES_ENABLED, AI_TABLES_DISABLED = _get_ai_tables_config()
@@ -54,11 +54,11 @@ def fetch_candles(symbol: str, intervals: List[str] = None, limit: int = 50) -> 
     """获取多周期 K线数据（全量 50 条）"""
     intervals = intervals or ALL_INTERVALS
     candles: Dict[str, List[Dict[str, Any]]] = {}
-    
+
     try:
         conn = _get_pg_conn()
         cur = conn.cursor()
-        
+
         for iv in intervals:
             table = f"market_data.candles_{iv}"
             sql = f"""
@@ -71,7 +71,7 @@ def fetch_candles(symbol: str, intervals: List[str] = None, limit: int = 50) -> 
             """
             cur.execute(sql, (symbol, limit))
             rows = cur.fetchall()
-            
+
             parsed = []
             for row in rows:
                 parsed.append({
@@ -87,22 +87,22 @@ def fetch_candles(symbol: str, intervals: List[str] = None, limit: int = 50) -> 
                     "taker_buy_quote_volume": float(row[9]) if row[9] else None,
                 })
             candles[iv] = parsed
-            
+
         cur.close()
         conn.close()
-    except Exception as e:
+    except Exception:
         # 回退到 psql CLI
         candles = _fetch_candles_psql(symbol, intervals, limit)
-    
+
     return candles
 
 
 def _fetch_candles_psql(symbol: str, intervals: List[str], limit: int) -> Dict[str, List[Dict[str, Any]]]:
     """使用 psql CLI 获取 K线（回退方案）"""
     import subprocess
-    
+
     candles: Dict[str, List[Dict[str, Any]]] = {}
-    
+
     for iv in intervals:
         table = f"market_data.candles_{iv}"
         sql = (
@@ -116,12 +116,12 @@ def _fetch_candles_psql(symbol: str, intervals: List[str], limit: int) -> Dict[s
         ]
         env = os.environ.copy()
         env["PGPASSWORD"] = DB_PASS
-        
+
         res = subprocess.run(cmd, capture_output=True, text=True, env=env)
         if res.returncode != 0:
             candles[iv] = []
             continue
-            
+
         parsed = []
         for line in res.stdout.splitlines():
             if not line.strip():
@@ -141,7 +141,7 @@ def _fetch_candles_psql(symbol: str, intervals: List[str], limit: int) -> Dict[s
                     "taker_buy_quote_volume": float(parts[9]) if len(parts) > 9 and parts[9] else None,
                 })
         candles[iv] = parsed
-    
+
     return candles
 
 
@@ -150,7 +150,7 @@ def fetch_metrics(symbol: str, limit: int = 50) -> List[Dict[str, Any]]:
     try:
         conn = _get_pg_conn()
         cur = conn.cursor()
-        
+
         sql = """
             SELECT create_time, symbol, sum_open_interest, sum_open_interest_value,
                    sum_toptrader_long_short_ratio, sum_taker_long_short_vol_ratio
@@ -161,7 +161,7 @@ def fetch_metrics(symbol: str, limit: int = 50) -> List[Dict[str, Any]]:
         """
         cur.execute(sql, (symbol, limit))
         rows = cur.fetchall()
-        
+
         result = []
         for row in rows:
             result.append({
@@ -172,7 +172,7 @@ def fetch_metrics(symbol: str, limit: int = 50) -> List[Dict[str, Any]]:
                 "sum_toptrader_long_short_ratio": str(row[4]) if row[4] else None,
                 "sum_taker_long_short_vol_ratio": str(row[5]) if row[5] else None,
             })
-        
+
         cur.close()
         conn.close()
         return result
@@ -198,19 +198,19 @@ def fetch_indicators_full(symbol: str) -> Dict[str, Any]:
 
     cur = conn.cursor()
     tables = [r[0] for r in cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
-    
+
     for tbl in tables:
         # 按配置过滤表
         if AI_TABLES_ENABLED and tbl not in AI_TABLES_ENABLED:
             continue
         if tbl in AI_TABLES_DISABLED:
             continue
-            
+
         try:
             cols = [d[1] for d in cur.execute(f"PRAGMA table_info('{tbl}')").fetchall()]
             if not cols:
                 continue
-                
+
             sym_col = None
             for cand in ["交易对", "symbol", "Symbol", "SYMBOL"]:
                 if cand in cols:
@@ -218,7 +218,7 @@ def fetch_indicators_full(symbol: str) -> Dict[str, Any]:
                     break
             if sym_col is None:
                 continue
-            
+
             # 有周期字段：每个周期取最新一条
             if "周期" in cols:
                 sql = f"SELECT * FROM '{tbl}' WHERE `{sym_col}`=? GROUP BY `周期` HAVING `数据时间`=MAX(`数据时间`)"
@@ -227,12 +227,12 @@ def fetch_indicators_full(symbol: str) -> Dict[str, Any]:
                 # 无周期字段：只取最新一条
                 sql = f"SELECT * FROM '{tbl}' WHERE `{sym_col}`=? ORDER BY `数据时间` DESC LIMIT 1"
                 rows = cur.execute(sql, (symbol,)).fetchall()
-            
+
             if rows:
                 indicators[tbl] = [dict(zip(cols, r)) for r in rows]
         except Exception as e:
             indicators[tbl] = {"error": str(e)}
-            
+
     cur.close()
     conn.close()
     return indicators
@@ -245,40 +245,40 @@ def fetch_single_token_data(symbol: str) -> Dict[str, Any]:
     """
     try:
         from cards.data_provider import get_ranking_provider, format_symbol
-        
+
         provider = get_ranking_provider()
         sym = format_symbol(symbol)
         if not sym:
             return {}
-        
+
         sym_full = sym if sym.endswith("USDT") else sym + "USDT"
-        
+
         # 获取所有面板数据
         data = {
             "basic": {},      # 基础面板
             "futures": {},    # 合约面板
             "advanced": {},   # 高级面板
         }
-        
+
         # 基础面板表
         basic_tables = [
             "布林带扫描器", "成交量比率扫描器", "全量支撑阻力扫描器",
             "主动买卖比扫描器", "KDJ随机指标扫描器", "MACD柱状扫描器",
             "OBV能量潮扫描器", "谐波信号扫描器"
         ]
-        
+
         # 合约面板表
         futures_tables = ["期货情绪聚合表"]
-        
+
         # 高级面板表
         advanced_tables = [
             "ATR波幅扫描器", "CVD信号排行榜", "G，C点扫描器",
             "K线形态扫描器", "MFI资金流量扫描器", "VPVR排行生成器",
             "VWAP离线信号扫描", "流动性扫描器", "超级精准趋势扫描器", "趋势线榜单"
         ]
-        
+
         periods = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"]
-        
+
         # 获取基础面板数据
         for tbl in basic_tables:
             data["basic"][tbl] = {}
@@ -289,7 +289,7 @@ def fetch_single_token_data(symbol: str) -> Dict[str, Any]:
                         data["basic"][tbl][p] = row
                 except Exception:
                     pass
-        
+
         # 获取合约面板数据
         for tbl in futures_tables:
             data["futures"][tbl] = {}
@@ -300,7 +300,7 @@ def fetch_single_token_data(symbol: str) -> Dict[str, Any]:
                         data["futures"][tbl][p] = row
                 except Exception:
                     pass
-        
+
         # 获取高级面板数据
         for tbl in advanced_tables:
             data["advanced"][tbl] = {}
@@ -311,7 +311,7 @@ def fetch_single_token_data(symbol: str) -> Dict[str, Any]:
                         data["advanced"][tbl][p] = row
                 except Exception:
                     pass
-        
+
         return data
     except ImportError:
         return {}
@@ -345,9 +345,9 @@ def fetch_payload(symbol: str, interval: str) -> Dict[str, Any]:
 
 
 __all__ = [
-    "fetch_payload", 
-    "fetch_candles", 
-    "fetch_metrics", 
+    "fetch_payload",
+    "fetch_candles",
+    "fetch_metrics",
     "fetch_indicators_full",
     "fetch_single_token_data",
 ]

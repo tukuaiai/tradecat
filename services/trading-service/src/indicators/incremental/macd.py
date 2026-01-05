@@ -30,7 +30,7 @@ def get_signal(macd: pd.Series, dif: pd.Series, dea: pd.Series) -> str:
 @register
 class MACD(Indicator):
     meta = IndicatorMeta(name="MACD柱状扫描器.py", lookback=50, is_incremental=True)
-    
+
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         if len(df) < 35:
             return pd.DataFrame()

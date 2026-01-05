@@ -25,7 +25,7 @@ def safe_int(v, default=0):
 @register
 class BaseData(Indicator):
     meta = IndicatorMeta(name="基础数据同步器.py", lookback=1, is_incremental=True)
-    
+
     def compute(self, df: pd.DataFrame, symbol: str, interval: str) -> pd.DataFrame:
         if df.empty:
             return pd.DataFrame()

@@ -14,10 +14,10 @@ class Trade(BaseModel):
     exchange: str
     symbol: str
     timestamp: datetime
-    
+
     trade_id: Optional[str] = None
     price: Decimal
     amount: Decimal
     side: str  # buy/sell
-    
+
     source: str = ""

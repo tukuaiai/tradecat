@@ -29,14 +29,14 @@ INTERVAL_SECONDS = {
 
 class DataCache:
     """全局数据缓存（高性能版）"""
-    
+
     MAX_ROWS = 500  # 每个交易对周期最多缓存 500 根 K 线
-    
+
     def __init__(self, db_url: str = None, exchange: str = None, lookback: int = 300):
         self.db_url = db_url or config.db_url
         self.exchange = exchange or config.exchange
         self.lookback = min(lookback, self.MAX_ROWS)  # 不超过 MAX_ROWS
-        
+
         # K线缓存: {interval: {symbol: DataFrame}}
         self._klines: Dict[str, Dict[str, pd.DataFrame]] = {}
         # 最后更新时间: {interval: {symbol: bucket_ts}}
@@ -45,24 +45,24 @@ class DataCache:
         self._lock = RLock()
         # 初始化标记
         self._initialized: Dict[str, bool] = {}
-    
+
     def init_interval(self, symbols: List[str], interval: str):
         """初始化单个周期 - 单SQL批量查询"""
         LOG.info(f"[{interval}] 初始化缓存 ({len(symbols)} 币种)...")
         t0 = time.time()
-        
+
         with self._lock:
             self._klines[interval] = {}
             self._last_ts[interval] = {}
-        
+
         table = f"candles_{interval}"
         symbols_set = set(symbols)
         count = 0
-        
+
         # 计算时间范围，避免扫描全部分区
         interval_minutes = {"1m": 1, "5m": 5, "15m": 15, "1h": 60, "4h": 240, "1d": 1440, "1w": 10080}
         minutes = interval_minutes.get(interval, 5) * self.lookback * 2
-        
+
         try:
             with psycopg.connect(self.db_url, row_factory=dict_row) as conn:
                 # 使用窗口函数限制每个币种的行数，加时间范围过滤
@@ -80,7 +80,7 @@ class DataCache:
                     ORDER BY symbol, bucket_ts ASC
                 """
                 rows = conn.execute(sql, (self.exchange, list(symbols), self.lookback)).fetchall()
-                
+
                 # 按币种分组
                 from itertools import groupby
                 for symbol, group in groupby(rows, key=lambda x: x['symbol']):
@@ -91,24 +91,24 @@ class DataCache:
                             self._klines[interval][symbol] = df
                             self._last_ts[interval][symbol] = df.index[-1]
                         count += 1
-                    
+
         except Exception as e:
             LOG.error(f"[{interval}] 初始化失败: {e}")
-        
+
         with self._lock:
             self._initialized[interval] = True
-        
+
         LOG.info(f"[{interval}] 缓存完成: {count} 币种, {time.time()-t0:.1f}s")
-    
+
     def update_interval(self, symbols: List[str], interval: str) -> int:
         """增量更新单个周期"""
         if not self._initialized.get(interval):
             self.init_interval(symbols, interval)
             return len(symbols)
-        
+
         table = f"candles_{interval}"
         updated = 0
-        
+
         try:
             with psycopg.connect(self.db_url, row_factory=dict_row) as conn:
                 for symbol in symbols:
@@ -133,7 +133,7 @@ class DataCache:
                             ORDER BY bucket_ts ASC
                         """
                         rows = conn.execute(sql, (symbol, self.exchange, last_ts)).fetchall()
-                    
+
                     if rows:
                         new_df = self._rows_to_df(rows if last_ts else list(reversed(rows)))
                         with self._lock:
@@ -150,9 +150,9 @@ class DataCache:
                         updated += 1
         except Exception as e:
             LOG.error(f"[{interval}] 更新失败: {e}")
-        
+
         return updated
-    
+
     def get_klines(self, interval: str, symbol: str = None) -> Dict[str, pd.DataFrame]:
         """获取K线数据（从缓存）"""
         with self._lock:
@@ -163,17 +163,17 @@ class DataCache:
                 return {symbol: df.copy()} if df is not None else {}
             # 返回全部（复制）
             return {s: df.copy() for s, df in self._klines[interval].items()}
-    
+
     def get_all_intervals(self) -> List[str]:
         """获取已缓存的周期"""
         with self._lock:
             return list(self._klines.keys())
-    
+
     def get_symbols(self, interval: str) -> List[str]:
         """获取已缓存的币种"""
         with self._lock:
             return list(self._klines.get(interval, {}).keys())
-    
+
     def _rows_to_df(self, rows: list) -> pd.DataFrame:
         df = pd.DataFrame(rows)
         df['bucket_ts'] = pd.to_datetime(df['bucket_ts'])
@@ -185,7 +185,7 @@ class DataCache:
 
 class CacheUpdater(Thread):
     """缓存更新线程"""
-    
+
     def __init__(self, cache: DataCache, symbols: List[str], intervals: List[str]):
         super().__init__(daemon=True, name="CacheUpdater")
         self.cache = cache
@@ -193,21 +193,21 @@ class CacheUpdater(Thread):
         self.intervals = intervals
         self._stop_event = Event()
         self._last_update: Dict[str, float] = {}
-    
+
     def stop(self):
         self._stop_event.set()
-    
+
     def run(self):
         LOG.info("缓存更新线程启动")
-        
+
         while not self._stop_event.is_set():
             now = datetime.now(timezone.utc)
             ts = now.timestamp()
-            
+
             for interval in self.intervals:
                 period = INTERVAL_SECONDS.get(interval, 60)
                 close_ts = int(ts // period) * period
-                
+
                 # K线闭合后2秒更新
                 if ts - close_ts >= 2 and ts - close_ts < 5:
                     last = self._last_update.get(interval, 0)
@@ -216,9 +216,9 @@ class CacheUpdater(Thread):
                         updated = self.cache.update_interval(self.symbols, interval)
                         if updated > 0:
                             LOG.debug(f"[{interval}] 更新 {updated} 币种")
-            
+
             time.sleep(0.5)
-        
+
         LOG.info("缓存更新线程停止")
 
 
@@ -238,9 +238,9 @@ def get_cache() -> DataCache:
 def init_cache(symbols: List[str], intervals: List[str], lookback: int = 300):
     """初始化全局缓存 - 多周期并行"""
     global _global_cache, _cache_updater
-    
+
     _global_cache = DataCache(lookback=lookback)
-    
+
     # 并行初始化所有周期
     workers = min(len(intervals), 7)
     with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -250,13 +250,13 @@ def init_cache(symbols: List[str], intervals: List[str], lookback: int = 300):
                 f.result()
             except Exception as e:
                 LOG.error(f"初始化失败: {e}")
-    
+
     _global_cache._initialized = {iv: True for iv in intervals}  # 标记已初始化
-    
+
     # 启动更新线程
     _cache_updater = CacheUpdater(_global_cache, symbols, intervals)
     _cache_updater.start()
-    
+
     return _global_cache
 
 

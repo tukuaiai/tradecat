@@ -20,17 +20,17 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Set
+from typing import Dict, List, Optional, Sequence
 
 import requests
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from adapters.ccxt import load_symbols, fetch_ohlcv, to_rows
-from adapters.rate_limiter import acquire, release, set_ban, parse_ban
+from adapters.ccxt import fetch_ohlcv, load_symbols, to_rows
+from adapters.metrics import Timer, metrics
+from adapters.rate_limiter import acquire, parse_ban, release, set_ban
 from adapters.timescale import TimescaleAdapter
-from adapters.metrics import metrics, Timer
-from config import settings, GapTask, INTERVAL_TO_MS
+from config import INTERVAL_TO_MS, settings
 
 logger = logging.getLogger(__name__)
 
@@ -48,41 +48,41 @@ class GapInfo:
     expected: int
     actual: int
     missing: int = field(init=False)
-    
+
     def __post_init__(self):
         self.missing = self.expected - self.actual
 
 
 class GapScanner:
     """精确缺口扫描器"""
-    
+
     def __init__(self, ts: TimescaleAdapter):
         self._ts = ts
-    
-    def scan_klines(self, symbols: Sequence[str], start: date, end: date, 
+
+    def scan_klines(self, symbols: Sequence[str], start: date, end: date,
                     interval: str = "1m", threshold: float = 0.95) -> Dict[str, List[GapInfo]]:
         """扫描 K 线缺口，返回 {symbol: [GapInfo]}"""
         expected = EXPECTED_1M_PER_DAY if interval == "1m" else int(EXPECTED_1M_PER_DAY / INTERVAL_TO_MS.get(interval, 60000) * 60000)
         min_count = int(expected * threshold)
-        
+
         table = f"{self._ts.schema}.candles_{interval}"
         sql = f"""
             SELECT symbol, DATE(bucket_ts AT TIME ZONE 'UTC') AS d, COUNT(*) AS c
             FROM {table}
-            WHERE exchange = %s AND symbol = ANY(%s) 
+            WHERE exchange = %s AND symbol = ANY(%s)
               AND bucket_ts >= %s AND bucket_ts < %s
             GROUP BY symbol, DATE(bucket_ts AT TIME ZONE 'UTC')
         """
         start_ts = datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc)
         end_ts = datetime.combine(end + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
-        
+
         counts: Dict[tuple, int] = {}
         with self._ts.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(sql, (settings.db_exchange, list(symbols), start_ts, end_ts))
                 for sym, d, c in cur.fetchall():
                     counts[(sym, d)] = c
-        
+
         gaps: Dict[str, List[GapInfo]] = {}
         for sym in symbols:
             sym_gaps = []
@@ -94,12 +94,12 @@ class GapScanner:
             if sym_gaps:
                 gaps[sym] = sym_gaps
         return gaps
-    
+
     def scan_metrics(self, symbols: Sequence[str], start: date, end: date,
                      threshold: float = 0.95) -> Dict[str, List[GapInfo]]:
         """扫描期货指标缺口"""
         min_count = int(EXPECTED_5M_PER_DAY * threshold)
-        
+
         sql = """
             SELECT symbol, DATE(create_time) AS d, COUNT(*) AS c
             FROM market_data.binance_futures_metrics_5m
@@ -108,14 +108,14 @@ class GapScanner:
         """
         start_ts = datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc)
         end_ts = datetime.combine(end + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
-        
+
         counts: Dict[tuple, int] = {}
         with self._ts.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(sql, (list(symbols), start_ts, end_ts))
                 for sym, d, c in cur.fetchall():
                     counts[(sym, d)] = c
-        
+
         gaps: Dict[str, List[GapInfo]] = {}
         for sym in symbols:
             sym_gaps = []
@@ -132,46 +132,46 @@ class GapScanner:
 # ==================== REST 分页补齐 ====================
 class RestBackfiller:
     """REST API 分页补齐 (用于小缺口) - 并行版"""
-    
+
     def __init__(self, ts: TimescaleAdapter, workers: int = 8):
         self._ts = ts
         self._workers = workers
-    
+
     def fill_kline_gap(self, symbol: str, gap: GapInfo, interval: str = "1m") -> int:
         """补齐单个 K 线缺口 - 收集后一次性写入"""
         start_ts = datetime.combine(gap.date, datetime.min.time(), tzinfo=timezone.utc)
         end_ts = datetime.combine(gap.date + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
         since_ms = int(start_ts.timestamp() * 1000)
         target_ms = int(end_ts.timestamp() * 1000)
-        
+
         all_rows = []  # 收集所有数据
         max_iterations = 100
-        
+
         for _ in range(max_iterations):
             candles = fetch_ohlcv(settings.ccxt_exchange, symbol, interval, since_ms, 1000)
             if not candles:
                 break
-            
-            rows = [r for r in to_rows(settings.db_exchange, symbol, candles, "ccxt_gap") 
+
+            rows = [r for r in to_rows(settings.db_exchange, symbol, candles, "ccxt_gap")
                     if start_ts <= r["bucket_ts"] < end_ts]
             all_rows.extend(rows)
-            
+
             last_ms = int(candles[-1][0])
             if last_ms == since_ms or last_ms >= target_ms:
                 break
             since_ms = last_ms + INTERVAL_TO_MS.get(interval, 60000)
-        
+
         # 一次性写入
         if all_rows:
             self._ts.upsert_candles(interval, all_rows)
         return len(all_rows)
-    
+
     def fill_gaps(self, gaps: Dict[str, List[GapInfo]], interval: str = "1m") -> int:
         """并行批量补齐缺口"""
         tasks = [(sym, gap, interval) for sym, sym_gaps in gaps.items() for gap in sym_gaps]
         if not tasks:
             return 0
-        
+
         total = 0
         with ThreadPoolExecutor(max_workers=self._workers) as pool:
             futures = {pool.submit(self.fill_kline_gap, sym, gap, iv): (sym, gap.date) for sym, gap, iv in tasks}
@@ -190,15 +190,15 @@ class RestBackfiller:
 # ==================== Metrics REST 补齐 ====================
 class MetricsRestBackfiller:
     """Metrics REST API 补齐 (用于 ZIP 未产出的近日数据)"""
-    
+
     FAPI = "https://fapi.binance.com"
-    
+
     def __init__(self, ts: TimescaleAdapter, workers: int = 3):
         self._ts = ts
         self._workers = workers
         self._proxies = {"http": settings.http_proxy, "https": settings.http_proxy} if settings.http_proxy else {}
         self._session = requests.Session()
-    
+
     def _get(self, url: str, params: dict) -> Optional[list]:
         """REST 请求"""
         acquire(1)
@@ -220,12 +220,12 @@ class MetricsRestBackfiller:
             return None
         finally:
             release()
-    
+
     def _fetch_day(self, symbol: str, d: date) -> List[dict]:
         """获取单日 Metrics 数据 (5个API)"""
         start_ms = int(datetime.combine(d, datetime.min.time(), tzinfo=timezone.utc).timestamp() * 1000)
         end_ms = start_ms + 86400000 - 1  # 当天结束
-        
+
         apis = [
             ("oi", f"{self.FAPI}/futures/data/openInterestHist", {"symbol": symbol, "period": "5m", "startTime": start_ms, "endTime": end_ms, "limit": 500}),
             ("pos", f"{self.FAPI}/futures/data/topLongShortPositionRatio", {"symbol": symbol, "period": "5m", "startTime": start_ms, "endTime": end_ms, "limit": 500}),
@@ -233,22 +233,22 @@ class MetricsRestBackfiller:
             ("glb", f"{self.FAPI}/futures/data/globalLongShortAccountRatio", {"symbol": symbol, "period": "5m", "startTime": start_ms, "endTime": end_ms, "limit": 500}),
             ("taker", f"{self.FAPI}/futures/data/takerlongshortRatio", {"symbol": symbol, "period": "5m", "startTime": start_ms, "endTime": end_ms, "limit": 500}),
         ]
-        
+
         results = {}
         for key, url, params in apis:
             results[key] = self._get(url, params) or []
-        
+
         # 以 oi 为基准合并
         oi_list = results.get("oi", [])
         if not oi_list:
             return []
-        
+
         # 构建时间戳索引
         pos_map = {r.get("timestamp"): r for r in results.get("pos", [])}
         acc_map = {r.get("timestamp"): r for r in results.get("acc", [])}
         glb_map = {r.get("timestamp"): r for r in results.get("glb", [])}
         taker_map = {r.get("timestamp"): r for r in results.get("taker", [])}
-        
+
         rows = []
         for oi in oi_list:
             ts = oi.get("timestamp", 0)
@@ -257,7 +257,7 @@ class MetricsRestBackfiller:
             acc = acc_map.get(ts, {})
             glb = glb_map.get(ts, {})
             taker = taker_map.get(ts, {})
-            
+
             rows.append({
                 "create_time": datetime.fromtimestamp(ts_aligned / 1000, tz=timezone.utc).replace(tzinfo=None),
                 "symbol": symbol.upper(),
@@ -272,7 +272,7 @@ class MetricsRestBackfiller:
                 "is_closed": True,
             })
         return rows
-    
+
     def fill_gap(self, symbol: str, gap: GapInfo) -> int:
         """补齐单个缺口"""
         rows = self._fetch_day(symbol, gap.date)
@@ -280,13 +280,13 @@ class MetricsRestBackfiller:
             self._ts.upsert_metrics(rows)
             return len(rows)
         return 0
-    
+
     def fill_gaps(self, gaps: Dict[str, List[GapInfo]]) -> int:
         """并行批量补齐"""
         tasks = [(sym, gap) for sym, sym_gaps in gaps.items() for gap in sym_gaps]
         if not tasks:
             return 0
-        
+
         total = 0
         with ThreadPoolExecutor(max_workers=self._workers) as pool:
             futures = {pool.submit(self.fill_gap, sym, gap): (sym, gap.date) for sym, gap in tasks}
@@ -305,9 +305,9 @@ class MetricsRestBackfiller:
 # ==================== ZIP 历史补齐 ====================
 class ZipBackfiller:
     """Binance Vision ZIP 补齐 - 智能颗粒度 + 代理重试"""
-    
+
     MAX_CACHE_DAYS = 7  # ZIP 文件最大缓存天数
-    
+
     def __init__(self, ts: TimescaleAdapter, workers: int = 8):
         self._ts = ts
         self.workers = workers
@@ -317,7 +317,7 @@ class ZipBackfiller:
         self._metrics_dir.mkdir(parents=True, exist_ok=True)
         self._proxies = {"http": settings.http_proxy, "https": settings.http_proxy} if settings.http_proxy else {}
         self._fallback_proxies = self._proxies  # 使用相同代理，不硬编码备用
-    
+
     def cleanup_old_files(self, max_age_days: int = None) -> int:
         """清理过期的 ZIP 文件"""
         max_age = max_age_days or self.MAX_CACHE_DAYS
@@ -334,7 +334,7 @@ class ZipBackfiller:
         if removed:
             logger.info("清理 %d 个过期 ZIP 文件", removed)
         return removed
-    
+
     def _download_with_retry(self, url: str, path: Path) -> bool:
         """下载文件，失败时自动走代理重试"""
         acquire(1)
@@ -365,23 +365,23 @@ class ZipBackfiller:
             return False
         finally:
             release()
-    
+
     def fill_kline_gaps(self, gaps: Dict[str, List[GapInfo]], interval: str = "1m") -> int:
         """批量补齐 K 线缺口 - 按月分组避免重复下载"""
         if not gaps:
             return 0
-        
+
         # 按 (symbol, month) 分组，避免重复下载月度 ZIP
         month_groups: Dict[tuple, List[date]] = {}
         for sym, sym_gaps in gaps.items():
             for gap in sym_gaps:
                 key = (sym, gap.date.strftime("%Y-%m"))
                 month_groups.setdefault(key, []).append(gap.date)
-        
+
         # 任务：每个 (symbol, month) 只下载一次，但导入多个日期
         tasks = [(sym, month, dates, interval) for (sym, month), dates in month_groups.items()]
         logger.info("K线 ZIP 补齐: %d 个月度任务 (原 %d 个日任务)", len(tasks), sum(len(g) for g in gaps.values()))
-        
+
         total = 0
         with ThreadPoolExecutor(max_workers=self.workers) as pool:
             futures = {pool.submit(self._download_kline_month, sym, month, dates, iv): (sym, month) for sym, month, dates, iv in tasks}
@@ -394,15 +394,15 @@ class ZipBackfiller:
                         total += n
                 except Exception as e:
                     logger.warning("[%s] %s 失败: %s", sym, month, e)
-        
+
         return total
-    
+
     def _download_kline_month(self, symbol: str, month: str, dates: List[date], interval: str) -> int:
         """下载并导入一个月的 K 线数据"""
         sym = symbol.upper()
         total = 0
         current_month = date.today().strftime("%Y-%m")
-        
+
         # 当月数据直接用日度ZIP（月度ZIP还没生成）
         if month == current_month:
             for d in dates:
@@ -415,21 +415,21 @@ class ZipBackfiller:
                         continue
                 total += self._import_kline_zip(day_path, symbol, interval)
             return total
-        
+
         # 1. 历史月份尝试月度 ZIP
         month_fname = f"{sym}-{interval}-{month}.zip"
         month_path = self._kline_dir / month_fname
         if not month_path.exists():
             month_url = f"{BINANCE_DATA_URL}/data/futures/um/monthly/klines/{sym}/{interval}/{month_fname}"
             self._download_with_retry(month_url, month_path)
-        
+
         if month_path.exists():
             # 月度 ZIP 存在，导入所有需要的日期
             for d in dates:
                 n = self._import_kline_zip(month_path, symbol, interval, d)
                 total += n
             return total
-        
+
         # 2. 月度不存在，降级到日度
         for d in dates:
             day_str = d.strftime("%Y-%m-%d")
@@ -440,24 +440,24 @@ class ZipBackfiller:
                 if not self._download_with_retry(day_url, day_path):
                     continue
             total += self._import_kline_zip(day_path, symbol, interval)
-        
+
         return total
-    
+
     def fill_metrics_gaps(self, gaps: Dict[str, List[GapInfo]]) -> int:
         """批量补齐期货指标缺口 - 按月分组避免重复下载"""
         if not gaps:
             return 0
-        
+
         # 按 (symbol, month) 分组
         month_groups: Dict[tuple, List[date]] = {}
         for sym, sym_gaps in gaps.items():
             for gap in sym_gaps:
                 key = (sym, gap.date.strftime("%Y-%m"))
                 month_groups.setdefault(key, []).append(gap.date)
-        
+
         tasks = [(sym, month, dates) for (sym, month), dates in month_groups.items()]
         logger.info("Metrics ZIP 补齐: %d 个月度任务 (原 %d 个日任务)", len(tasks), sum(len(g) for g in gaps.values()))
-        
+
         total = 0
         with ThreadPoolExecutor(max_workers=self.workers) as pool:
             futures = {pool.submit(self._download_metrics_month, sym, month, dates): (sym, month) for sym, month, dates in tasks}
@@ -470,15 +470,15 @@ class ZipBackfiller:
                         total += n
                 except Exception as e:
                     logger.warning("[%s] %s 失败: %s", sym, month, e)
-        
+
         return total
-    
+
     def _download_metrics_month(self, symbol: str, month: str, dates: List[date]) -> int:
         """下载并导入一个月的 Metrics 数据"""
         sym = symbol.upper()
         total = 0
         current_month = date.today().strftime("%Y-%m")
-        
+
         # 当月数据直接用日度ZIP
         if month == current_month:
             for d in dates:
@@ -491,20 +491,20 @@ class ZipBackfiller:
                         continue
                 total += self._import_metrics_zip(day_path, symbol)
             return total
-        
+
         # 1. 历史月份尝试月度 ZIP
         month_fname = f"{sym}-metrics-{month}.zip"
         month_path = self._metrics_dir / month_fname
         if not month_path.exists():
             month_url = f"{BINANCE_DATA_URL}/data/futures/um/monthly/metrics/{sym}/{month_fname}"
             self._download_with_retry(month_url, month_path)
-        
+
         if month_path.exists():
             for d in dates:
                 n = self._import_metrics_zip(month_path, symbol, d)
                 total += n
             return total
-        
+
         # 2. 降级到日度
         for d in dates:
             day_str = d.strftime("%Y-%m-%d")
@@ -515,9 +515,9 @@ class ZipBackfiller:
                 if not self._download_with_retry(day_url, day_path):
                     continue
             total += self._import_metrics_zip(day_path, symbol)
-        
+
         return total
-    
+
     def _import_kline_zip(self, path: Path, symbol: str, interval: str, filter_date: date = None) -> int:
         """导入 K 线 ZIP，可选按日期过滤"""
         rows = []
@@ -536,15 +536,15 @@ class ZipBackfiller:
                                 if filter_date and ts.date() != filter_date:
                                     continue
                                 rows.append({
-                                    "exchange": settings.db_exchange, 
+                                    "exchange": settings.db_exchange,
                                     "symbol": symbol.upper(),
                                     "bucket_ts": ts,
-                                    "open": float(row[1]), "high": float(row[2]), 
-                                    "low": float(row[3]), "close": float(row[4]), 
+                                    "open": float(row[1]), "high": float(row[2]),
+                                    "low": float(row[3]), "close": float(row[4]),
                                     "volume": float(row[5]),
                                     "quote_volume": float(row[7]) if len(row) > 7 and row[7] else None,
                                     "trade_count": int(row[8]) if len(row) > 8 and row[8] else None,
-                                    "is_closed": True, 
+                                    "is_closed": True,
                                     "source": "binance_zip",
                                     "taker_buy_volume": float(row[9]) if len(row) > 9 and row[9] else None,
                                     "taker_buy_quote_volume": float(row[10]) if len(row) > 10 and row[10] else None,
@@ -554,11 +554,11 @@ class ZipBackfiller:
         except Exception as e:
             logger.error("解析失败 %s: %s", path, e)
             return 0
-        
+
         if rows:
             return self._ts.upsert_candles(interval, rows)
         return 0
-    
+
     def _import_metrics_zip(self, path: Path, symbol: str, filter_date: date = None) -> int:
         """导入 metrics ZIP，可选按日期过滤"""
         rows = []
@@ -577,13 +577,13 @@ class ZipBackfiller:
                                     ts = int(ts_val)
                                 else:
                                     ts = int(datetime.fromisoformat(ts_val.replace("Z", "+00:00")).timestamp() * 1000)
-                                
+
                                 # 对齐到 5 分钟边界
                                 ts = (ts // 300000) * 300000
                                 dt = datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
                                 if filter_date and dt.date() != filter_date:
                                     continue
-                                
+
                                 rows.append({
                                     "create_time": dt.replace(tzinfo=None),
                                     "symbol": symbol.upper(),
@@ -602,11 +602,11 @@ class ZipBackfiller:
         except Exception as e:
             logger.error("解析失败 %s: %s", path, e)
             return 0
-        
+
         if rows:
             return self._upsert_metrics(rows)
         return 0
-    
+
     def _upsert_metrics(self, rows: List[dict]) -> int:
         """批量 upsert metrics - 使用 COPY 高性能写入"""
         if not rows:
@@ -619,7 +619,7 @@ class ZipBackfiller:
 # ==================== 统一补齐器 ====================
 class DataBackfiller:
     """统一数据补齐器"""
-    
+
     def __init__(self, lookback_days: int = 10, workers: int = 8, threshold: float = 0.95):
         self.lookback_days = lookback_days
         self.workers = workers
@@ -628,63 +628,63 @@ class DataBackfiller:
         self._scanner = GapScanner(self._ts)
         self._rest = RestBackfiller(self._ts)
         self._zip = ZipBackfiller(self._ts, workers)
-    
+
     def run_klines(self, symbols: Optional[Sequence[str]] = None, interval: str = "1m") -> Dict[str, int]:
         """补齐 K 线"""
         with Timer("last_backfill_duration"):
             symbols = symbols or load_symbols(settings.ccxt_exchange)
             end = date.today() - timedelta(days=1)
             start = end - timedelta(days=self.lookback_days)
-            
+
             # 1. 扫描缺口
             logger.info("扫描 K 线缺口: %d 个符号, %s ~ %s", len(symbols), start, end)
             gaps = self._scanner.scan_klines(symbols, start, end, interval, self.threshold)
-            
+
             if not gaps:
                 logger.info("K 线无缺口")
                 return {"scanned": len(symbols), "gaps": 0, "filled": 0}
-            
+
             total_gaps = sum(len(g) for g in gaps.values())
             metrics.inc("gaps_found", total_gaps)
             logger.info("发现 %d 个符号共 %d 个缺口", len(gaps), total_gaps)
-            
+
             # 2. ZIP 补齐 (优先)
             filled = self._zip.fill_kline_gaps(gaps, interval)
-            
+
             # 3. 复检 + REST 补齐剩余
             remaining = self._scanner.scan_klines(list(gaps.keys()), start, end, interval, self.threshold)
             if remaining:
                 logger.info("复检: 仍有 %d 个缺口，尝试 REST 补齐", sum(len(g) for g in remaining.values()))
                 filled += self._rest.fill_gaps(remaining, interval)
-            
+
             # 4. 最终复检
             final = self._scanner.scan_klines(list(gaps.keys()), start, end, interval, self.threshold)
             final_gaps = sum(len(g) for g in final.values()) if final else 0
-            
+
             metrics.inc("gaps_filled", filled)
             logger.info("K 线补齐完成: 填充 %d 条, 剩余缺口 %d | %s", filled, final_gaps, metrics)
             return {"scanned": len(symbols), "gaps": total_gaps, "filled": filled, "remaining": final_gaps}
-    
+
     def run_metrics(self, symbols: Optional[Sequence[str]] = None) -> Dict[str, int]:
         """补齐期货指标"""
         symbols = symbols or load_symbols(settings.ccxt_exchange)
         end = date.today() - timedelta(days=1)
         start = end - timedelta(days=self.lookback_days)
-        
+
         # 1. 扫描缺口
         logger.info("扫描 Metrics 缺口: %d 个符号, %s ~ %s", len(symbols), start, end)
         gaps = self._scanner.scan_metrics(symbols, start, end, self.threshold)
-        
+
         if not gaps:
             logger.info("Metrics 无缺口")
             return {"scanned": len(symbols), "gaps": 0, "filled": 0}
-        
+
         total_gaps = sum(len(g) for g in gaps.values())
         logger.info("发现 %d 个符号共 %d 个缺口", len(gaps), total_gaps)
-        
+
         # 2. ZIP 补齐
         filled = self._zip.fill_metrics_gaps(gaps)
-        
+
         # 3. 复检 + REST 补齐剩余
         remaining = self._scanner.scan_metrics(list(gaps.keys()), start, end, self.threshold)
         if remaining:
@@ -692,14 +692,14 @@ class DataBackfiller:
             logger.info("ZIP 后仍有 %d 个缺口，尝试 REST 补齐", remaining_count)
             rest_filler = MetricsRestBackfiller(self._ts, workers=self.workers)
             filled += rest_filler.fill_gaps(remaining)
-        
+
         # 4. 最终复检
         final = self._scanner.scan_metrics(list(gaps.keys()), start, end, self.threshold)
         final_gaps = sum(len(g) for g in final.values()) if final else 0
-        
+
         logger.info("Metrics 补齐完成: 填充 %d 条, 剩余缺口 %d", filled, final_gaps)
         return {"scanned": len(symbols), "gaps": total_gaps, "filled": filled, "remaining": final_gaps}
-    
+
     def run_all(self, symbols: Optional[Sequence[str]] = None) -> Dict[str, Dict[str, int]]:
         """并行补齐 K线 + Metrics"""
         with ThreadPoolExecutor(max_workers=2) as pool:
@@ -709,7 +709,7 @@ class DataBackfiller:
                 "klines": f_klines.result(),
                 "metrics": f_metrics.result(),
             }
-    
+
     def close(self) -> None:
         self._ts.close()
 
@@ -758,12 +758,12 @@ def main() -> None:
     parser.add_argument("--all", action="store_true", help="补齐全部")
     parser.add_argument("--scan-only", action="store_true", help="仅扫描不补齐")
     args = parser.parse_args()
-    
+
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-    
+
     # 从环境变量获取配置
     mode, env_days, _ = get_backfill_config()
-    
+
     # 确定回溯天数
     if args.lookback:
         lookback = args.lookback
@@ -774,25 +774,25 @@ def main() -> None:
         return
     else:
         lookback = env_days
-    
+
     logger.info("补齐模式: %s, 回溯: %d 天", mode, lookback)
-    
+
     symbols = args.symbols.split(",") if args.symbols else None
     bf = DataBackfiller(lookback, args.workers, args.threshold)
-    
+
     try:
         if args.scan_only:
             # 仅扫描
             symbols = symbols or load_symbols(settings.ccxt_exchange)
             end = date.today() - timedelta(days=1)
             start = end - timedelta(days=lookback)
-            
+
             if args.klines or args.all or not args.metrics:
                 gaps = bf._scanner.scan_klines(symbols, start, end)
                 print(f"\nK线缺口: {sum(len(g) for g in gaps.values())} 个")
                 for sym, sym_gaps in list(gaps.items())[:5]:
                     print(f"  {sym}: {[str(g.date) for g in sym_gaps[:3]]}")
-            
+
             if args.metrics or args.all:
                 gaps = bf._scanner.scan_metrics(symbols, start, end)
                 print(f"\nMetrics缺口: {sum(len(g) for g in gaps.values())} 个")

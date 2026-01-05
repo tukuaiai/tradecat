@@ -15,12 +15,12 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.base import RankingCard
 from cards.data_provider import get_ranking_provider, format_symbol
-from cards.i18n import btn_auto as _btn_auto
+from cards.i18n import btn_auto as _btn_auto, gettext as _t
 from cards.排行榜服务 import DEFAULT_PERIODS, normalize_period
 
 
 class 主动买卖比排行卡片(RankingCard):
-    FALLBACK = "🔄 主动买卖比数据正在准备，稍后再试"
+    FALLBACK = "card.taker_ratio.fallback"
 
     def __init__(self) -> None:
         super().__init__(
@@ -132,7 +132,7 @@ class 主动买卖比排行卡片(RankingCard):
         fields_state = self._ensure_field_state(handler)
 
         rows, header = self._load_rows(handler, period, sort_order, limit, sort_field, fields_state)
-        aligned = handler.dynamic_align_format(rows) if rows else "暂无数据"
+        aligned = handler.dynamic_align_format(rows) if rows else _t("data.no_data")
         time_info = handler.get_current_time_display()
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         display_sort_field = sort_field.replace("_", "\\_")

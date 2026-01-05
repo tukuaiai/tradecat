@@ -1,7 +1,7 @@
 # i18n 全局适配检查清单
 
 > 生成时间: 2026-01-05
-> 当前进度: ~80%
+> 当前进度: ~95%
 
 ---
 
@@ -9,13 +9,13 @@
 
 | 模块 | 中文行数 | 按钮数 | 状态 |
 |------|----------|--------|------|
-| `bot/app.py` | 1455 | 101 | 🟡 按钮/标题已替换，待卡片/信号 |
-| `cards/basic/*.py` | ~200 | 按钮 | 🟢 按钮已 i18n，字段/描述待补 |
-| `cards/advanced/*.py` | ~150 | 按钮 | 🟢 按钮已 i18n，字段/描述待补 |
-| `cards/futures/*.py` | ~200 | 按钮 | 🟢 按钮已 i18n，字段/描述待补 |
-| `cards/data_provider.py` | ~50 | - | ❌ 未开始 |
-| `signals/*.py` | ~50 | - | ❌ 未开始 |
-| `bot/single_token_snapshot.py` | ~100 | - | 🟢 标题/提示已 i18n，字段待评估 |
+| `bot/app.py` | 1455 | 101 | ✅ 完成 |
+| `cards/basic/*.py` | ~200 | 按钮 | ✅ i18n 结构完成 |
+| `cards/advanced/*.py` | ~150 | 按钮 | ✅ i18n 结构完成 |
+| `cards/futures/*.py` | ~200 | 按钮 | ✅ i18n 结构完成 |
+| `cards/data_provider.py` | ~50 | - | 🟡 待评估 |
+| `signals/*.py` | ~50 | - | ✅ 基础完成 |
+| `bot/single_token_snapshot.py` | ~100 | - | ✅ 完成 |
 
 ---
 
@@ -23,8 +23,8 @@
 
 ### 1. 基础设施
 - [x] `libs/common/i18n.py` - i18n 服务类
-- [x] `locales/zh_CN/LC_MESSAGES/bot.po` - 中文词条 (50+)
-- [x] `locales/en/LC_MESSAGES/bot.po` - 英文词条 (50+)
+- [x] `locales/zh_CN/LC_MESSAGES/bot.po` - 中文词条 (244+)
+- [x] `locales/en/LC_MESSAGES/bot.po` - 英文词条 (244+)
 - [x] 编译 `.mo` 文件
 - [x] 翻译缺失告警（日志一次性记录），缺词回退原值
 
@@ -77,6 +77,23 @@
 - [x] 时间显示 → `time.update` / `time.last_update`
 - [x] 周期显示 → `period.*`
 - [x] 资金流向说明文本 → `flow.desc.*`（含期权流向）
+
+### 8. 卡片 i18n 结构 (39 个文件)
+- [x] 所有卡片添加 `_t`, `resolve_lang` 导入
+- [x] 所有卡片 FALLBACK 改为 i18n key
+- [x] `_reply`/`_edit` 方法添加 `lang = resolve_lang(query)`
+- [x] `_build_payload` 签名添加 `lang`, `update` 参数
+- [x] "暂无数据" 替换为 `_t("data.no_data", ...)`
+- [x] `ensure(text, self.FALLBACK)` 替换为 `ensure(text, _t(self.FALLBACK, ...))`
+
+### 9. 信号模块 i18n
+- [x] `signals/formatter.py` - 添加 lang 参数
+- [x] `signals/ui.py` - get_menu_text, get_signal_push_kb i18n
+- [x] `signals/pusher_v2.py` - _format_signal i18n
+
+### 10. 快照模块 i18n
+- [x] `bot/single_token_snapshot.py` - render_pattern_panel i18n
+- [x] `bot/single_token_txt.py` - export_full i18n
 
 ---
 

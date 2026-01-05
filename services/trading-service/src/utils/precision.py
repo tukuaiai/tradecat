@@ -20,10 +20,10 @@ def format_number(x) -> str:
         val = float(x)
     except (TypeError, ValueError):
         return str(x) if x else None
-    
+
     if val == 0:
         return "0"
-    
+
     abs_val = abs(val)
     if abs_val >= 1:
         result = f"{val:.2f}"
@@ -31,7 +31,7 @@ def format_number(x) -> str:
         exp = math.floor(math.log10(abs_val))
         precision = -exp + 2
         result = f"{round(val, precision):.{precision}f}"
-    
+
     if '.' in result:
         result = result.rstrip('0').rstrip('.')
     return result

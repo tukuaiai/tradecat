@@ -15,9 +15,9 @@ import requests
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from adapters.ccxt import load_symbols
-from adapters.rate_limiter import acquire, release, set_ban, parse_ban
+from adapters.metrics import Timer, metrics
+from adapters.rate_limiter import acquire, parse_ban, release, set_ban
 from adapters.timescale import TimescaleAdapter
-from adapters.metrics import metrics, Timer
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -89,17 +89,17 @@ class MetricsCollector:
             ("glb", f"{FAPI}/futures/data/globalLongShortAccountRatio", {"symbol": sym, "period": "5m", "limit": 1}),
             ("taker", f"{FAPI}/futures/data/takerlongshortRatio", {"symbol": sym, "period": "5m", "limit": 1}),
         ]
-        
+
         results = {}
         for key, url, params in apis:
             results[key] = self._get(url, params)
-        
+
         oi, pos, acc, glb, taker = results.get("oi"), results.get("pos"), results.get("acc"), results.get("glb"), results.get("taker")
-        
+
         # 至少要有 oi 数据才有意义
         if not oi or not isinstance(oi, list) or not oi:
             return None
-        
+
         ts = int(oi[0].get("timestamp", 0))
         ts = (ts // 300000) * 300000
 

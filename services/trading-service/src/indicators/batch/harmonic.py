@@ -10,12 +10,12 @@ def calc_harmonic(df: pd.DataFrame) -> float:
     """计算谐波值 - 多周期RSI均值"""
     if len(df) < max(RSI_PERIODS) + 2:
         return None
-    
+
     typ_price = (df["high"] + df["low"] + df["close"]) / 3
     delta = typ_price.diff()
     gain = delta.where(delta > 0, 0)
     loss = -delta.where(delta < 0, 0)
-    
+
     rsi_vals = []
     for n in RSI_PERIODS:
         avg_gain = gain.ewm(alpha=1/n, adjust=False).mean().iloc[-1]
@@ -26,7 +26,7 @@ def calc_harmonic(df: pd.DataFrame) -> float:
         rsi = 100 - (100 / (1 + rs))
         if not np.isnan(rsi):
             rsi_vals.append(rsi)
-    
+
     return float(np.mean(rsi_vals)) if rsi_vals else None
 
 

@@ -3,20 +3,22 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, Iterator, List, Optional, Sequence
 
+from psycopg import sql
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
-from psycopg import sql
 
-from ..config import settings, normalize_interval
+from ..config import normalize_interval, settings
 from ..schema_adapter import (
-    KlineAdapter, MetricsAdapter,
-    get_kline_table, get_metrics_table,
-    get_kline_conflict_keys, get_metrics_conflict_keys,
-    get_kline_time_field, get_metrics_time_field,
+    KlineAdapter,
+    MetricsAdapter,
+    get_kline_conflict_keys,
+    get_kline_table,
+    get_metrics_conflict_keys,
+    get_metrics_table,
 )
 
 logger = logging.getLogger(__name__)
@@ -84,7 +86,7 @@ class TimescaleAdapter:
         except Exception as e:
             logger.debug("获取 batch_id 失败: %s", e)
             return 0
-    
+
     def _get_batch_id_safe(self, data_type: str) -> Optional[int]:
         """安全获取 batch_id，失败返回 None 而非抛异常 (F-04 修复)"""
         try:
@@ -97,18 +99,18 @@ class TimescaleAdapter:
     def upsert_candles(self, interval: str, rows: Sequence[dict], batch_size: int = 2000) -> int:
         """
         使用 COPY 命令批量 upsert K线，支持双模式写入。
-        
+
         - raw 模式: 写入 raw.crypto_kline_1m，字段转换 + batch_id
         - legacy 模式: 写入 market_data.candles_1m，保持原字段
-        
+
         Returns:
             写入的行数
         """
         if not rows:
             return 0
-        
+
         interval = normalize_interval(interval)
-        
+
         # 根据模式处理数据 (F-03/F-04: 使用安全的 batch_id 获取)
         if settings.is_raw_mode:
             batch_id = self._get_batch_id_safe("kline") or 0
@@ -120,15 +122,15 @@ class TimescaleAdapter:
             table_name = f"{self.schema}.candles_{interval}"
             conflict_keys = ("exchange", "symbol", "bucket_ts")
             time_field = "bucket_ts"
-        
+
         cols = list(rows[0].keys())
-        
+
         # 确保关键列存在
         if time_field not in cols or "symbol" not in cols or "exchange" not in cols:
             raise ValueError(f"Rows must contain {time_field}, symbol, and exchange")
 
         temp_table_name = f"temp_candles_{int(datetime.now().timestamp() * 1000)}"
-        
+
         # 解析 schema 和 table
         if "." in table_name:
             schema_name, tbl_name = table_name.split(".", 1)
@@ -145,12 +147,12 @@ class TimescaleAdapter:
 
         # ON CONFLICT 更新的列（排除冲突键）
         update_cols = [col for col in cols if col not in conflict_keys]
-        
+
         # 构建 ON CONFLICT 子句
         conflict_clause = sql.SQL("({})").format(
             sql.SQL(", ").join(map(sql.Identifier, conflict_keys))
         )
-        
+
         sql_upsert_from_temp = sql.SQL("""
             INSERT INTO {target_table} ({cols})
             SELECT {cols} FROM {temp_table}
@@ -172,11 +174,11 @@ class TimescaleAdapter:
         with self.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(sql_create_temp)
-                
+
                 # 分批处理
                 for i in range(0, len(rows), batch_size):
                     batch = rows[i:i + batch_size]
-                    
+
                     # 使用 COPY 命令高效写入临时表
                     with cur.copy(sql.SQL("COPY {temp_table} ({cols}) FROM STDIN").format(
                         temp_table=sql.Identifier(temp_table_name),
@@ -184,13 +186,13 @@ class TimescaleAdapter:
                     )) as copy:
                         for row in batch:
                             copy.write_row(tuple(row.get(col) for col in cols))
-                
+
                 # 从临时表一次性 upsert 到目标表
                 cur.execute(sql_upsert_from_temp)
                 total_inserted = cur.rowcount if cur.rowcount > 0 else len(rows)
 
             conn.commit()
-            
+
         return total_inserted
 
     def upsert_metrics(self, rows: Sequence[dict], batch_size: int = 2000) -> int:
@@ -207,16 +209,16 @@ class TimescaleAdapter:
         else:
             table_name = f"{self.schema}.binance_futures_metrics_5m"
             conflict_keys = ("symbol", "create_time")
-        
+
         cols = list(rows[0].keys())
-        
+
         # 检查时间字段 (raw 模式用 timestamp，legacy 用 create_time)
         time_field = "timestamp" if settings.is_raw_mode else "create_time"
         if time_field not in cols or "symbol" not in cols:
             raise ValueError(f"Rows must contain {time_field} and symbol")
 
         temp_table_name = f"temp_metrics_{int(datetime.now().timestamp() * 1000)}"
-        
+
         # 解析 schema 和 table
         if "." in table_name:
             schema_name, tbl_name = table_name.split(".", 1)
@@ -230,14 +232,14 @@ class TimescaleAdapter:
             temp_table=sql.Identifier(temp_table_name),
             target_table=sql.Identifier(schema_name, tbl_name)
         )
-        
+
         update_cols = [col for col in cols if col not in conflict_keys]
-        
+
         # 构建 ON CONFLICT 子句
         conflict_clause = sql.SQL("({})").format(
             sql.SQL(", ").join(map(sql.Identifier, conflict_keys))
         )
-        
+
         sql_upsert_from_temp = sql.SQL("""
             INSERT INTO {target_table} ({cols})
             SELECT {cols} FROM {temp_table}
@@ -259,7 +261,7 @@ class TimescaleAdapter:
         with self.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(sql_create_temp)
-                
+
                 for i in range(0, len(rows), batch_size):
                     batch = rows[i:i + batch_size]
                     with cur.copy(sql.SQL("COPY {temp_table} ({cols}) FROM STDIN").format(
@@ -268,12 +270,12 @@ class TimescaleAdapter:
                     )) as copy:
                         for row in batch:
                             copy.write_row(tuple(row.get(col) for col in cols))
-                
+
                 cur.execute(sql_upsert_from_temp)
                 total_inserted = cur.rowcount if cur.rowcount > 0 else len(rows)
 
             conn.commit()
-            
+
         return total_inserted
 
     def get_symbols(self, exchange: str, interval: str = "1m") -> List[str]:
@@ -283,7 +285,7 @@ class TimescaleAdapter:
         # 验证表名 (R2-01 修复)
         from ..config import validate_table_name
         validate_table_name(table)
-        
+
         with self.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -302,7 +304,7 @@ class TimescaleAdapter:
         table = f"{self.schema}.candles_{interval}"
         from ..config import validate_table_name
         validate_table_name(table)
-        
+
         with self.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -319,26 +321,26 @@ class TimescaleAdapter:
         table = f"{self.schema}.candles_{interval}"
         from ..config import validate_table_name
         validate_table_name(table)
-        
+
         # 使用参数化查询，lookback_min 和 threshold_sec 是整数，安全
         query = sql.SQL("""
             WITH o AS (
                 SELECT symbol, bucket_ts, LEAD(bucket_ts) OVER (PARTITION BY symbol ORDER BY bucket_ts) AS next_ts
-                FROM {table} 
-                WHERE exchange = %(ex)s AND symbol = ANY(%(sym)s) 
+                FROM {table}
+                WHERE exchange = %(ex)s AND symbol = ANY(%(sym)s)
                   AND bucket_ts >= NOW() - INTERVAL '{lookback} minutes'
             )
-            SELECT symbol, bucket_ts, next_ts 
-            FROM o 
-            WHERE next_ts IS NOT NULL AND next_ts - bucket_ts >= INTERVAL '{threshold} seconds' 
-            ORDER BY bucket_ts 
+            SELECT symbol, bucket_ts, next_ts
+            FROM o
+            WHERE next_ts IS NOT NULL AND next_ts - bucket_ts >= INTERVAL '{threshold} seconds'
+            ORDER BY bucket_ts
             LIMIT %(lim)s
         """).format(
             table=sql.Identifier(self.schema, f"candles_{interval}"),
             lookback=sql.Literal(lookback_min),
             threshold=sql.Literal(threshold_sec)
         )
-        
+
         with self.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(query, {"ex": exchange, "sym": list(symbols), "lim": limit})
@@ -350,10 +352,10 @@ class TimescaleAdapter:
         table = f"{self.schema}.candles_{interval}"
         from ..config import validate_table_name
         validate_table_name(table)
-        
+
         conds = [sql.SQL("exchange = %s"), sql.SQL("symbol = %s")]
         params: list = [exchange, symbol]
-        
+
         if start:
             conds.append(sql.SQL("bucket_ts >= %s"))
             params.append(start)
@@ -361,12 +363,12 @@ class TimescaleAdapter:
             conds.append(sql.SQL("bucket_ts <= %s"))
             params.append(end)
         params.append(limit)
-        
+
         query = sql.SQL("SELECT * FROM {} WHERE {} ORDER BY bucket_ts DESC LIMIT %s").format(
             sql.Identifier(self.schema, f"candles_{interval}"),
             sql.SQL(" AND ").join(conds)
         )
-        
+
         with self.connection() as conn:
             with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(query, params)

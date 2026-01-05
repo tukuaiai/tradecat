@@ -9,10 +9,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from core.fetcher import BaseFetcher
-from core.registry import register_fetcher
-from core.key_manager import get_key_manager
 from config import settings
+from core.fetcher import BaseFetcher
+from core.key_manager import get_key_manager
+from core.registry import register_fetcher
 
 
 class MacroQuery(BaseModel):
@@ -33,11 +33,11 @@ class MacroData(BaseModel):
 @register_fetcher("fredapi", "macro")
 class FREDMacroFetcher(BaseFetcher[MacroQuery, MacroData]):
     """FRED 宏观数据获取器 - 美联储官方数据
-    
+
     支持多 Key 负载均衡，在 config/.env 中配置:
         FRED_API_KEY=key1,key2,key3
     """
-    
+
     # 常用序列
     SERIES = {
         "GDP": "国内生产总值",
@@ -49,7 +49,7 @@ class FREDMacroFetcher(BaseFetcher[MacroQuery, MacroData]):
         "M2SL": "M2 货币供应",
         "FEDFUNDS": "联邦基金有效利率",
     }
-    
+
     def __init__(self, api_key: str | None = None):
         self._single_key = api_key
         self._key_manager = get_key_manager("FRED_API_KEY") if not api_key else None
@@ -57,7 +57,7 @@ class FREDMacroFetcher(BaseFetcher[MacroQuery, MacroData]):
         if settings.http_proxy:
             os.environ.setdefault("HTTP_PROXY", settings.http_proxy)
             os.environ.setdefault("HTTPS_PROXY", settings.http_proxy)
-    
+
     def _get_api_key(self) -> str:
         """获取 API Key (支持多 Key 轮询)"""
         if self._single_key:
@@ -67,16 +67,16 @@ class FREDMacroFetcher(BaseFetcher[MacroQuery, MacroData]):
             if key:
                 return key
         raise ValueError("需要 FRED_API_KEY 环境变量")
-    
+
     def transform_query(self, params: dict[str, Any]) -> MacroQuery:
         return MacroQuery(**params)
-    
+
     async def extract(self, query: MacroQuery) -> list[dict[str, Any]]:
         from fredapi import Fred
-        
+
         api_key = self._get_api_key()
         fred = Fred(api_key=api_key)
-        
+
         try:
             series = await asyncio.to_thread(
                 fred.get_series,
@@ -84,18 +84,18 @@ class FREDMacroFetcher(BaseFetcher[MacroQuery, MacroData]):
                 observation_start=query.start,
                 observation_end=query.end
             )
-            
+
             if self._key_manager:
                 self._key_manager.report_success(api_key)
-            
-            return [{"date": idx, "value": val, "series_id": query.series_id} 
+
+            return [{"date": idx, "value": val, "series_id": query.series_id}
                     for idx, val in series.items() if val == val]  # 过滤 NaN
-                    
-        except Exception as e:
+
+        except Exception:
             if self._key_manager:
                 self._key_manager.report_error(api_key)
             raise
-    
+
     def transform_data(self, raw: list[dict[str, Any]]) -> list[MacroData]:
         return [MacroData(
             series_id=r["series_id"],

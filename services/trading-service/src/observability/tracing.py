@@ -36,28 +36,28 @@ class Span:
     status: str = "ok"
     tags: Dict[str, Any] = field(default_factory=dict)
     events: List[Dict[str, Any]] = field(default_factory=list)
-    
+
     def set_tag(self, key: str, value: Any) -> "Span":
         self.tags[key] = value
         return self
-    
+
     def add_event(self, name: str, **attrs):
         self.events.append({
             "name": name,
             "timestamp": time.time(),
             **attrs
         })
-    
+
     def finish(self, status: str = "ok"):
         self.end_time = time.time()
         self.status = status
         _report_span(self)
-    
+
     @property
     def duration_ms(self) -> float:
         end = self.end_time or time.time()
         return (end - self.start_time) * 1000
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "trace_id": self.trace_id,
@@ -94,7 +94,7 @@ def _report_span(span: Span):
         # 保留最近的 span
         if len(_spans) > _max_spans:
             _spans.pop(0)
-    
+
     # 日志输出
     if span.status == "error":
         LOG.warning(f"Span {span.name} 失败", extra={"ctx": span.to_dict()})
@@ -119,7 +119,7 @@ def trace(name: str, **tags):
         tags=tags,
     )
     _set_current_span(span)
-    
+
     try:
         yield span
         span.finish("ok")
@@ -135,7 +135,7 @@ def traced(name: str = None):
     """追踪装饰器"""
     def decorator(func):
         span_name = name or func.__name__
-        
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             with trace(span_name) as span:

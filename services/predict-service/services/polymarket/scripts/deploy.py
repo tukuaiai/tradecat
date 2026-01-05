@@ -3,9 +3,7 @@
 import os
 import sys
 import subprocess
-import tarfile
 import time
-from pathlib import Path
 
 # Configuration (env only to避免明文泄露)
 SERVER_IP = os.environ.get("SERVER_IP")
@@ -200,7 +198,7 @@ def main():
         print(f"1. SSH to server: ssh {SERVER_USER}@{SERVER_IP}")
         print(f"2. Configure .env: nano {REMOTE_PATH}/bot/.env")
         print(f"3. Start bot: cd {REMOTE_PATH}/bot && node src/bot.js")
-        print(f"4. (Optional) PM2: npm install -g pm2 && pm2 start src/bot.js")
+        print("4. (Optional) PM2: npm install -g pm2 && pm2 start src/bot.js")
         print()
 
     finally:

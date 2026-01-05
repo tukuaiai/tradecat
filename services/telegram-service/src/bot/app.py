@@ -10,18 +10,9 @@ import asyncio
 import logging
 import requests
 import time
-import functools
-import random
 import json
-import hashlib
-import re
 import threading
-import subprocess
-import ssl
-import aiohttp
 import importlib.util
-import httpx
-import gzip
 
 # 提前初始化 logger
 logger = logging.getLogger(__name__)
@@ -58,7 +49,7 @@ except ImportError:
     print("[INFO] python-certifi-win32库未安装")
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Optional
 # 当前位置 bot/app.py，需要上移一层回到 src 作为根
 SRC_ROOT = Path(__file__).resolve().parent.parent  # .../src
 PROJECT_ROOT = SRC_ROOT.parent                    # .../telegram-service
@@ -99,11 +90,9 @@ from telegram.ext import (
     CallbackQueryHandler,
     MessageHandler,
     filters,
-    ContextTypes,
-    ApplicationHandlerStop,  # 用于在禁用场景下阻断后续命令处理
+    ContextTypes,  # 用于在禁用场景下阻断后续命令处理
 )
-from telegram.error import Conflict, NetworkError, BadRequest, Forbidden
-from telegram.helpers import escape_markdown
+from telegram.error import BadRequest
 
 # ================== 本地 .env 加载 ==================
 ENV_FILE = REPO_ROOT / "config" / ".env"
@@ -296,7 +285,7 @@ async def send_help_message(update_or_query, context, *, via_query: bool = False
             InlineKeyboardButton(_t(update_or_query, "menu.data"), callback_data="ranking_menu"),
         ]
     ])
-    
+
     try:
         if via_query and hasattr(update_or_query, 'callback_query'):
             await update_or_query.callback_query.edit_message_text(help_text, reply_markup=keyboard, parse_mode='Markdown')
@@ -360,15 +349,15 @@ def format_beijing_time(dt_str, format_str="%Y-%m-%d %H:%M:%S"):
             dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
         else:
             dt = dt_str
-        
+
         # 如果没有时区信息，假设是UTC
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
-        
+
         # 转换为北京时间
         beijing_tz = timezone(timedelta(hours=8))
         beijing_dt = dt.astimezone(beijing_tz)
-        
+
         return beijing_dt.strftime(format_str)
     except Exception as e:
         logger.error(f"时间格式化失败: {e}")
@@ -388,7 +377,6 @@ BLOCKED_SYMBOLS = set(s.strip().upper() for s in _blocked_str.split(',') if s.st
 # 🔁 策略扫描脚本路径（用于定时刷新 CSV 榜单）
 
 # 数据文件配置 - 使用项目根目录下的data文件夹
-import os
 BASE_DIR = str(PROJECT_ROOT)
 DATA_DIR = os.path.join(BASE_DIR, "data")  # 数据目录
 CACHE_DIR = os.path.join(DATA_DIR, "cache")  # 缓存目录
@@ -437,7 +425,7 @@ def check_click_rate_limit(user_id: int, button_data: str = "", is_ai_feature: b
     return True, 0.0
 
 # ==================== 单币快照辅助 ====================
-def build_single_snapshot_keyboard(enabled_periods: dict, panel: str, enabled_cards: dict, page: int = 0, pages: int = 1):
+def build_single_snapshot_keyboard(enabled_periods: dict, panel: str, enabled_cards: dict, page: int = 0, pages: int = 1, update=None):
     """构造单币快照按钮：卡片开关/周期开关/面板切换/主控+翻页。"""
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     try:
@@ -584,7 +572,7 @@ def build_pattern_keyboard_with_periods(enabled_periods: dict, update=None) -> I
         on = enabled_periods.get(p, False)
         label = p if on else f"❎{p}"
         row_period.append(InlineKeyboardButton(label, callback_data=f"pattern_toggle_{p}"))
-    
+
     return InlineKeyboardMarkup([
         row_period,
         [
@@ -663,19 +651,19 @@ initialize_data_isolation()
 def optimize_button_response_logging():
     """优化按钮响应日志记录"""
     import sys
-    
+
     # 确保日志输出到控制台
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     console_handler.setFormatter(formatter)
-    
+
     # 添加到根日志记录器
     root_logger = logging.getLogger()
     if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
         root_logger.addHandler(console_handler)
         root_logger.setLevel(logging.INFO)
-    
+
     logger.info("✅ 按钮响应日志记录已优化")
 
 # 初始化优化的日志记录
@@ -715,8 +703,6 @@ def smart_spread_format(spread: float) -> str:
     except Exception:
         return str(spread)
 
-
-        return f"${volume}"
 
 # 存储用户的选择状态
 user_states = {
@@ -777,18 +763,18 @@ class DataManager:
     """简化的数据管理器"""
     load_json = staticmethod(load_json)
     save_json = staticmethod(save_json)
-    
+
     @staticmethod
     def validate_data_integrity():
         return {"issues_found": [], "fixes_applied": [], "success": True}
 
 class BinanceFuturesClient:
     """币安合约API客户端 - 基于官方API文档v1.0"""
-    
+
     def __init__(self):
         self.base_url = BINANCE_FUTURES_URL
         self.spot_url = BINANCE_SPOT_URL
-        
+
         # 优化连接池配置
         adapter = requests.adapters.HTTPAdapter(
             pool_connections=10,  # 连接池数量
@@ -796,7 +782,7 @@ class BinanceFuturesClient:
             max_retries=0,        # 禁用自动重试，我们自己控制
             pool_block=False      # 非阻塞连接池
         )
-        
+
         self.session = requests.Session()
         self.session.mount('https://', adapter)
         self.session.mount('http://', adapter)
@@ -806,7 +792,7 @@ class BinanceFuturesClient:
             self.session.verify = certifi.where()
         else:
             self.session.verify = True  # 使用系统默认证书
-        
+
         # 优化请求头
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -814,23 +800,23 @@ class BinanceFuturesClient:
             'Content-Type': 'application/json',
             'Connection': 'keep-alive'  # 保持连接活跃
         })
-        
+
         # 缓存交易规则信息
         self._exchange_info = None
         self._exchange_info_timestamp = 0
-    
+
     def make_request_with_retry(self, endpoint, params=None, max_retries=2, timeout=8, fast_mode=False):
         """带重试机制的请求方法 - 优化版本"""
         # 如果禁用了 Binance API，直接返回 None
         if BINANCE_API_DISABLED:
             logger.debug(f"Binance API 已禁用，跳过请求: {endpoint}")
             return None
-        
+
         # 快速模式下使用更短的超时和更少的重试
         if fast_mode:
             timeout = min(timeout, 5)
             max_retries = 1
-            
+
         for attempt in range(max_retries):
             try:
                 # 根据endpoint选择正确的base URL
@@ -840,10 +826,10 @@ class BinanceFuturesClient:
                     url = f"{self.base_url}{endpoint}"
                 else:
                     url = f"{self.spot_url}{endpoint}"
-                
+
                 logger.info(f"请求 {url} (第{attempt+1}次) - 参数: {params} - 超时: {timeout}s")
                 response = self.session.get(url, params=params, timeout=timeout)
-                
+
                 # 检查响应状态
                 if response.status_code == 429:
                     # 请求频率限制 - 优化等待时间
@@ -853,20 +839,20 @@ class BinanceFuturesClient:
                     logger.warning(f"请求频率限制，等待 {retry_after} 秒")
                     time.sleep(retry_after)
                     continue
-                
+
                 response.raise_for_status()
                 data = response.json()
-                
+
                 # 验证返回数据
                 if isinstance(data, dict) and 'code' in data and data['code'] != 200:
                     logger.warning(f"API返回错误: {data}")
                     if attempt < max_retries - 1:
                         time.sleep((attempt + 1) * 2)
                         continue
-                
+
                 logger.info(f"请求成功，返回 {len(data) if isinstance(data, list) else 1} 条数据")
                 return data
-                
+
             except requests.exceptions.RequestException as e:
                 logger.warning(f"第{attempt+1}次请求失败: {e}")
                 if attempt < max_retries - 1:
@@ -877,13 +863,13 @@ class BinanceFuturesClient:
                     time.sleep(wait_time)
                 else:
                     logger.error(f"所有重试失败，最终错误: {e}")
-                    
+
         return []
-    
+
     def ping(self):
         """测试服务器连通性"""
         return self.make_request_with_retry('/fapi/v1/ping')
-    
+
     def get_exchange_info(self, force_refresh=False):
         """获取交易规则和交易对信息"""
         now = time.time()
@@ -894,33 +880,33 @@ class BinanceFuturesClient:
             self._exchange_info = data
             self._exchange_info_timestamp = now
         return data
-    
+
     def get_depth(self, symbol, limit=500):
         """获取深度信息"""
         params = {'symbol': symbol}
         if limit:
             params['limit'] = limit
         return self.make_request_with_retry('/fapi/v1/depth', params)
-    
+
     def get_premium_index(self, symbol=None):
         """获取最新标记价格和资金费率"""
         params = {}
         if symbol:
             params['symbol'] = symbol
         return self.make_request_with_retry('/fapi/v1/premiumIndex', params)
-    
+
     def get_24hr_ticker(self, symbol=None):
         """获取24小时价格变动情况"""
         params = {}
         if symbol:
             params['symbol'] = symbol
         return self.make_request_with_retry('/fapi/v1/ticker/24hr', params)
-    
+
     def get_open_interest(self, symbol):
         """获取未平仓合约数"""
         params = {'symbol': symbol}
         return self.make_request_with_retry('/fapi/v1/openInterest', params)
-    
+
     def get_open_interest_hist(self, symbol, period, limit=30, start_time=None, end_time=None):
         """获取合约持仓量历史"""
         params = {'symbol': symbol, 'period': period, 'limit': limit}
@@ -929,7 +915,7 @@ class BinanceFuturesClient:
         if end_time:
             params['endTime'] = end_time
         return self.make_request_with_retry('/futures/data/openInterestHist', params)
-    
+
     def get_long_short_ratio(self, symbol, period, limit=30, start_time=None, end_time=None):
         """获取多空持仓人数比"""
         params = {'symbol': symbol, 'period': period, 'limit': limit}
@@ -938,7 +924,7 @@ class BinanceFuturesClient:
         if end_time:
             params['endTime'] = end_time
         return self.make_request_with_retry('/futures/data/globalLongShortAccountRatio', params)
-    
+
     def get_klines(self, symbol, interval, start_time=None, end_time=None, limit=500):
         """获取K线数据"""
         params = {'symbol': symbol, 'interval': interval, 'limit': limit}
@@ -950,7 +936,7 @@ class BinanceFuturesClient:
 
 class UserRequestHandler:
     """专门处理用户请求的轻量级处理器 - 只读取缓存，不进行网络请求"""
-    
+
     def __init__(self, card_registry: Optional[RankingRegistry] = None):
         # 需要屏蔽的币种列表（从全局配置读取）
         self.blocked_symbols = BLOCKED_SYMBOLS
@@ -1010,43 +996,43 @@ class UserRequestHandler:
     def check_feature_access(self, user_id: int, feature_name: str) -> tuple:
         """检查功能访问权限 - 所有功能免费"""
         return True, None
-        
+
     def deduct_feature_cost(self, user_id: int, feature_name: str) -> bool:
         """扣费 - 已禁用，所有功能免费"""
         return True
-    
+
     def load_cached_data(self, cache_key, max_age_minutes=10):
         """从JSON文件加载缓存数据"""
         try:
             cache_file = os.path.join(DATA_DIR, "cache", f"{cache_key}.json")
-            
+
             if not os.path.exists(cache_file):
                 return None, "缓存文件不存在"
-            
+
             cache_data = DataManager.load_json(cache_file)
             if not cache_data or 'data' not in cache_data:
                 return None, "缓存数据格式无效"
-            
+
             # 检查缓存时间
             cache_timestamp = cache_data.get('timestamp', 0)
             current_time = int(time.time() * 1000)
             age_minutes = (current_time - cache_timestamp) / (1000 * 60)
-            
+
             if age_minutes > max_age_minutes:
                 return None, f"缓存数据过期 ({age_minutes:.1f}分钟前)"
-            
+
             logger.info(f"✅ 使用缓存数据: {cache_key} ({cache_data.get('total_coins', 0)}个币种, {age_minutes:.1f}分钟前)")
             return cache_data['data'], None
-            
+
         except Exception as e:
             logger.error(f"❌ 加载缓存数据失败 {cache_key}: {e}")
             return None, str(e)
-    
-    
+
+
     def load_latest_futures_data(self):
         """CoinGlass 本地数据已下线，直接返回 None。"""
         return None
-    
+
     def get_cached_data_safely(self, key, fallback_message=None):
         """安全获取缓存数据；CoinGlass 数据源已下线直接返回空。"""
         global cache
@@ -1062,7 +1048,7 @@ class UserRequestHandler:
             fallback_message = "🔄 数据正在后台加载中，请稍后重试\n💡 机器人刚启动时需要几秒钟加载数据"
         logger.warning(f"缓存中没有数据: {key}")
         return [], fallback_message
-    
+
     def dynamic_align_format(self, data_rows, left_align_cols: int = 2, align_override=None):
         """
         数据对齐：默认前 left_align_cols 列左对齐，其余右对齐；支持传入对齐列表 ["L","R",...]
@@ -1099,7 +1085,7 @@ class UserRequestHandler:
             'time_only': format_beijing_time(get_beijing_time().isoformat(), '%H:%M'),
             'hour_min': f"{now.hour}时{now.minute}分"
         }
-    
+
     def get_main_menu_text(self, update: Optional[Update] = None):
         """获取主菜单文本（随用户语言）"""
         time_info = self.get_current_time_display()
@@ -1205,7 +1191,7 @@ class UserRequestHandler:
             InlineKeyboardButton(I18N.gettext("btn.refresh", lang=lang), callback_data="ranking_menu"),
         ])
         return InlineKeyboardMarkup(rows)
-    
+
     def get_reply_keyboard(self, update: Optional[Update] = None):
         """获取常驻回复键盘（按用户语言渲染）"""
         lang = _resolve_lang(update) if update else I18N.default_locale
@@ -1225,13 +1211,13 @@ class UserRequestHandler:
             ],
         ]
         return ReplyKeyboardMarkup(
-            keyboard, 
+            keyboard,
             resize_keyboard=True,
             is_persistent=True,
             one_time_keyboard=False,
             selective=False
         )
-    
+
     async def send_with_persistent_keyboard(self, update, text, parse_mode='Markdown'):
         """
         Args:
@@ -1240,14 +1226,14 @@ class UserRequestHandler:
             parse_mode: 解析模式，默认Markdown
         """
         reply_keyboard = self.get_reply_keyboard(update)
-        
+
         # 发送内容，使用常驻键盘
         await update.message.reply_text(
             text,
             reply_markup=reply_keyboard,
             parse_mode=parse_mode
         )
-    
+
     def get_position_ranking(self, limit=10, sort_order='desc', period='24h', sort_field: str = "position", update=None):
         """获取持仓量排行榜 - 委托给TradeCatBot处理"""
         global bot
@@ -1267,8 +1253,8 @@ class UserRequestHandler:
         global bot
         if bot:
             return bot.get_position_ranking_keyboard(
-                current_sort=current_sort, 
-                current_limit=current_limit, 
+                current_sort=current_sort,
+                current_limit=current_limit,
                 current_period=current_period,
                 update=update
             )
@@ -1277,8 +1263,8 @@ class UserRequestHandler:
             try:
                 temp_bot = TradeCatBot()
                 return temp_bot.get_position_ranking_keyboard(
-                    current_sort=current_sort, 
-                    current_limit=current_limit, 
+                    current_sort=current_sort,
+                    current_limit=current_limit,
                     current_period=current_period,
                     update=update
                 )
@@ -1287,7 +1273,7 @@ class UserRequestHandler:
                 # 回退键盘
                 keyboard = [[_btn(None, "btn.back_home", "main_menu")]]
                 return InlineKeyboardMarkup(keyboard)
-    
+
     def get_funding_rate_ranking(self, limit=10, sort_order='desc', sort_type='funding_rate'):
         """资金费率排行已下线占位。"""
         return "⏸️ 资金费率排行功能已下线，敬请期待替代方案。"
@@ -1301,7 +1287,7 @@ class UserRequestHandler:
         return InlineKeyboardMarkup([
             [_btn(None, "btn.back_home", "main_menu")]
         ])
-    
+
     def get_volume_ranking(self, limit=10, period='24h', sort_order='desc', market_type='futures', sort_field: str = "volume", update=None):
         """获取交易量排行榜"""
         if market_type == 'futures':
@@ -1401,7 +1387,7 @@ class UserRequestHandler:
 ```
 {_t(update, "time.last_update", time=time_info['full'])}"""
         )
-    
+
 
     def get_spot_volume_ranking(self, limit=10, period='24h', sort_order='desc', sort_field: str = "volume", update=None):
         """基于TimescaleDB生成现货交易量排行榜"""
@@ -1472,24 +1458,24 @@ class UserRequestHandler:
 
         if not coinglass_data:
             return "❌ 获取市场数据失败，请稍后重试"
-        
+
         # 计算持仓/市值比
         ratio_data = []
         for coin in coinglass_data:
             symbol = coin.get('symbol', '')
             if not symbol or symbol in self.blocked_symbols:
                 continue
-            
+
             # 使用持仓市值比字段
             ratio = coin.get('open_interest_market_cap_ratio', 0)
             if ratio <= 0:
                 continue
-            
+
             # 获取其他数据
             current_price = coin.get('current_price', 0)
             market_cap = coin.get('market_cap_usd', 0)
             open_interest = coin.get('open_interest_usd', 0)
-            
+
             ratio_data.append({
                 'symbol': symbol,
                 'ratio': ratio,
@@ -1497,21 +1483,21 @@ class UserRequestHandler:
                 'market_cap': market_cap,
                 'open_interest': open_interest
             })
-        
+
         # 排序
         reverse_sort = (sort_order == 'desc')
         sorted_data = sorted(ratio_data, key=lambda x: x['ratio'], reverse=reverse_sort)[:limit]
-        
+
         # 准备数据行
         data_rows = []
         for i, item in enumerate(sorted_data, 1):
             symbol = item['symbol']
             ratio = item['ratio']
             open_interest = item['open_interest']
-            
+
             # 格式化比率
             ratio_str = f"{ratio:.4f}"
-            
+
             # 格式化持仓量
             if open_interest >= 1e9:
                 value_str = f"${open_interest/1e9:.2f}B"
@@ -1519,23 +1505,23 @@ class UserRequestHandler:
                 value_str = f"${open_interest/1e6:.2f}M"
             else:
                 value_str = f"${open_interest/1e3:.2f}K"
-            
+
             data_rows.append([
                 f"{i}.",
                 symbol,
                 value_str,
                 ratio_str
             ])
-        
+
         # 动态对齐格式化
         aligned_data = self.dynamic_align_format(data_rows)
-        
+
         time_info = self.get_current_time_display()
-        
+
         # 排序方式显示
         sort_symbol = "⬇️" if sort_order == 'desc' else "🔼"
         sort_text = _sort_text(update, sort_order)
-        
+
         text = f"""{_t(update, "ranking.ratio.position_market")}
 {_t(update, "time.update", time=time_info['full'])}
 📊 排序 比率({sort_symbol}) / {sort_text}
@@ -1544,9 +1530,9 @@ class UserRequestHandler:
 ```
 💡 持仓/市值比 = 持仓量 / 市值
 {_t(update, "time.last_update", time=time_info['full'])}"""
-        
+
         return text
-    
+
     def get_volume_market_ratio(self, limit=10, sort_order='desc', update=None):
         """获取交易量/市值比排行榜"""
         # 获取市场缓存数据
@@ -1554,34 +1540,34 @@ class UserRequestHandler:
 
         if not coinglass_data:
             return "❌ 获取市场数据失败，请稍后重试"
-        
+
         # 计算交易量/市值比
         ratio_data = []
         for coin in coinglass_data:
             symbol = coin.get('symbol', '')
             if not symbol or symbol in self.blocked_symbols:
                 continue
-            
+
             # 计算交易量/市值比
             market_cap = coin.get('market_cap_usd', 0)
             open_interest = coin.get('open_interest_usd', 0)
             oi_volume_ratio = coin.get('open_interest_volume_ratio', 0)
-            
+
             if market_cap <= 0 or oi_volume_ratio <= 0:
                 continue
-            
+
             # 根据 持仓量/交易量比 计算交易量
             volume_24h = open_interest / oi_volume_ratio if oi_volume_ratio > 0 else 0
-            
+
             if volume_24h <= 0:
                 continue
-            
+
             # 计算交易量/市值比
             ratio = volume_24h / market_cap
-            
+
             # 获取其他数据
             current_price = coin.get('current_price', 0)
-            
+
             ratio_data.append({
                 'symbol': symbol,
                 'ratio': ratio,
@@ -1589,21 +1575,21 @@ class UserRequestHandler:
                 'market_cap': market_cap,
                 'volume_24h': volume_24h
             })
-        
+
         # 排序
         reverse_sort = (sort_order == 'desc')
         sorted_data = sorted(ratio_data, key=lambda x: x['ratio'], reverse=reverse_sort)[:limit]
-        
+
         # 准备数据行
         data_rows = []
         for i, item in enumerate(sorted_data, 1):
             symbol = item['symbol']
             ratio = item['ratio']
             volume_24h = item['volume_24h']
-            
+
             # 格式化比率
             ratio_str = f"{ratio:.4f}"
-            
+
             # 格式化交易量
             if volume_24h >= 1e9:
                 value_str = f"${volume_24h/1e9:.2f}B"
@@ -1611,23 +1597,23 @@ class UserRequestHandler:
                 value_str = f"${volume_24h/1e6:.2f}M"
             else:
                 value_str = f"${volume_24h/1e3:.2f}K"
-            
+
             data_rows.append([
                 f"{i}.",
                 symbol,
                 value_str,
                 ratio_str
             ])
-        
+
         # 动态对齐格式化
         aligned_data = self.dynamic_align_format(data_rows)
-        
+
         time_info = self.get_current_time_display()
-        
+
         # 排序方式显示
         sort_symbol = "⬇️" if sort_order == 'desc' else "🔼"
         sort_text = _sort_text(update, sort_order)
-        
+
         text = f"""{_t(update, "ranking.ratio.volume_market")}
 {_t(update, "time.update", time=time_info['full'])}
 📊 排序 比率({sort_symbol}) / {sort_text}
@@ -1636,9 +1622,9 @@ class UserRequestHandler:
 ```
 💡 交易量/市值比 = 24h交易量 / 市值
 {_t(update, "time.last_update", time=time_info['full'])}"""
-        
+
         return text
-    
+
     def get_volume_oi_ratio(self, limit=10, sort_order='desc', update=None):
         """获取交易量/持仓量比排行榜"""
         # 获取市场缓存数据
@@ -1646,30 +1632,30 @@ class UserRequestHandler:
 
         if not coinglass_data:
             return "❌ 获取市场数据失败，请稍后重试"
-        
+
         # 计算交易量/持仓量比
         ratio_data = []
         for coin in coinglass_data:
             symbol = coin.get('symbol', '')
             if not symbol or symbol in self.blocked_symbols:
                 continue
-            
+
             # 使用持仓交易量比字段的倒数
             oi_volume_ratio = coin.get('open_interest_volume_ratio', 0)
-            
+
             if oi_volume_ratio <= 0:
                 continue
-            
+
             # 交易量/持仓量比 = 1 / (持仓量/交易量比)
             ratio = 1 / oi_volume_ratio
-            
+
             # 获取其他数据
             current_price = coin.get('current_price', 0)
             open_interest = coin.get('open_interest_usd', 0)
-            
+
             # 计算交易量
             volume_24h = open_interest / oi_volume_ratio if oi_volume_ratio > 0 else 0
-            
+
             ratio_data.append({
                 'symbol': symbol,
                 'ratio': ratio,
@@ -1677,21 +1663,21 @@ class UserRequestHandler:
                 'open_interest': open_interest,
                 'volume_24h': volume_24h
             })
-        
+
         # 排序
         reverse_sort = (sort_order == 'desc')
         sorted_data = sorted(ratio_data, key=lambda x: x['ratio'], reverse=reverse_sort)[:limit]
-        
+
         # 准备数据行
         data_rows = []
         for i, item in enumerate(sorted_data, 1):
             symbol = item['symbol']
             ratio = item['ratio']
             volume_24h = item['volume_24h']
-            
+
             # 格式化比率
             ratio_str = f"{ratio:.4f}"
-            
+
             # 格式化交易量
             if volume_24h >= 1e9:
                 value_str = f"${volume_24h/1e9:.2f}B"
@@ -1699,23 +1685,23 @@ class UserRequestHandler:
                 value_str = f"${volume_24h/1e6:.2f}M"
             else:
                 value_str = f"${volume_24h/1e3:.2f}K"
-            
+
             data_rows.append([
                 f"{i}.",
                 symbol,
                 value_str,
                 ratio_str
             ])
-        
+
         # 动态对齐格式化
         aligned_data = self.dynamic_align_format(data_rows)
-        
+
         time_info = self.get_current_time_display()
-        
+
         # 排序方式显示
         sort_symbol = "⬇️" if sort_order == 'desc' else "🔼"
         sort_text = _sort_text(update, sort_order)
-        
+
         text = f"""{_t(update, "ranking.ratio.volume_oi")}
 {_t(update, "time.update", time=time_info['full'])}
 📊 排序 比率({sort_symbol}) / {sort_text}
@@ -1724,48 +1710,48 @@ class UserRequestHandler:
 ```
 💡 交易量/持仓量比 = 24h交易量 / 持仓量
 {_t(update, "time.last_update", time=time_info['full'])}"""
-        
+
         return text
-    
+
     def calculate_historical_ratio(self, coin, period):
         """计算历史时间点的持仓/市值比"""
         try:
             # 获取价格变化和持仓量变化
             price_change_key = f'price_change_percent_{period}'
             oi_change_key = f'open_interest_change_percent_{period}'
-            
+
             price_change = coin.get(price_change_key, 0)
             oi_change = coin.get(oi_change_key, 0)
-            
+
             # 当前值
             current_price = coin.get('current_price', 0)
             current_market_cap = coin.get('market_cap_usd', 0)
             current_oi = coin.get('open_interest_usd', 0)
-            
+
             if current_price <= 0 or current_market_cap <= 0 or current_oi <= 0:
                 return None
-            
+
             # 计算历史价格和持仓量
             historical_price = current_price / (1 + price_change / 100)
             historical_oi = current_oi / (1 + oi_change / 100)
-            
+
             # 计算历史市值（假设流通量不变）
             historical_market_cap = current_market_cap * (historical_price / current_price)
-            
+
             # 计算历史比率
             if historical_market_cap > 0:
                 historical_ratio = historical_oi / historical_market_cap
                 return historical_ratio
-            
+
             return None
-            
-        except Exception as e:
+
+        except Exception:
             return None
-    
+
     def get_coinglass_cache_data(self):
         """CoinGlass 缓存已下线，返回空列表。"""
         return []
-    
+
     def get_unified_ratio_keyboard(self, current_sort='desc', current_limit=10, current_ratio_type='position_market', update=None):
         """获取统一的比率键盘布局"""
         lang = _resolve_lang(update) if update else I18N.default_locale
@@ -1806,15 +1792,15 @@ class UserRequestHandler:
     def get_position_market_ratio_keyboard(self, current_sort='desc', current_limit=10):
         """获取持仓/市值比键盘 - 兼容性保持"""
         return self.get_unified_ratio_keyboard(current_sort, current_limit, 'position_market')
-    
+
     def get_volume_market_ratio_keyboard(self, current_sort='desc', current_limit=10):
         """获取交易量/市值比键盘 - 兼容性保持"""
         return self.get_unified_ratio_keyboard(current_sort, current_limit, 'volume_market')
-    
+
     def get_volume_oi_ratio_keyboard(self, current_sort='desc', current_limit=10):
         """获取交易量/持仓量比键盘 - 兼容性保持"""
         return self.get_unified_ratio_keyboard(current_sort, current_limit, 'volume_oi')
-    
+
     def get_money_flow(self, limit=10, period='24h', sort_order='desc', flow_type='absolute', market='futures', update=None):
         """获取资金流向排行榜 - 支持合约和现货数据"""
         if market == 'spot':
@@ -1823,17 +1809,17 @@ class UserRequestHandler:
         else:
             # 合约数据（原有逻辑）
             return self.get_futures_money_flow(limit, period, sort_order, flow_type, update=update)
-    
+
     def get_option_money_flow(self, limit=10, sort_order='desc', flow_type='absolute', update=None):
         """获取期权资金流向排行榜"""
         option_data, error = self.get_cached_data_safely('coinglass_option_flow_data')
-        
+
         if error:
             return "❌ 期权数据获取失败，请稍后重试"
-        
+
         if not option_data:
             return "🔄 期权数据正在加载中，请稍后重试"
-        
+
         # 获取缓存状态信息
         cache_info = ""
         try:
@@ -1844,7 +1830,7 @@ class UserRequestHandler:
                     cache_info = f"\n📄 缓存时间: {cache_data['last_update']}"
         except Exception:
             pass
-        
+
         # 根据流向类型过滤和排序数据
         if flow_type == 'inflow':
             # 只显示资金流入的币种
@@ -1858,7 +1844,7 @@ class UserRequestHandler:
             # 显示所有币种，按绝对值排序
             reverse_sort = (sort_order == 'desc')
             sorted_data = sorted(option_data, key=lambda x: abs(x['net_flow_usd']), reverse=reverse_sort)[:limit]
-        
+
         # 准备数据行
         data_rows = []
         for i, item in enumerate(sorted_data, 1):
@@ -1866,7 +1852,7 @@ class UserRequestHandler:
             net_flow = item['net_flow_usd']
             oi_change = item['oi_change_24h']
             volume_change = item['volume_change_24h']
-            
+
             # 格式化净流量
             if abs(net_flow) >= 1e9:
                 flow_str = f"+{net_flow/1e9:.2f}B" if net_flow >= 0 else f"{net_flow/1e9:.2f}B"
@@ -1876,13 +1862,13 @@ class UserRequestHandler:
                 flow_str = f"+{net_flow/1e3:.2f}K" if net_flow >= 0 else f"{net_flow/1e3:.2f}K"
             else:
                 flow_str = f"+{net_flow:.0f}" if net_flow >= 0 else f"{net_flow:.0f}"
-            
+
             # 持仓量变化
             oi_str = f"+{oi_change:.2f}%" if oi_change >= 0 else f"{oi_change:.2f}%"
-            
+
             # 成交量变化
             vol_str = f"+{volume_change:.1f}%" if volume_change >= 0 else f"{volume_change:.1f}%"
-            
+
             data_rows.append([
                 f"{i}.",
                 symbol,
@@ -1890,12 +1876,12 @@ class UserRequestHandler:
                 oi_str,
                 vol_str
             ])
-        
+
         # 动态对齐格式化
         aligned_data = self.dynamic_align_format(data_rows)
-        
+
         time_info = self.get_current_time_display()
-        
+
         # 根据流向类型设置标题和说明
         if flow_type == 'inflow':
             title = _t(update, "flow.option.inflow")
@@ -1925,9 +1911,9 @@ class UserRequestHandler:
 {flow_desc}
 💡 净流量 = 持仓量变化(70%) + 成交量变化(30%)
 {_t(update, "time.last_update", time=time_info['full'])}{cache_info}"""
-        
+
         return text
-    
+
 
 
     def get_futures_money_flow(self, limit=10, period='24h', sort_order='desc', flow_type='absolute', update=None):
@@ -1993,16 +1979,16 @@ class UserRequestHandler:
 
         if flow_type == 'inflow':
             title = _t(update, "flow.title.futures_long", period=period_name)
-            desc = _t(update, "flow.desc.futures_long")
+            _t(update, "flow.desc.futures_long")
         elif flow_type == 'outflow':
             title = _t(update, "flow.title.futures_short", period=period_name)
-            desc = _t(update, "flow.desc.futures_short")
+            _t(update, "flow.desc.futures_short")
         elif flow_type == 'volume':
             title = _t(update, "flow.title.futures_volume", period=period_name)
-            desc = _t(update, "flow.desc.volume")
+            _t(update, "flow.desc.volume")
         else:
             title = _t(update, "flow.title.futures", period=period_name)
-            desc = _t(update, "flow.desc.absolute", symbol=sort_symbol, sort=sort_text)
+            _t(update, "flow.desc.absolute", symbol=sort_symbol, sort=sort_text)
 
         return (
             f"""{title}
@@ -2078,16 +2064,16 @@ class UserRequestHandler:
 
         if flow_type == 'inflow':
             title = _t(update, "flow.title.spot_long", period=period_name)
-            desc = _t(update, "flow.desc.spot_long")
+            _t(update, "flow.desc.spot_long")
         elif flow_type == 'outflow':
             title = _t(update, "flow.title.spot_short", period=period_name)
-            desc = _t(update, "flow.desc.spot_short")
+            _t(update, "flow.desc.spot_short")
         elif flow_type == 'volume':
             title = _t(update, "flow.title.spot_volume", period=period_name)
-            desc = _t(update, "flow.desc.volume")
+            _t(update, "flow.desc.volume")
         else:
             title = _t(update, "flow.title.spot", period=period_name)
-            desc = _t(update, "flow.desc.absolute", symbol=sort_symbol, sort=sort_text)
+            _t(update, "flow.desc.absolute", symbol=sort_symbol, sort=sort_text)
 
         return (
             f"""{title}
@@ -2191,11 +2177,11 @@ class UserRequestHandler:
         ])
 
         return InlineKeyboardMarkup(keyboard)
-    
+
     def get_market_depth(self, limit=10, sort_type='ratio', sort_order='desc'):
         """市场深度排行已下线占位。"""
         return "⏸️ 市场深度排行功能已下线，敬请期待替代方案。"
-    
+
     def get_market_depth_keyboard(self, current_limit=10, current_sort_type='ratio', current_sort='desc', update=None):
         """市场深度排行已下线的占位键盘。"""
         return InlineKeyboardMarkup([
@@ -2229,7 +2215,7 @@ class TradeCatBot:
         self.metric_service = BINANCE_DB_METRIC_SERVICE
         if self.metric_service is None:
             logger.warning("⚠️ 币安数据库指标服务未就绪，部分排行榜将回退至缓存逻辑")
-        
+
         # 初始化信号格式化器
         try:
             SignalFormatter = _load_signal_formatter()
@@ -2238,60 +2224,60 @@ class TradeCatBot:
         except Exception as e:
             logger.error(f"❌ 信号格式化器初始化失败: {e}")
             self.signal_formatter = None
-    
+
     def filter_blocked_symbols(self, data_list):
         """过滤掉被屏蔽的币种"""
         if not data_list:
             return data_list
-        
+
         filtered_data = []
         for item in data_list:
             symbol = item.get('symbol', '')
             if symbol not in self.blocked_symbols:
                 filtered_data.append(item)
-        
+
         return filtered_data
-    
+
     def get_available_cache_files(self):
         """获取可用的缓存文件列表，按修改时间排序"""
         cache_files = []
-        
+
         # 检查主缓存文件
         if os.path.exists(self.cache_file_primary):
             mtime = os.path.getmtime(self.cache_file_primary)
             cache_files.append((self.cache_file_primary, mtime))
-        
+
         # 检查备份缓存文件
         if os.path.exists(self.cache_file_secondary):
             mtime = os.path.getmtime(self.cache_file_secondary)
             cache_files.append((self.cache_file_secondary, mtime))
-        
+
         # 按修改时间降序排序（最新的在前面）
         cache_files.sort(key=lambda x: x[1], reverse=True)
-        
+
         return [file_path for file_path, _ in cache_files]
-    
+
     def load_cache_from_file(self):
         """从文件加载缓存数据 - 支持双缓存文件机制"""
         global cache
-        
+
         available_files = self.get_available_cache_files()
         if not available_files:
             logger.info("📄 没有找到缓存文件，将创建新的缓存")
             return False
-        
+
         # 尝试从最新的缓存文件加载
         for cache_file in available_files:
             try:
                 logger.info(f"📄 尝试从缓存文件加载: {cache_file}")
                 with open(cache_file, 'r', encoding='utf-8') as f:
                     file_cache = json.load(f)
-                
+
                 # 检查缓存是否过期
                 now = time.time()
                 valid_cache = {}
                 total_items = len(file_cache)
-                
+
                 for key, cache_item in file_cache.items():
                     if isinstance(cache_item, dict) and 'timestamp' in cache_item:
                         # 检查缓存是否在有效期内（扩展到10分钟，允许更长的使用时间）
@@ -2303,7 +2289,7 @@ class TradeCatBot:
                             logger.debug(f"文件缓存已过期: {key} (年龄: {cache_age:.1f}秒)")
                     else:
                         logger.warning(f"无效的缓存格式: {key}")
-                
+
                 if valid_cache:
                     cache.update(valid_cache)
                     logger.info(f"✅ 从文件 {cache_file} 加载了 {len(valid_cache)}/{total_items} 个有效缓存项")
@@ -2311,14 +2297,14 @@ class TradeCatBot:
                     return True
                 else:
                     logger.info(f"📄 缓存文件 {cache_file} 中没有有效数据")
-                    
+
             except Exception as e:
                 logger.error(f"❌ 加载缓存文件失败 {cache_file}: {e}")
                 continue
-        
+
         logger.warning("❌ 所有缓存文件都无法加载或已过期")
         return False
-    
+
     def save_cache_to_file(self, force_new_file=False):
         """保存缓存数据到文件 - 双缓存文件机制"""
         global cache
@@ -2334,11 +2320,11 @@ class TradeCatBot:
                     except (TypeError, ValueError) as e:
                         logger.warning(f"缓存项 {key} 无法序列化，跳过: {e}")
                         continue
-            
+
             if not serializable_cache:
                 logger.warning("⚠️ 没有可序列化的缓存数据")
                 return False
-            
+
             # 选择要写入的缓存文件
             if force_new_file or self._is_updating:
                 # 如果正在更新或强制使用新文件，则使用备用文件
@@ -2349,29 +2335,29 @@ class TradeCatBot:
             else:
                 # 否则使用当前文件
                 target_file = self._current_cache_file
-            
+
             # 写入临时文件，然后重命名，确保原子性操作
             temp_file = target_file + '.tmp'
             with open(temp_file, 'w', encoding='utf-8') as f:
                 json.dump(serializable_cache, f, ensure_ascii=False, indent=2)
-            
+
             # 原子性重命名
             if os.path.exists(target_file):
                 os.remove(target_file)
             os.rename(temp_file, target_file)
-            
+
             # 更新当前使用的缓存文件
             if force_new_file or self._is_updating:
                 self._current_cache_file = target_file
                 logger.info(f"✅ 缓存已保存到新文件: {target_file} ({len(serializable_cache)} 个项目)")
-                
+
                 # 清理旧的缓存文件（保留最新的两个文件）
                 self.cleanup_old_cache_files()
             else:
                 logger.info(f"✅ 缓存已更新到文件: {target_file} ({len(serializable_cache)} 个项目)")
-            
+
             return True
-                
+
         except Exception as e:
             logger.error(f"❌ 保存缓存文件失败: {e}")
             # 清理临时文件
@@ -2381,14 +2367,14 @@ class TradeCatBot:
                     os.remove(temp_file)
                 except Exception:
                     pass
-        
+
         return False
-    
+
     def cleanup_old_cache_files(self):
         """清理旧的缓存文件，只保留最新的两个"""
         try:
             available_files = self.get_available_cache_files()
-            
+
             # 如果超过2个文件，删除最旧的
             if len(available_files) > 2:
                 files_to_delete = available_files[2:]  # 保留前两个（最新的）
@@ -2398,10 +2384,10 @@ class TradeCatBot:
                         logger.info(f"🗑️ 已删除旧缓存文件: {file_path}")
                     except Exception as e:
                         logger.warning(f"⚠️ 删除旧缓存文件失败 {file_path}: {e}")
-                        
+
         except Exception as e:
             logger.error(f"❌ 清理缓存文件失败: {e}")
-        
+
     def get_cached_data(self, key, fetch_func, *args, **kwargs):
         """获取缓存数据或重新获取"""
         global cache
@@ -2409,7 +2395,7 @@ class TradeCatBot:
         if key in cache and now - cache[key]['timestamp'] < CACHE_DURATION:
             logger.info(f"使用缓存数据: {key}")
             return cache[key]['data']
-        
+
         try:
             logger.info(f"获取新数据: {key}")
             data = fetch_func(*args, **kwargs)
@@ -2429,16 +2415,16 @@ class TradeCatBot:
         """初始化缓存 - 预加载所有数据"""
         if self._is_initialized:
             return
-        
+
         logger.info("🚀 开始初始化缓存，预加载所有数据...")
-        
+
         # 首先尝试从文件加载缓存
         cache_loaded = self.load_cache_from_file()
         if cache_loaded:
             logger.info("📄 使用文件缓存数据，跳过部分网络请求")
         else:
             logger.info("🌐 文件缓存无效，将重新获取所有数据")
-        
+
         # 预加载数据的任务列表 - 扩展更多缓存
         cache_tasks = [
             # 核心数据源
@@ -2447,32 +2433,32 @@ class TradeCatBot:
             ('open_interest_data', self.fetch_open_interest_data),
             ('market_depth_data', self.fetch_market_depth_data),
             ('liquidation_data', self.fetch_liquidation_data),
-            
+
             # 多空比数据（不同周期）
             ('long_short_ratio_data_1d', lambda: self.fetch_long_short_ratio_data('1d')),
             ('long_short_ratio_data_4h', lambda: self.fetch_long_short_ratio_data('4h')),
             ('long_short_ratio_data_1h', lambda: self.fetch_long_short_ratio_data('1h')),
-            
+
             # 持仓量历史数据（不同周期）
             ('open_interest_hist_24h', lambda: self.fetch_open_interest_hist_data('24h')),
             ('open_interest_hist_4h', lambda: self.fetch_open_interest_hist_data('4h')),
             ('open_interest_hist_1h', lambda: self.fetch_open_interest_hist_data('1h')),
             ('open_interest_hist_15m', lambda: self.fetch_open_interest_hist_data('15m')),
-            
+
             # K线交易量数据（不同周期）
             ('volume_kline_data_24h', lambda: self.fetch_kline_volume_data('24h')),
             ('volume_kline_data_12h', lambda: self.fetch_kline_volume_data('12h')),
             ('volume_kline_data_4h', lambda: self.fetch_kline_volume_data('4h')),
             ('volume_kline_data_1h', lambda: self.fetch_kline_volume_data('1h')),
             ('volume_kline_data_15m', lambda: self.fetch_kline_volume_data('15m')),
-            
+
             # 预计算的市场指标（减少实时计算压力）
             ('market_sentiment_cache', self.compute_market_sentiment_data),
             ('top_gainers_cache', lambda: self.compute_top_movers_data('gainers')),
             ('top_losers_cache', lambda: self.compute_top_movers_data('losers')),
             ('active_symbols_cache', lambda: self.get_active_symbols(force_refresh=True)),
         ]
-        
+
         # 预加载活跃交易对
         try:
             logger.info("📊 预加载活跃交易对...")
@@ -2480,7 +2466,7 @@ class TradeCatBot:
             logger.info("✅ 活跃交易对加载完成")
         except Exception as e:
             logger.error(f"❌ 活跃交易对加载失败: {e}")
-        
+
         # 使用异步方式预加载所有数据（避免阻塞）
         async def load_cache_async(key, fetch_func):
             """异步加载缓存数据"""
@@ -2491,46 +2477,46 @@ class TradeCatBot:
                     if now - cache[key]['timestamp'] < CACHE_DURATION:
                         logger.info(f"✅ {key} 缓存仍然有效，跳过网络请求")
                         return
-                
+
                 logger.info(f"📊 预加载 {key}...")
                 # 在线程池中执行，避免阻塞
                 loop = asyncio.get_event_loop()
                 data = await loop.run_in_executor(None, fetch_func)
-                
+
                 if data:
                     cache[key] = {'data': data, 'timestamp': time.time()}
                     logger.info(f"✅ {key} 加载完成，数据量: {len(data) if isinstance(data, list) else 1}")
                 else:
                     logger.warning(f"⚠️ {key} 数据为空")
-                    
+
             except Exception as e:
                 logger.error(f"❌ {key} 加载失败: {e}")
-        
+
         # 分批并发加载，避免过多并发请求
         batch_size = 4
         for i in range(0, len(cache_tasks), batch_size):
             batch = cache_tasks[i:i+batch_size]
             tasks = [load_cache_async(key, func) for key, func in batch]
             await asyncio.gather(*tasks, return_exceptions=True)
-            
+
             # 批次间稍作休息
             if i + batch_size < len(cache_tasks):
                 await asyncio.sleep(0.3)
-        
+
         # 保存缓存到文件（异步执行）
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, self.save_cache_to_file)
-        
+
         self._is_initialized = True
         logger.info("🎉 缓存初始化完成！所有数据已预加载并保存到文件")
-        
+
         # 启动快速预热模式，确保最关键数据立即可用
         await self.quick_warmup_cache()
 
     async def quick_warmup_cache(self):
         """快速预热关键缓存 - 确保用户立即可以使用最重要的功能"""
         logger.info("🔥 开始快速预热关键缓存...")
-        
+
         # 最高优先级：立即确保这些数据可用
         if BINANCE_API_DISABLED:
             logger.info("⏸️ BINANCE_API_DISABLED=1，跳过关键数据预热")
@@ -2539,7 +2525,7 @@ class TradeCatBot:
             ('ticker_24hr_data', self.fetch_24hr_ticker_data),
             ('funding_rate_data', self.fetch_funding_rate_data),
         ]
-        
+
         # 如果这些关键数据不在缓存中，立即获取
         for key, fetch_func in critical_tasks:
             if key not in cache or not cache[key].get('data'):
@@ -2554,7 +2540,7 @@ class TradeCatBot:
                         logger.warning(f"⚠️ 关键数据预热失败: {key}")
                 except Exception as e:
                     logger.error(f"❌ 关键数据预热异常: {key} - {e}")
-        
+
         logger.info("🔥 快速预热完成，机器人可立即响应用户请求！")
 
     def get_cached_data_only(self, key):
@@ -2567,7 +2553,7 @@ class TradeCatBot:
         else:
             logger.warning(f"缓存中没有数据: {key}")
             return []
-    
+
     def get_cached_data_with_fallback(self, key, fallback_message=None):
         """获取缓存数据，如果没有则返回友好提示"""
         global cache
@@ -2580,45 +2566,45 @@ class TradeCatBot:
             if fallback_message is None:
                 fallback_message = "🔄 数据正在后台加载中，请稍后重试\n💡 机器人刚启动时需要几秒钟加载数据"
             return [], fallback_message
-    
+
     def get_cache_status(self):
         """获取缓存状态信息"""
         global cache
         if not cache:
             return "❌ 缓存为空"
-        
+
         status_info = []
         current_time = time.time()
-        
+
         for key, data in cache.items():
             age = current_time - data['timestamp']
             data_count = len(data['data']) if isinstance(data['data'], list) else 1
             status_info.append(f"- {key}: {data_count}条数据, {age:.1f}秒前")
-        
-        return f"📊 缓存状态:\n" + "\n".join(status_info)
+
+        return "📊 缓存状态:\n" + "\n".join(status_info)
 
     async def refresh_cache_background(self):
         """🚀 极轻量级后台刷新 - 完全非阻塞，用户体验优先"""
         update_interval = 120  # 基础更新间隔2分钟，进一步减少频率
         consecutive_failures = 0
-        last_user_activity = time.time()
-        
+        time.time()
+
         while True:
             try:
                 # 智能调整更新间隔，失败时延长间隔
                 current_interval = min(update_interval * (1 + consecutive_failures * 0.5), 600)  # 最大10分钟
-                
+
                 # 根据系统负载动态调整
                 import psutil
                 cpu_percent = psutil.cpu_percent(interval=0.1)
                 if cpu_percent > 80:
                     current_interval *= 1.5  # CPU高负载时延长间隔
-                
+
                 await asyncio.sleep(current_interval)
-                
+
                 # 🔧 关键修复：使用轻量级更新，完全非阻塞
                 logger.info(f"🚀 启动极轻量级缓存刷新... (间隔: {current_interval:.0f}秒, CPU: {cpu_percent:.1f}%)")
-                
+
                 try:
                     # 使用轻量级异步更新，不设置阻塞标志
                     await self.update_cache_lightweight()
@@ -2627,15 +2613,15 @@ class TradeCatBot:
                 except Exception as update_error:
                     logger.error(f"❌ 后台缓存更新失败: {update_error}")
                     consecutive_failures += 1
-                
+
             except Exception as e:
                 logger.error(f"❌ 后台缓存刷新失败: {e}")
                 consecutive_failures += 1
-                
+
                 # 失败后等待时间递增，但保持较短
                 wait_time = min(5 * consecutive_failures, 30)  # 最大30秒
                 await asyncio.sleep(wait_time)
-    
+
     async def update_cache_lightweight(self):
         """轻量级缓存更新 - 不设置阻塞标志，确保用户请求不受影响"""
         global cache
@@ -2643,12 +2629,12 @@ class TradeCatBot:
             logger.info("⏸️ BINANCE_API_DISABLED=1，跳过轻量级缓存更新")
             return
         logger.info("📊 开始轻量级非阻塞缓存更新...")
-        
+
         # 🔧 不设置 self._is_updating = True，确保用户请求不被阻塞
-        
+
         # 创建新的缓存数据
         new_cache_data = {}
-        
+
         # 轻量级异步包装器
         async def fetch_lightweight(key, fetch_func):
             """轻量级异步包装器，优先保证用户体验"""
@@ -2656,11 +2642,11 @@ class TradeCatBot:
                 logger.info(f"🔄 轻量级更新 {key}...")
                 # 在线程池中执行，设置较短超时
                 loop = asyncio.get_event_loop()
-                
+
                 # 设置30秒超时，避免长时间阻塞
                 try:
                     data = await asyncio.wait_for(
-                        loop.run_in_executor(None, fetch_func), 
+                        loop.run_in_executor(None, fetch_func),
                         timeout=30.0
                     )
                 except asyncio.TimeoutError:
@@ -2669,7 +2655,7 @@ class TradeCatBot:
                     if key in cache:
                         return key, cache[key]
                     return key, None
-                
+
                 if data:
                     logger.info(f"✅ {key} 轻量级更新完成")
                     return key, {'data': data, 'timestamp': time.time()}
@@ -2678,7 +2664,7 @@ class TradeCatBot:
                     if key in cache:
                         return key, cache[key]
                     return key, None
-                    
+
             except Exception as e:
                 logger.error(f"❌ 轻量级更新 {key} 失败: {e}")
                 # 保留旧缓存数据
@@ -2686,13 +2672,13 @@ class TradeCatBot:
                     logger.info(f"🔄 保留 {key} 的旧缓存数据")
                     return key, cache[key]
                 return key, None
-        
+
         # 只更新最关键的数据，减少更新时间
         critical_tasks = [
             ('ticker_24hr_data', self.fetch_24hr_ticker_data),
             ('funding_rate_data', self.fetch_funding_rate_data),
         ]
-        
+
         # 分批执行，每批之间有延迟，确保用户请求有机会处理
         logger.info("🚀 开始执行关键任务...")
         for i, (key, func) in enumerate(critical_tasks):
@@ -2701,20 +2687,20 @@ class TradeCatBot:
                 result = await fetch_lightweight(key, func)
                 if result[1] is not None:
                     new_cache_data[result[0]] = result[1]
-                
+
                 # 任务间休息，让用户交互有机会处理
                 if i < len(critical_tasks) - 1:
                     await asyncio.sleep(0.5)
-                    
+
             except Exception as e:
                 logger.error(f"关键任务 {key} 异常: {e}")
                 continue
-        
+
         # 如果有数据更新成功，原子性更新全局缓存
         if new_cache_data:
             # 快速原子性更新
             cache.update(new_cache_data)
-            
+
             # 异步保存到文件，不等待完成
             try:
                 loop = asyncio.get_event_loop()
@@ -2722,23 +2708,23 @@ class TradeCatBot:
                 loop.run_in_executor(None, lambda: self.save_cache_to_file(force_new_file=False))
             except Exception as save_error:
                 logger.warning(f"缓存保存任务创建失败: {save_error}")
-            
+
             logger.info(f"🎉 轻量级缓存更新完成！更新了 {len(new_cache_data)} 个数据源")
         else:
             logger.warning("⚠️ 本次轻量级更新没有获取到新数据")
-    
+
     async def update_cache_non_blocking(self):
         """真正非阻塞的缓存更新 - 重定向到轻量级更新（保留兼容性）"""
         await self.update_cache_lightweight()
         return  # 提前返回，避免执行原来的重型更新逻辑
-        
+
         # 原来的重型更新逻辑保留但不执行
         global cache
         logger.info("📊 开始真正非阻塞缓存更新...")
-        
+
         # 创建新的缓存数据
         new_cache_data = {}
-        
+
         # 将所有同步函数包装为异步任务
         async def fetch_async(key, fetch_func):
             """异步包装器，在线程池中执行同步API调用"""
@@ -2747,7 +2733,7 @@ class TradeCatBot:
                 # 在线程池中执行，避免阻塞事件循环
                 loop = asyncio.get_event_loop()
                 data = await loop.run_in_executor(None, fetch_func)
-                
+
                 if data:
                     logger.info(f"✅ {key} 更新完成，数据量: {len(data) if isinstance(data, list) else 1}")
                     return key, {'data': data, 'timestamp': time.time()}
@@ -2757,7 +2743,7 @@ class TradeCatBot:
                     if key in cache:
                         return key, cache[key]
                     return key, None
-                    
+
             except Exception as e:
                 logger.error(f"❌ 更新 {key} 失败: {e}")
                 # 保留旧缓存数据
@@ -2765,113 +2751,113 @@ class TradeCatBot:
                     logger.info(f"🔄 保留 {key} 的旧缓存数据")
                     return key, cache[key]
                 return key, None
-        
+
         # 分组任务 - 按优先级和依赖关系分批处理
         high_priority_tasks = [
             ('ticker_24hr_data', self.fetch_24hr_ticker_data),
             ('funding_rate_data', self.fetch_funding_rate_data),
         ]
-        
+
         medium_priority_tasks = [
             ('open_interest_data', self.fetch_open_interest_data),
             ('market_depth_data', self.fetch_market_depth_data),
             ('liquidation_data', self.fetch_liquidation_data),
         ]
-        
+
         low_priority_tasks = [
             # 多空比数据
             ('long_short_ratio_data_1d', lambda: self.fetch_long_short_ratio_data('1d')),
             ('long_short_ratio_data_4h', lambda: self.fetch_long_short_ratio_data('4h')),
             ('long_short_ratio_data_1h', lambda: self.fetch_long_short_ratio_data('1h')),
-            
+
             # 持仓量历史数据
             ('open_interest_hist_24h', lambda: self.fetch_open_interest_hist_data('24h')),
             ('open_interest_hist_4h', lambda: self.fetch_open_interest_hist_data('4h')),
             ('open_interest_hist_1h', lambda: self.fetch_open_interest_hist_data('1h')),
             ('open_interest_hist_15m', lambda: self.fetch_open_interest_hist_data('15m')),
-            
+
             # K线交易量数据
             ('volume_kline_data_24h', lambda: self.fetch_kline_volume_data('24h')),
             ('volume_kline_data_12h', lambda: self.fetch_kline_volume_data('12h')),
             ('volume_kline_data_4h', lambda: self.fetch_kline_volume_data('4h')),
             ('volume_kline_data_1h', lambda: self.fetch_kline_volume_data('1h')),
             ('volume_kline_data_15m', lambda: self.fetch_kline_volume_data('15m')),
-            
+
             # 预计算数据
             ('market_sentiment_cache', self.compute_market_sentiment_data),
             ('top_gainers_cache', lambda: self.compute_top_movers_data('gainers')),
             ('top_losers_cache', lambda: self.compute_top_movers_data('losers')),
             ('active_symbols_cache', lambda: self.get_active_symbols(force_refresh=True)),
         ]
-        
+
         # 第一批：高优先级任务（并发执行）
         logger.info("🚀 开始执行高优先级任务...")
         tasks = [fetch_async(key, func) for key, func in high_priority_tasks]
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         for result in results:
             if isinstance(result, Exception):
                 logger.error(f"高优先级任务异常: {result}")
             elif result[1] is not None:
                 new_cache_data[result[0]] = result[1]
-        
+
         # 中间休息，让用户交互有机会处理
         await asyncio.sleep(0.1)
-        
+
         # 第二批：中优先级任务（并发执行）
         logger.info("⚡ 开始执行中优先级任务...")
         tasks = [fetch_async(key, func) for key, func in medium_priority_tasks]
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         for result in results:
             if isinstance(result, Exception):
                 logger.error(f"中优先级任务异常: {result}")
             elif result[1] is not None:
                 new_cache_data[result[0]] = result[1]
-        
+
         # 中间休息，让用户交互有机会处理
         await asyncio.sleep(0.1)
-        
+
         # 第三批：低优先级任务（分小批次执行）
         logger.info("🔄 开始执行低优先级任务...")
         batch_size = 3  # 每批3个任务
-        
+
         for i in range(0, len(low_priority_tasks), batch_size):
             batch = low_priority_tasks[i:i+batch_size]
             tasks = [fetch_async(key, func) for key, func in batch]
             results = await asyncio.gather(*tasks, return_exceptions=True)
-            
+
             for result in results:
                 if isinstance(result, Exception):
                     logger.error(f"低优先级任务异常: {result}")
                 elif result[1] is not None:
                     new_cache_data[result[0]] = result[1]
-            
+
             # 每批次之间休息，确保用户交互流畅
             if i + batch_size < len(low_priority_tasks):
                 await asyncio.sleep(0.2)
-        
+
         # 统计更新结果
         updated_count = len([k for k, v in new_cache_data.items() if v is not None and k not in cache or cache[k] != v])
-        
+
         # 如果有数据更新成功，则更新全局缓存并保存到新文件
         if new_cache_data:
             # 原子性更新全局缓存
             cache.update(new_cache_data)
-            
+
             # 异步保存到新的缓存文件（在线程池中执行）
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, lambda: self.save_cache_to_file(force_new_file=True))
-            
+
             logger.info(f"🎉 真正非阻塞缓存更新完成！成功更新 {updated_count} 个数据源")
         else:
             logger.warning("⚠️ 没有数据更新成功，保持现有缓存")
-    
+
     def get_cache_file_info(self):
         """获取缓存文件信息"""
         info = []
         available_files = self.get_available_cache_files()
-        
+
         for i, file_path in enumerate(available_files):
             try:
                 mtime = os.path.getmtime(file_path)
@@ -2879,12 +2865,12 @@ class TradeCatBot:
                 # 转换为北京时间 UTC+8
                 mtime_str = datetime.fromtimestamp(mtime, timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S')
                 size_str = f"{size/1024:.1f}KB" if size < 1024*1024 else f"{size/(1024*1024):.1f}MB"
-                
+
                 status = "当前使用" if file_path == self._current_cache_file else "备份文件"
                 info.append(f"- {file_path}: {status}, {mtime_str}, {size_str}")
             except Exception as e:
                 info.append(f"- {file_path}: 读取失败 - {e}")
-        
+
         return "\n".join(info) if info else "没有找到缓存文件"
 
     def get_active_symbols(self, force_refresh=False):
@@ -2892,7 +2878,7 @@ class TradeCatBot:
         now = time.time()
         if not force_refresh and self._active_symbols and (now - self._active_symbols_timestamp) < 300:  # 5分钟缓存
             return self._active_symbols
-        
+
         try:
             # 获取交易所信息
             exchange_info = self.futures_client.get_exchange_info()
@@ -2900,12 +2886,12 @@ class TradeCatBot:
                 # 先收集所有活跃的USDT永续合约
                 active_symbols = []
                 for symbol_info in exchange_info['symbols']:
-                    if (symbol_info['status'] == 'TRADING' and 
+                    if (symbol_info['status'] == 'TRADING' and
                         symbol_info['symbol'].endswith('USDT') and
                         symbol_info['contractType'] == 'PERPETUAL' and
                         symbol_info['symbol'] not in self.blocked_symbols):
                         active_symbols.append(symbol_info['symbol'])
-                
+
                 # 获取24小时交易数据进行排序
                 try:
                     ticker_data = self.futures_client.get_24hr_ticker()
@@ -2915,23 +2901,23 @@ class TradeCatBot:
                         for ticker in ticker_data:
                             if ticker['symbol'] in active_symbols:
                                 volume_map[ticker['symbol']] = float(ticker.get('quoteVolume', 0))
-                        
+
                         # 按交易量排序，优先活跃度高的币种
                         active_symbols.sort(key=lambda x: volume_map.get(x, 0), reverse=True)
                         logger.info(f"按交易量排序完成，前10名: {active_symbols[:10]}")
-                
+
                 except Exception as e:
                     logger.warning(f"获取交易量数据失败，使用默认排序: {e}")
-                
+
                 # 增加支持的币种数量到500个（从100个增加）
                 self._active_symbols = active_symbols[:500]  # 支持更多币种
                 self._active_symbols_timestamp = now
                 logger.info(f"✅ 获取到 {len(self._active_symbols)} 个活跃交易对（已按交易量排序）")
                 return self._active_symbols
-                
+
         except Exception as e:
             logger.error(f"获取活跃交易对失败: {e}")
-        
+
         # 返回扩展的默认主流币种，过滤掉被屏蔽的币种
         default_symbols = [
             # 主流币种
@@ -2966,19 +2952,19 @@ class TradeCatBot:
             # 获取基础数据
             price_data = self.get_cached_data_only('ticker_24hr_data')
             funding_data = self.get_cached_data_only('funding_rate_data')
-            
+
             if not price_data or not funding_data:
                 return None
-            
+
             # 计算市场情绪指标
             filtered_price = [item for item in price_data if item['symbol'].endswith('USDT') and item['symbol'] not in self.blocked_symbols]
             total_coins = len(filtered_price)
             rising_coins = len([item for item in filtered_price if float(item['priceChangePercent']) > 0])
-            
+
             # 计算资金费率情绪
             filtered_funding = [item for item in funding_data if item['symbol'].endswith('USDT') and item['symbol'] not in self.blocked_symbols]
             avg_funding_rate = sum([float(item['lastFundingRate']) for item in filtered_funding]) / len(filtered_funding) if filtered_funding else 0
-            
+
             return {
                 'total_coins': total_coins,
                 'rising_coins': rising_coins,
@@ -2996,17 +2982,17 @@ class TradeCatBot:
             price_data = self.get_cached_data_only('ticker_24hr_data')
             if not price_data:
                 return None
-            
+
             # 过滤数据
             filtered_data = [
-                item for item in price_data 
+                item for item in price_data
                 if item['symbol'].endswith('USDT') and float(item['quoteVolume']) > 1000000 and item['symbol'] not in self.blocked_symbols
             ]
-            
+
             # 排序
             reverse_sort = (move_type == 'gainers')
             sorted_data = sorted(filtered_data, key=lambda x: float(x['priceChangePercent']), reverse=reverse_sort)
-            
+
             return {
                 'data': sorted_data[:50],  # 保存前50名
                 'move_type': move_type,
@@ -3026,13 +3012,13 @@ class TradeCatBot:
             active_symbols = self.get_active_symbols()
             if not active_symbols:
                 return []
-            
+
             open_interest_data = []
             # 批量获取持仓量数据，限制并发数量
             batch_size = 20
             for i in range(0, min(len(active_symbols), 50), batch_size):
                 batch_symbols = active_symbols[i:i+batch_size]
-                
+
                 for symbol in batch_symbols:
                     try:
                         oi_data = self.futures_client.get_open_interest(symbol)
@@ -3041,13 +3027,13 @@ class TradeCatBot:
                     except Exception as e:
                         logger.debug(f"获取{symbol}持仓量失败: {e}")
                         continue
-                
+
                 # 避免请求过于频繁
                 if i + batch_size < min(len(active_symbols), 50):
                     time.sleep(0.1)
-            
+
             return open_interest_data
-            
+
         except Exception as e:
             logger.error(f"获取持仓量数据失败: {e}")
             return []
@@ -3058,17 +3044,17 @@ class TradeCatBot:
             # 主流币种，过滤掉被屏蔽的币种
             major_symbols = [symbol for symbol in ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT', 'SOLUSDT', 'DOGEUSDT', 'DOTUSDT'] if symbol not in self.blocked_symbols]
             hist_data = []
-            
+
             # 周期映射
             period_map = {
                 '24h': '1d',
-                '4h': '4h', 
+                '4h': '4h',
                 '1h': '1h',
                 '15m': '15m'
             }
-            
+
             api_period = period_map.get(period, '1d')
-            
+
             for symbol in major_symbols:
                 try:
                     data = self.futures_client.get_open_interest_hist(
@@ -3084,7 +3070,7 @@ class TradeCatBot:
                 except Exception as e:
                     logger.debug(f"获取{symbol}持仓量历史失败: {e}")
                     continue
-            
+
             return hist_data
         except Exception as e:
             logger.error(f"获取持仓量历史数据失败: {e}")
@@ -3096,12 +3082,12 @@ class TradeCatBot:
             # 获取主流币种的多空比数据，过滤掉被屏蔽的币种
             major_symbols = [symbol for symbol in ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT'] if symbol not in self.blocked_symbols]
             ratio_data = []
-            
+
             for symbol in major_symbols:
                 try:
                     data = self.futures_client.get_global_long_short_account_ratio(
-                        symbol=symbol, 
-                        period=period, 
+                        symbol=symbol,
+                        period=period,
                         limit=1
                     )
                     if data:
@@ -3109,7 +3095,7 @@ class TradeCatBot:
                 except Exception as e:
                     logger.debug(f"获取{symbol}多空比失败: {e}")
                     continue
-            
+
             return ratio_data
         except Exception as e:
             logger.error(f"获取多空比数据失败: {e}")
@@ -3120,42 +3106,42 @@ class TradeCatBot:
         try:
             price_data = self.futures_client.get_24hr_ticker()
             funding_data = self.fetch_funding_rate_data()
-            
+
             if not price_data or not funding_data:
                 return []
-            
+
             # 创建资金费率映射
             funding_map = {}
             for item in funding_data:
                 if 'symbol' in item and 'lastFundingRate' in item:
                     funding_map[item['symbol']] = float(item['lastFundingRate'])
-            
+
             liquidation_risks = []
             for item in price_data:
                 if not item.get('symbol', '').endswith('USDT') or item.get('symbol', '') in self.blocked_symbols:
                     continue
-                
+
                 try:
                     symbol = item['symbol']
                     change_24h = float(item.get('priceChangePercent', 0))
                     volume = float(item.get('quoteVolume', 0))
                     funding_rate = funding_map.get(symbol, 0)
-                    
+
                     # 计算综合风险评分
                     # 1. 波动性风险 (24h涨跌幅)
                     volatility_risk = abs(change_24h) * 0.4
-                    
+
                     # 2. 资金费率风险
                     funding_risk = abs(funding_rate * 100) * 30
-                    
+
                     # 3. 流动性风险 (交易量越小风险越高)
                     liquidity_risk = max(0, (1e8 - volume) / 1e8) * 0.2
-                    
+
                     # 4. 价格趋势风险
                     trend_risk = abs(change_24h) * 0.1 if abs(change_24h) > 10 else 0
-                    
+
                     risk_score = volatility_risk + funding_risk + liquidity_risk + trend_risk
-                    
+
                     liquidation_risks.append({
                         'symbol': symbol,
                         'risk_score': risk_score,
@@ -3166,13 +3152,13 @@ class TradeCatBot:
                         'funding_risk': funding_risk,
                         'liquidity_risk': liquidity_risk
                     })
-                    
+
                 except (ValueError, TypeError, KeyError) as e:
                     logger.debug(f"处理{item.get('symbol', 'unknown')}数据失败: {e}")
                     continue
-            
+
             return sorted(liquidation_risks, key=lambda x: x['risk_score'], reverse=True)
-            
+
         except Exception as e:
             logger.error(f"获取爆仓风险数据失败: {e}")
             return []
@@ -3185,21 +3171,21 @@ class TradeCatBot:
             if not active_symbols:
                 logger.error("无法获取活跃交易对列表")
                 return []
-            
+
             # 为了避免API限制，分批处理深度数据
             # 每次获取前150个最活跃的币种的深度数据（从100个增加）
             target_symbols = active_symbols[:150]
-            
+
             logger.info(f"🔄 开始获取{len(target_symbols)}个币种的市场深度数据")
-            
+
             depth_data = []
             success_count = 0
             batch_size = 30  # 每批处理30个币种
-            
+
             for i in range(0, len(target_symbols), batch_size):
                 batch_symbols = target_symbols[i:i+batch_size]
                 batch_success = 0
-                
+
                 for symbol in batch_symbols:
                     try:
                         depth = self.futures_client.get_depth(symbol, limit=20)
@@ -3207,7 +3193,7 @@ class TradeCatBot:
                             # 计算买卖盘深度
                             bid_depth = sum(float(bid[1]) for bid in depth['bids'][:10])
                             ask_depth = sum(float(ask[1]) for ask in depth['asks'][:10])
-                            
+
                             if bid_depth > 0 and ask_depth > 0:  # 确保深度数据有效
                                 depth_data.append({
                                     'symbol': symbol,
@@ -3221,16 +3207,16 @@ class TradeCatBot:
                     except Exception as e:
                         logger.debug(f"获取{symbol}深度数据失败: {e}")
                         continue
-                
+
                 # 批次之间添加小延迟，避免API限制
                 if i + batch_size < len(target_symbols):
                     time.sleep(0.2)  # 200ms延迟
-                
+
                 logger.debug(f"批次 {i//batch_size + 1}: 成功获取 {batch_success}/{len(batch_symbols)} 个币种深度数据")
-            
+
             logger.info(f"✅ 成功获取{success_count}个币种的市场深度数据")
             return depth_data
-            
+
         except Exception as e:
             logger.error(f"获取市场深度数据失败: {e}")
             return []
@@ -3243,7 +3229,7 @@ class TradeCatBot:
         """验证和格式化数据"""
         if not data_list:
             return []
-        
+
         valid_data = []
         for item in data_list:
             if all(field in item for field in required_fields):
@@ -3255,7 +3241,7 @@ class TradeCatBot:
                     valid_data.append(item)
                 except (ValueError, TypeError):
                     continue
-        
+
         return valid_data
 
     def dynamic_align_format(self, data_rows, left_align_cols: int = 2, align_override=None):
@@ -3294,7 +3280,7 @@ class TradeCatBot:
             'time_only': format_beijing_time(get_beijing_time().isoformat(), '%H:%M'),
             'hour_min': f"{now.hour}时{now.minute}分"
         }
-    
+
 
     def get_main_menu_text(self, update: Optional[Update] = None):
         """获取主菜单文本（随用户语言）"""
@@ -3306,25 +3292,25 @@ class TradeCatBot:
         """获取持仓量排行榜"""
         # 加载最新的合约数据
         futures_data = self.load_latest_futures_data()
-        
+
         if not futures_data:
             return "🔄 持仓数据正在加载中，请稍后重试"
-        
+
         # 映射时间周期到字段
         period_mapping = {
             '5m': '5m',
             '15m': '15m',
             '30m': '30m',
             '1h': '1h',
-            '4h': '4h', 
+            '4h': '4h',
             '24h': '24h'
         }
-        
+
         if period not in period_mapping:
             period = '24h'  # 默认使用24h
-        
+
         period_suffix = period_mapping[period]
-        
+
         # 处理数据
         processed_data = []
         for item in futures_data:
@@ -3332,21 +3318,21 @@ class TradeCatBot:
                 symbol = item.get('symbol', '')
                 if not symbol or symbol in self.blocked_symbols:
                     continue
-                
+
                 # 获取基础持仓量数据
                 current_oi_usd = float(item.get('open_interest_usd', 0))
                 current_oi_quantity = float(item.get('open_interest_quantity', 0))
-                
+
                 if current_oi_usd <= 0:
                     continue
-                
+
                 # 获取指定周期的变化数据
                 change_percent = float(item.get(f'open_interest_change_percent_{period_suffix}', 0))
                 change_usd = float(item.get(f'open_interest_change_usd_{period_suffix}', 0))
-                
+
                 # 获取价格数据
                 current_price = float(item.get('current_price', 0))
-                
+
                 processed_data.append({
                     'symbol': symbol,
                     'current_oi_usd': current_oi_usd,
@@ -3355,11 +3341,11 @@ class TradeCatBot:
                     'change_usd': change_usd,  # 指定时间周期内的变化值
                     'current_price': current_price
                 })
-                
+
             except (ValueError, TypeError) as e:
                 logger.warning(f"处理{symbol}持仓数据时出错: {e}")
                 continue
-        
+
         # 排序 - 根据变化金额的绝对值排序
         reverse_sort = (sort_order == 'desc')
 
@@ -3373,14 +3359,14 @@ class TradeCatBot:
             return abs(item.get('change_usd', 0))
 
         sorted_data = sorted(processed_data, key=_key, reverse=reverse_sort)[:limit]
-        
+
         # 准备数据行
         data_rows = []
         for i, item in enumerate(sorted_data, 1):
             symbol = item['symbol']
             change_percent = item['change_percent']
             change_usd = item['change_usd']
-            
+
             # 格式化变化金额
             if abs(change_usd) >= 1e9:
                 if change_usd >= 0:
@@ -3402,32 +3388,32 @@ class TradeCatBot:
                     change_value_str = f"+${change_usd:.0f}"
                 else:
                     change_value_str = f"-${abs(change_usd):.0f}"
-            
+
             # 显示变化百分比
             if change_percent >= 0:
                 change_percent_str = f"+{change_percent:.2f}%"
             else:
                 change_percent_str = f"{change_percent:.2f}%"
-            
+
             data_rows.append([
                 f"{i}.",
                 symbol,
                 change_value_str,
                 change_percent_str
             ])
-        
+
         # 动态对齐格式化
         aligned_data = self.dynamic_align_format(data_rows)
-        
+
         time_info = self.get_current_time_display()
-        
+
         # 时间周期显示
         period_text = _period_text(update, period)
-        
+
         # 排序方式显示
         sort_symbol = "⬇️" if sort_order == 'desc' else "🔼"
         sort_text = _sort_text(update, sort_order)
-        
+
         cache_info = ""
         text = f"""{_t(update, "ranking.position")}
 {_t(update, "time.update", time=time_info['full'])}
@@ -3436,7 +3422,7 @@ class TradeCatBot:
 {aligned_data}
 ```
 {_t(update, "time.last_update", time=time_info['full'])}{cache_info}"""
-        
+
         return text
     def get_position_ranking_keyboard(self, current_sort='desc', current_limit=10, current_period='24h', update=None):
         """获取持仓量排行榜键盘"""
@@ -3446,7 +3432,7 @@ class TradeCatBot:
         period_buttons_row2 = []
         periods_row1 = ['5m', '15m', '30m']
         periods_row2 = ['1h', '4h', '24h']
-        
+
         for period_value in periods_row1:
             label = _period_text_lang(lang, period_value)
             period_buttons_row1.append(
@@ -3455,7 +3441,7 @@ class TradeCatBot:
                     callback_data=f"position_period_{period_value}"
                 )
             )
-        
+
         for period_value in periods_row2:
             label = _period_text_lang(lang, period_value)
             period_buttons_row2.append(
@@ -3464,10 +3450,10 @@ class TradeCatBot:
                     callback_data=f"position_period_{period_value}"
                 )
             )
-        
+
         # 排序和数量按钮合并为一行（第三行）
         sort_limit_buttons = []
-        
+
         # 排序按钮
         if current_sort == 'desc':
             sort_limit_buttons.append(_btn_lang(lang, "btn.desc", "position_sort_desc", active=True))
@@ -3475,7 +3461,7 @@ class TradeCatBot:
         else:
             sort_limit_buttons.append(_btn_lang(lang, "btn.desc", "position_sort_desc"))
             sort_limit_buttons.append(_btn_lang(lang, "btn.asc", "position_sort_asc", active=True))
-        
+
         # 数量按钮
         limits = [10, 20, 30]
         for limit_val in limits:
@@ -3486,7 +3472,7 @@ class TradeCatBot:
                     callback_data=f"position_{limit_val}"
                 )
             )
-        
+
         keyboard = [
             period_buttons_row1,  # 第一行：5分 15分 30分
             period_buttons_row2,  # 第二行：1小时 4小时 24小时
@@ -3512,12 +3498,12 @@ class TradeCatBot:
                 '4h': '4h',   # 4小时
                 '15m': '15m'  # 15分钟
             }
-            
+
             interval = period_map.get(period, '1d')
             major_symbols = self.get_active_symbols()[:50]  # 获取前50个活跃交易对
-            
+
             volume_data = []
-            
+
             for symbol in major_symbols:
                 try:
                     # 获取最近的K线数据
@@ -3526,21 +3512,21 @@ class TradeCatBot:
                         interval=interval,
                         limit=2  # 获取最近2根K线
                     )
-                    
+
                     if klines and len(klines) >= 1:
                         # K线数据格式: [开盘时间, 开盘价, 最高价, 最低价, 收盘价, 成交量, 收盘时间, 成交额, ...]
                         latest_kline = klines[-1]  # 最新的K线
-                        
+
                         open_price = float(latest_kline[1])
                         high_price = float(latest_kline[2])
                         low_price = float(latest_kline[3])
                         close_price = float(latest_kline[4])
                         volume = float(latest_kline[5])  # 成交量
                         quote_volume = float(latest_kline[7])  # 成交额(USDT)
-                        
+
                         # 计算价格变化百分比
                         price_change_percent = ((close_price - open_price) / open_price) * 100 if open_price > 0 else 0
-                        
+
                         volume_data.append({
                             'symbol': symbol,
                             'lastPrice': str(close_price),
@@ -3551,13 +3537,13 @@ class TradeCatBot:
                             'priceChangePercent': str(price_change_percent),
                             'period': period
                         })
-                        
+
                 except Exception as e:
                     logger.debug(f"获取{symbol} {period}周期K线数据失败: {e}")
                     continue
-            
+
             return volume_data
-            
+
         except Exception as e:
             logger.error(f"获取{period}周期K线交易量数据失败: {e}")
             return []
@@ -3572,7 +3558,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not _is_command_allowed(update):
         return
-    
+
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
         return
@@ -3580,13 +3566,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         # 先发送带键盘的消息刷新底部键盘
         await update.message.reply_text(_t(update, "start.greet"), reply_markup=user_handler.get_reply_keyboard(update))
-        
+
         text = user_handler.get_main_menu_text(update)
         inline_keyboard = user_handler.get_main_menu_keyboard(update)
         text = ensure_valid_text(text, _t(update, "start.fallback"))
-        
+
         await update.message.reply_text(text, reply_markup=inline_keyboard)
-        
+
     except Exception as e:
         logger.error(f"❌ /start 命令处理出错: {e}")
         import traceback
@@ -3620,13 +3606,12 @@ def _build_ranking_menu_text(group: str, update: Optional[Update] = None) -> str
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """按钮回调处理器"""
     global user_handler, bot
-    
-    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+
+    from telegram import InlineKeyboardMarkup
 
     query = update.callback_query
     user_id = query.from_user.id
     button_data = query.data
-    chat_type = query.message.chat.type
 
     # 打开语言选择菜单
     if button_data == "lang_menu":
@@ -3687,7 +3672,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 记录用户语言偏好，贯通到 AI 服务
             context.user_data["lang_preference"] = _resolve_lang(update)
             ai_handler = get_ai_handler(symbols_provider=lambda: user_handler.get_active_symbols() if user_handler else None)
-            
+
             # 根据按钮类型和当前状态分发
             if button_data.startswith("ai_interval_"):
                 context.user_data["ai_state"] = SELECTING_INTERVAL
@@ -3793,9 +3778,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer(_t("ui.processing", update))
     except Exception:
         pass
-    
+
     logger.info(f"🔍 按钮回调 / 用户: {user_id} / 按钮: {button_data}")
-    
+
     # ---- 形态面板周期开关 ----
     if button_data.startswith("pattern_toggle_"):
         if user_handler is None:
@@ -3810,7 +3795,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         period = button_data.replace("pattern_toggle_", "")
         pattern_periods[period] = not pattern_periods.get(period, False)
         states["pattern_periods"] = pattern_periods
-        
+
         from bot.single_token_snapshot import render_pattern_panel
         text = render_pattern_panel(sym, pattern_periods)
         keyboard = build_pattern_keyboard_with_periods(pattern_periods)
@@ -3819,7 +3804,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except BadRequest:
             pass
         return
-    
+
     # ---- 单币快照按钮处理 ----
     if button_data.startswith("single_"):
         if user_handler is None:
@@ -3947,7 +3932,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='Markdown'
         )
         return
-    
+
     # 特殊处理：如果用户在AI对话中点击了其他功能按钮，强制结束AI对话状态
     if query.data in ["ranking_menu", "ranking_menu_group_basic", "ranking_menu_group_futures", "ranking_menu_group_advanced", "position_ranking", "funding_rate", "volume_ranking", "basic_market", "market_sentiment", "liquidation_ranking", "money_flow", "market_depth"]:
         # 清理可能的AI对话状态
@@ -3959,7 +3944,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del context.user_data['waiting_manual_input']
         if 'symbols_page' in context.user_data:
             del context.user_data['symbols_page']
-    
+
     if user_handler is None:
         logger.warning("⚠️ user_handler为None，尝试多种方式重新初始化...")
         try:
@@ -4012,24 +3997,24 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception as e:
                     logger.warning(f"⚠️ 获取主菜单文本失败: {e}")
                     text = None
-                
+
                 # 强制检查：如果文本为空或无效，使用预设文本
                 if not text or len(str(text).strip()) == 0:
                     logger.warning("⚠️ 主菜单文本为空，使用强制默认文本")
                     text = """⚡️欢迎使用交易猫"""
-                
+
                 # 再次验证文本有效性
                 text = ensure_valid_text(text, """⚡️欢迎使用交易猫
 
 💰 管理您的账户""")
-                
+
                 # 强化键盘处理：确保永远有键盘
                 try:
                     keyboard = user_handler.get_main_menu_keyboard(update)
                 except Exception as e:
                     logger.warning(f"⚠️ 获取主菜单键盘失败: {e}")
                     keyboard = None
-                
+
                 if not keyboard:
                     logger.warning("⚠️ 主菜单键盘为空，使用强制默认键盘")
                     keyboard = InlineKeyboardMarkup([
@@ -4045,9 +4030,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             _btn(update, "btn.refresh_menu", "main_menu")
                         ]
                     ])
-                
+
                 await query.edit_message_text(text, reply_markup=keyboard)
-                
+
             except Exception as e:
                 logger.error(f"❌ 主菜单处理错误: {e}")
                 # 发送最简单的错误恢复消息
@@ -4060,7 +4045,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     )
                 except Exception:
                     await query.answer(_t("ui.system_reloading", update))
-            
+
         elif query.data == "cancel_analysis":
             # 处理AI点位分析中的"返回主菜单"按钮
             # 清理AI对话状态
@@ -4072,7 +4057,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 del context.user_data['waiting_manual_input']
             if 'symbols_page' in context.user_data:
                 del context.user_data['symbols_page']
-            
+
             # 直接返回主菜单，不显示中间提示
             text = user_handler.get_main_menu_text(update)
             keyboard = user_handler.get_main_menu_keyboard(update)
@@ -4134,7 +4119,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode='Markdown'
             )
             await query.answer()
-        
+
         elif query.data == "basic_market":
             # 免费功能 - 直接提供服务
             loop = asyncio.get_event_loop()
@@ -4162,7 +4147,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 current_market_type=market_type
             )
             await query.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         elif query.data == "money_flow":
             # 异步获取数据
             loop = asyncio.get_event_loop()
@@ -4179,16 +4164,16 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             keyboard = user_handler.get_money_flow_keyboard(
                 current_period=user_handler.user_states['money_flow_period'],
-                current_sort=user_handler.user_states['money_flow_sort'], 
-                current_limit=user_handler.user_states['money_flow_limit'], 
+                current_sort=user_handler.user_states['money_flow_sort'],
+                current_limit=user_handler.user_states['money_flow_limit'],
                 current_flow_type=user_handler.user_states['money_flow_type'],
                 current_market=user_handler.user_states['money_flow_market'],
                 update=update,
             )
             text = ensure_valid_text(text, "💰 资金流向数据加载中，请稍后重试...")
-            
+
             await query.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         elif query.data == "market_depth":
             # 异步获取数据
             loop = asyncio.get_event_loop()
@@ -4204,9 +4189,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 current_sort=user_handler.user_states.get('market_depth_sort', 'desc')
             )
             text = ensure_valid_text(text, "📊 市场深度数据加载中，请稍后重试...")
-            
+
             await query.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         # 智能数量选择按钮处理
         elif (
             "_" in query.data
@@ -4216,9 +4201,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parts = query.data.split("_")
             limit = int(parts[-1])
             feature_type = "_".join(parts[:-1])
-            
+
             loop = asyncio.get_event_loop()
-            
+
             # 根据功能类型更新用户状态并调用相应的方法
             if feature_type == "position":
                 user_handler.user_states['position_limit'] = limit
@@ -4240,7 +4225,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif feature_type == "funding":
                 user_handler.user_states['funding_limit'] = limit
                 text = await loop.run_in_executor(
-                    None, user_handler.get_funding_rate_ranking, 
+                    None, user_handler.get_funding_rate_ranking,
                     limit, user_handler.user_states['funding_sort']
                 )
                 keyboard = user_handler.get_funding_rate_keyboard(current_sort=user_handler.user_states['funding_sort'], current_limit=limit)
@@ -4248,13 +4233,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_handler.user_states['liquidation_limit'] = limit
                 text = await loop.run_in_executor(
                     None, user_handler.get_liquidation_ranking,
-                    limit, 
+                    limit,
                     user_handler.user_states['liquidation_sort'],
                     user_handler.user_states['liquidation_period'],
                     user_handler.user_states['liquidation_type']
                 )
                 keyboard = user_handler.get_liquidation_ranking_keyboard(
-                    current_limit=limit, 
+                    current_limit=limit,
                     current_sort=user_handler.user_states['liquidation_sort'],
                     current_period=user_handler.user_states['liquidation_period'],
                     current_type=user_handler.user_states['liquidation_type']
@@ -4275,8 +4260,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 keyboard = user_handler.get_money_flow_keyboard(
                     current_period=user_handler.user_states['money_flow_period'],
-                    current_sort=user_handler.user_states['money_flow_sort'], 
-                    current_limit=limit, 
+                    current_sort=user_handler.user_states['money_flow_sort'],
+                    current_limit=limit,
                     current_flow_type=user_handler.user_states['money_flow_type'],
                     current_market=user_handler.user_states['money_flow_market'],
                     update=update,
@@ -4299,11 +4284,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_handler.user_states['position_market_limit'] = limit
                 user_handler.user_states['current_ratio_type'] = 'position_market'
                 text = await loop.run_in_executor(
-                    None, user_handler.get_unified_ratio_data, 
+                    None, user_handler.get_unified_ratio_data,
                     limit, user_handler.user_states['position_market_sort'], 'position_market'
                 )
                 keyboard = user_handler.get_unified_ratio_keyboard(
-                    current_sort=user_handler.user_states['position_market_sort'], 
+                    current_sort=user_handler.user_states['position_market_sort'],
                     current_limit=limit,
                     current_ratio_type='position_market'
                 )
@@ -4329,7 +4314,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # 统一比率数量按钮处理
                 # 使用当前比率类型状态
                 current_ratio_type = user_handler.user_states.get('current_ratio_type', 'position_market')
-                
+
                 # 根据比率类型更新相应的数量状态
                 if current_ratio_type == 'position_market':
                     current_sort = user_handler.user_states.get('position_market_sort', 'desc')
@@ -4342,13 +4327,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     user_handler.user_states['volume_oi_limit'] = limit
                 else:
                     current_sort = 'desc'
-                
+
                 text = await loop.run_in_executor(
                     None, user_handler.get_unified_ratio_data,
                     limit, current_sort, current_ratio_type
                 )
                 keyboard = user_handler.get_unified_ratio_keyboard(
-                    current_sort=current_sort, 
+                    current_sort=current_sort,
                     current_limit=limit,
                     current_ratio_type=current_ratio_type
                 )
@@ -4357,20 +4342,20 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 loop = asyncio.get_event_loop()
                 text = await loop.run_in_executor(None, lambda: user_handler.get_main_menu_text(update))
                 keyboard = user_handler.get_main_menu_keyboard(update)
-            
+
             text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
 
-            
+
+
         # 比率类型选择按钮处理 - 使用统一数据函数
         elif query.data.startswith("ratio_type_"):
             ratio_type = query.data.replace("ratio_type_", "")
             loop = asyncio.get_event_loop()
-            
+
             # 获取当前比率类型的状态，用于保持数量设置
             current_ratio_type = user_handler.user_states.get('current_ratio_type', 'position_market')
-            
+
             # 获取当前显示的数量（从当前比率类型中获取）
             if current_ratio_type == "position_market":
                 current_limit = user_handler.user_states.get('position_market_limit', 10)
@@ -4380,10 +4365,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 current_limit = user_handler.user_states.get('volume_oi_limit', 10)
             else:
                 current_limit = 10
-            
+
             # 更新当前比率类型状态
             user_handler.user_states['current_ratio_type'] = ratio_type
-            
+
             # 获取新比率类型的排序状态，但保持当前的数量设置
             if ratio_type == "position_market":
                 current_sort = user_handler.user_states.get('position_market_sort', 'desc')
@@ -4399,29 +4384,29 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_handler.user_states['volume_oi_limit'] = current_limit
             else:
                 current_sort = 'desc'
-            
+
             # 使用统一数据函数
             text = await loop.run_in_executor(
                 None, user_handler.get_unified_ratio_data,
                 current_limit, current_sort, ratio_type
             )
             keyboard = user_handler.get_unified_ratio_keyboard(
-                current_sort=current_sort, 
+                current_sort=current_sort,
                 current_limit=current_limit,
                 current_ratio_type=ratio_type
             )
-            
+
             text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         # 统一比率排序按钮处理
         elif query.data.startswith("unified_ratio_sort_"):
             sort_order = query.data.replace("unified_ratio_sort_", "")
             loop = asyncio.get_event_loop()
-            
+
             # 使用当前比率类型状态
             current_ratio_type = user_handler.user_states.get('current_ratio_type', 'position_market')
-            
+
             # 根据比率类型更新相应的排序状态
             if current_ratio_type == 'position_market':
                 current_limit = user_handler.user_states.get('position_market_limit', 10)
@@ -4434,28 +4419,28 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_handler.user_states['volume_oi_sort'] = sort_order
             else:
                 current_limit = 10
-            
+
             text = await loop.run_in_executor(
                 None, user_handler.get_unified_ratio_data,
                 current_limit, sort_order, current_ratio_type
             )
             keyboard = user_handler.get_unified_ratio_keyboard(
-                current_sort=sort_order, 
+                current_sort=sort_order,
                 current_limit=current_limit,
                 current_ratio_type=current_ratio_type
             )
-            
+
             text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
 
         # 统一比率刷新按钮处理
         elif query.data == "unified_ratio_refresh":
             loop = asyncio.get_event_loop()
-            
+
             # 使用当前比率类型状态
             current_ratio_type = user_handler.user_states.get('current_ratio_type', 'position_market')
-            
+
             # 根据比率类型获取相应的状态
             if current_ratio_type == 'position_market':
                 current_limit = user_handler.user_states.get('position_market_limit', 10)
@@ -4469,21 +4454,21 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 current_limit = 10
                 current_sort = 'desc'
-            
+
             # 异步获取数据
             text = await loop.run_in_executor(
                 None, user_handler.get_unified_ratio_data,
                 current_limit, current_sort, current_ratio_type
             )
             keyboard = user_handler.get_unified_ratio_keyboard(
-                current_sort=current_sort, 
+                current_sort=current_sort,
                 current_limit=current_limit,
                 current_ratio_type=current_ratio_type
             )
-            
+
             text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
             await query.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         # 交易量/市值比排序按钮处理
         elif query.data.startswith("volume_market_sort_"):
             sort_order = query.data.replace("volume_market_sort_", "")
@@ -4496,7 +4481,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard = user_handler.get_volume_market_ratio_keyboard(current_sort=sort_order, current_limit=user_handler.user_states.get('volume_market_limit', 10))
             text = ensure_valid_text(text, "📊 交易量/市值比数据加载中，请稍后重试...")
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         # 交易量/市值比数量按钮处理
         elif query.data.startswith("volume_market_") and query.data.replace("volume_market_", "").isdigit():
             limit = int(query.data.replace("volume_market_", ""))
@@ -4509,7 +4494,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard = user_handler.get_volume_market_ratio_keyboard(current_sort=user_handler.user_states.get('volume_market_sort', 'desc'), current_limit=limit)
             text = ensure_valid_text(text, "📊 交易量/市值比数据加载中，请稍后重试...")
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         # 交易量/持仓量比排序按钮处理
         elif query.data.startswith("volume_oi_sort_"):
             sort_order = query.data.replace("volume_oi_sort_", "")
@@ -4522,7 +4507,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard = user_handler.get_volume_oi_ratio_keyboard(current_sort=sort_order, current_limit=user_handler.user_states.get('volume_oi_limit', 10))
             text = ensure_valid_text(text, "📊 交易量/持仓量比数据加载中，请稍后重试...")
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         # 交易量/持仓量比数量按钮处理
         elif query.data.startswith("volume_oi_") and query.data.replace("volume_oi_", "").isdigit():
             limit = int(query.data.replace("volume_oi_", ""))
@@ -4535,7 +4520,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard = user_handler.get_volume_oi_ratio_keyboard(current_sort=user_handler.user_states.get('volume_oi_sort', 'desc'), current_limit=limit)
             text = ensure_valid_text(text, "📊 交易量/持仓量比数据加载中，请稍后重试...")
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         # 持仓/市值比数量按钮处理
         elif query.data.startswith("position_market_") and query.data.replace("position_market_", "").isdigit():
             limit = int(query.data.replace("position_market_", ""))
@@ -4547,13 +4532,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 limit, user_handler.user_states['position_market_sort'], 'position_market'
             )
             keyboard = user_handler.get_unified_ratio_keyboard(
-                current_sort=user_handler.user_states['position_market_sort'], 
+                current_sort=user_handler.user_states['position_market_sort'],
                 current_limit=limit,
                 current_ratio_type='position_market'
             )
             text = ensure_valid_text(text, "📊 持仓/市值比数据加载中，请稍后重试...")
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         # 资金流向周期选择按钮处理
         # 资金流向类型选择按钮处理
         elif query.data.startswith("money_flow_type_"):
@@ -4563,7 +4548,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             text = await loop.run_in_executor(None, lambda: user_handler.get_money_flow(
                 limit=user_handler.user_states['money_flow_limit'],
-                period=user_handler.user_states['money_flow_period'], 
+                period=user_handler.user_states['money_flow_period'],
                 sort_order=user_handler.user_states['money_flow_sort'],
                 flow_type=flow_type,
                 market=user_handler.user_states['money_flow_market'],
@@ -4573,14 +4558,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
             keyboard = user_handler.get_money_flow_keyboard(
                 current_period=user_handler.user_states['money_flow_period'],
-                current_sort=user_handler.user_states['money_flow_sort'], 
-                current_limit=user_handler.user_states['money_flow_limit'], 
+                current_sort=user_handler.user_states['money_flow_sort'],
+                current_limit=user_handler.user_states['money_flow_limit'],
                 current_flow_type=flow_type,
                 current_market=user_handler.user_states['money_flow_market'],
                 update=update,
             )
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         # 资金流向市场选择按钮处理
         elif query.data.startswith("money_flow_market_"):
             market = query.data.replace("money_flow_market_", "")
@@ -4590,7 +4575,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             text = await loop.run_in_executor(None, lambda: user_handler.get_money_flow(
                 limit=user_handler.user_states['money_flow_limit'],
-                period=user_handler.user_states['money_flow_period'], 
+                period=user_handler.user_states['money_flow_period'],
                 sort_order=user_handler.user_states['money_flow_sort'],
                 flow_type=user_handler.user_states['money_flow_type'],
                 market=market,
@@ -4600,14 +4585,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
             keyboard = user_handler.get_money_flow_keyboard(
                 current_period=user_handler.user_states['money_flow_period'],
-                current_sort=user_handler.user_states['money_flow_sort'], 
-                current_limit=user_handler.user_states['money_flow_limit'], 
+                current_sort=user_handler.user_states['money_flow_sort'],
+                current_limit=user_handler.user_states['money_flow_limit'],
                 current_flow_type=user_handler.user_states['money_flow_type'],
                 current_market=market,
                 update=update,
             )
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         # 资金流向排序选择按钮处理
         elif query.data.startswith("money_flow_sort_"):
             sort_order = query.data.replace("money_flow_sort_", "")
@@ -4616,7 +4601,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             text = await loop.run_in_executor(None, lambda: user_handler.get_money_flow(
                 limit=user_handler.user_states['money_flow_limit'],
-                period=user_handler.user_states['money_flow_period'], 
+                period=user_handler.user_states['money_flow_period'],
                 sort_order=sort_order,
                 flow_type=user_handler.user_states['money_flow_type'],
                 market=user_handler.user_states['money_flow_market'],
@@ -4626,14 +4611,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
             keyboard = user_handler.get_money_flow_keyboard(
                 current_period=user_handler.user_states['money_flow_period'],
-                current_sort=sort_order, 
-                current_limit=user_handler.user_states['money_flow_limit'], 
+                current_sort=sort_order,
+                current_limit=user_handler.user_states['money_flow_limit'],
                 current_flow_type=user_handler.user_states['money_flow_type'],
                 current_market=user_handler.user_states['money_flow_market'],
                 update=update,
             )
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         # 资金流向时间周期选择按钮处理
         elif query.data.startswith("money_flow_period_"):
             period = query.data.replace("money_flow_period_", "")
@@ -4642,7 +4627,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             text = await loop.run_in_executor(None, lambda: user_handler.get_money_flow(
                 limit=user_handler.user_states['money_flow_limit'],
-                period=period, 
+                period=period,
                 sort_order=user_handler.user_states['money_flow_sort'],
                 flow_type=user_handler.user_states['money_flow_type'],
                 market=user_handler.user_states['money_flow_market'],
@@ -4652,14 +4637,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
             keyboard = user_handler.get_money_flow_keyboard(
                 current_period=period,
-                current_sort=user_handler.user_states['money_flow_sort'], 
-                current_limit=user_handler.user_states['money_flow_limit'], 
+                current_sort=user_handler.user_states['money_flow_sort'],
+                current_limit=user_handler.user_states['money_flow_limit'],
                 current_flow_type=user_handler.user_states['money_flow_type'],
                 current_market=user_handler.user_states['money_flow_market'],
                 update=update,
             )
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         # 基础行情 - 市场类型选择按钮处理
         elif query.data.startswith("basic_market_type_"):
             market_type = query.data.replace("basic_market_type_", "")
@@ -4683,7 +4668,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 current_market_type=market_type
             )
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         # 基础行情 - 排序类型选择按钮处理
         elif query.data.startswith("basic_market_sort_type_"):
             sort_type = query.data.replace("basic_market_sort_type_", "")
@@ -4707,7 +4692,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 current_market_type=user_handler.user_states['basic_market_type']
             )
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         # 基础行情 - 时间周期选择按钮处理
         elif query.data.startswith("basic_market_period_"):
             period = query.data.replace("basic_market_period_", "")
@@ -4731,7 +4716,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 current_market_type=user_handler.user_states['basic_market_type']
             )
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         # 基础行情 - 排序方向选择按钮处理
         elif query.data.startswith("basic_market_sort_order_"):
             sort_order = query.data.replace("basic_market_sort_order_", "")
@@ -4755,7 +4740,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 current_market_type=user_handler.user_states['basic_market_type']
             )
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         # 市场深度 - 排序类型选择按钮处理
         elif query.data.startswith("market_depth_sort_type_"):
             sort_type = query.data.replace("market_depth_sort_type_", "")
@@ -4776,7 +4761,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 current_sort=user_handler.user_states.get('market_depth_sort', 'desc')
             )
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         # 市场深度 - 排序方向选择按钮处理
         elif query.data.startswith("market_depth_sort_"):
             sort_order = query.data.replace("market_depth_sort_", "")
@@ -4797,7 +4782,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 current_sort=sort_order
             )
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         # 爆仓排行榜 - 时间周期选择按钮处理
         elif query.data.startswith("liquidation_period_"):
             period = query.data.replace("liquidation_period_", "")
@@ -4814,13 +4799,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
             keyboard = user_handler.get_liquidation_ranking_keyboard(
-                current_limit=user_handler.user_states['liquidation_limit'], 
+                current_limit=user_handler.user_states['liquidation_limit'],
                 current_sort=user_handler.user_states['liquidation_sort'],
                 current_period=period,
                 current_type=user_handler.user_states['liquidation_type']
             )
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-        
+
         # 爆仓排行榜 - 数据类型选择按钮处理
         elif query.data.startswith("liquidation_type_"):
             liquidation_type = query.data.replace("liquidation_type_", "")
@@ -4837,13 +4822,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
             keyboard = user_handler.get_liquidation_ranking_keyboard(
-                current_limit=user_handler.user_states['liquidation_limit'], 
+                current_limit=user_handler.user_states['liquidation_limit'],
                 current_sort=user_handler.user_states['liquidation_sort'],
                 current_period=user_handler.user_states['liquidation_period'],
                 current_type=liquidation_type
             )
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-        
+
         # 爆仓排行榜 - 排序选择按钮处理
         elif query.data.startswith("liquidation_sort_"):
             sort_order = query.data.replace("liquidation_sort_", "")
@@ -4860,13 +4845,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
             keyboard = user_handler.get_liquidation_ranking_keyboard(
-                current_limit=user_handler.user_states['liquidation_limit'], 
+                current_limit=user_handler.user_states['liquidation_limit'],
                 current_sort=sort_order,
                 current_period=user_handler.user_states['liquidation_period'],
                 current_type=user_handler.user_states['liquidation_type']
             )
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
         elif query.data in ["coin_search", "help", "aggregated_alerts", "subscription"]:
             feature_names = {
                 "coin_search": "🔍 币种搜索",
@@ -4874,9 +4859,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "aggregated_alerts": "🚨 信号",
                 "subscription": "💲 订阅"
             }
-            
+
             feature_name = feature_names.get(query.data, query.data)
-            
+
             if query.data == "help":
                 await send_help_message(update, context, via_query=True)
             elif query.data == "coin_search":
@@ -4935,11 +4920,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     ]]),
                     parse_mode='Markdown'
                 )
-        
+
         # 信号/订阅/AI相关回调 - 统一返回开发中提示
-        elif query.data in {"show_subscription", "show_subscription_settings", "signal_history", 
-                           "subscription_config", "subscription_help", "confirm_subscribe", 
-                           "confirm_unsubscribe", "aggregated_alerts", "start_coin_analysis", 
+        elif query.data in {"show_subscription", "show_subscription_settings", "signal_history",
+                           "subscription_config", "subscription_help", "confirm_subscribe",
+                           "confirm_unsubscribe", "aggregated_alerts", "start_coin_analysis",
                            "start_ai_analysis", "start_basis_analysis", "start_batch_analysis",
                            "symbols_prev_page", "symbols_next_page", "show_all_symbols",
                            "manual_input", "manual_input_text", "back_to_coin_selection",
@@ -4952,7 +4937,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ]]),
                 parse_mode='Markdown'
             )
-        
+
         # 其他按钮处理
         else:
             await query.message.reply_text(
@@ -4962,7 +4947,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ]]),
                 parse_mode='Markdown'
             )
-            
+
     except Exception as e:
         logger.error(f"按钮回调处理错误: {e}")
         try:
@@ -4984,13 +4969,13 @@ async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = getattr(getattr(update, "effective_user", None), "id", None)
     if user_id is None:
         return
-    
+
     # 获取当前语言，切换到另一种
     current_lang = _resolve_lang(update)
     new_lang = "en" if current_lang == "zh_CN" else "zh_CN"
     _save_user_locale(user_id, new_lang)
     context.user_data["lang_preference"] = new_lang
-    
+
     display_names = {"zh_CN": "简体中文", "en": "English"}
     msg = I18N.gettext("lang.set", lang=new_lang, lang_name=display_names.get(new_lang, new_lang))
     main_text = None
@@ -5001,7 +4986,7 @@ async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_keyboard = user_handler.get_reply_keyboard(update)
         main_text = user_handler.get_main_menu_text(update)
         main_keyboard = user_handler.get_main_menu_keyboard(update)
-    
+
     if getattr(update, "callback_query", None):
         await update.callback_query.answer(msg)
         if user_handler:
@@ -5030,7 +5015,7 @@ async def vol_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
         return
-    
+
     try:
         loop = asyncio.get_event_loop()
 
@@ -5065,7 +5050,7 @@ async def sentiment_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
         return
-    
+
     try:
         loop = asyncio.get_event_loop()
         text = await loop.run_in_executor(None, user_handler.get_market_sentiment)
@@ -5087,7 +5072,7 @@ async def market_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
         return
-    
+
     try:
         loop = asyncio.get_event_loop()
 
@@ -5123,7 +5108,7 @@ async def flow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
         return
-    
+
     try:
         loop = asyncio.get_event_loop()
 
@@ -5169,7 +5154,7 @@ async def depth_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
         return
-    
+
     try:
         loop = asyncio.get_event_loop()
 
@@ -5202,7 +5187,7 @@ async def ratio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
         return
-    
+
     try:
         loop = asyncio.get_event_loop()
 
@@ -5226,15 +5211,15 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not _is_command_allowed(update):
         return
     await update.message.reply_text(
-        f"💡 即将支持的功能：\n"
-        f"- 📊 价格走势分析\n"
-        f"- 💰 持仓量变化趋势\n"
-        f"- 📈 技术指标分析\n"
-        f"- 🔔 价格预警设置\n\n"
-        f"📞 如需帮助请联系客服：\n"
-        f"- 客服1: zancy1\n"
-                    f"- 客服2: xiaocaixing\n"
-                    f"- 客服3: wangbw123",
+        "💡 即将支持的功能：\n"
+        "- 📊 价格走势分析\n"
+        "- 💰 持仓量变化趋势\n"
+        "- 📈 技术指标分析\n"
+        "- 🔔 价格预警设置\n\n"
+        "📞 如需帮助请联系客服：\n"
+        "- 客服1: zancy1\n"
+                    "- 客服2: xiaocaixing\n"
+                    "- 客服3: wangbw123",
         reply_markup=InlineKeyboardMarkup([[
             _btn(update, "btn.back_home", "main_menu")
         ]]),
@@ -5271,21 +5256,21 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
         return
-    
+
     # 发送主菜单，保持永久常驻键盘
     reply_keyboard = user_handler.get_reply_keyboard(update)
     text = user_handler.get_main_menu_text(update)
     keyboard = user_handler.get_main_menu_keyboard(update)
-    
+
     # 确保文本不为空
     text = ensure_valid_text(text, "⚡️欢迎使用交易猫")
-    
+
     # 先发送简短欢迎消息和常驻键盘来激活常驻键盘
     await update.message.reply_text(
         "⚡️欢迎使用交易猫",
         reply_markup=reply_keyboard    # 使用常驻键盘
     )
-    
+
     # 再发送完整主菜单文本和内联键盘
     await update.message.reply_text(
         text,
@@ -5316,10 +5301,10 @@ async def query_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if args:
         # 直接查询指定币种
         coin = args[0].upper().replace("USDT", "")
-        symbol = coin + "USDT"
+        coin + "USDT"
         # 触发单币查询
         update.message.text = f"{coin}!"
-        await handle_message(update, context)
+        await handle_keyboard_message(update, context)
     else:
         # 显示币种列表
         from common.symbols import get_configured_symbols
@@ -5386,7 +5371,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if bot is None:
         await update.message.reply_text(_t(update, "start.initializing"))
         return
-    
+
     try:
         # 安全地获取缓存信息，避免Markdown解析错误
         def escape_markdown_safe(text):
@@ -5397,15 +5382,15 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for char in special_chars:
                 text = text.replace(char, f'\\{char}')
             return text
-        
+
         cache_info = bot.get_cache_file_info()
         cache_status = bot.get_cache_status()
-        
+
         # 安全地格式化所有动态内容
         safe_cache_info = escape_markdown_safe(str(cache_info)) if cache_info else "缓存信息获取失败"
         safe_cache_status = escape_markdown_safe(str(cache_status)) if cache_status else "缓存状态获取失败"
         safe_current_file = escape_markdown_safe(str(bot._current_cache_file)) if bot._current_cache_file else "未知"
-        
+
         status_text = f"""🤖tradecat机器人状态
 - 已初始化: {'✅' if bot._is_initialized else '❌'}
 - 后台更新: {'🔄 进行中' if bot._is_updating else '✅ 空闲'}
@@ -5424,7 +5409,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - 智能缓存降级
 - 原子性文件操作
 - 请求频率控制"""
-        
+
         await update.message.reply_text(
             status_text,
             reply_markup=InlineKeyboardMarkup([[
@@ -5451,13 +5436,13 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
 
     message_text = update.message.text
     lang = _resolve_lang(update)
-    
+
     if user_handler is None:
         logger.warning("user_handler 未初始化")
         return
         await update.message.reply_text(_t(update, "start.initializing"))
         return
-    
+
     # 映射常驻键盘按钮到对应功能
     button_mapping = {
         "🐋 持仓量排行": "position_ranking",
@@ -5486,12 +5471,12 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
         "🌐 语言": "lang_menu",
         "🌐 Language": "lang_menu",
     }
-    
+
     try:
         # -------- AI 分析触发：如 "btc@" 或 "BTC@" --------
         import re
         norm_text = (message_text or "").replace("\u200b", "").strip()
-        
+
         if "@" in norm_text:
             m = re.match(r'^([A-Za-z0-9]{2,15})@$', norm_text.strip())
             if m:
@@ -5520,13 +5505,13 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     from bot.single_token_txt import export_single_token_txt
                     import io
                     from datetime import datetime
-                    
+
                     txt_content = export_single_token_txt(sym)
-                    
+
                     # 创建文件对象
                     file_obj = io.BytesIO(txt_content.encode('utf-8'))
                     file_obj.name = f"{sym}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-                    
+
                     # 发送文件
                     await update.message.reply_document(
                         document=file_obj,
@@ -5603,7 +5588,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
             if action == "lang_menu":
                 await lang_command(update, context)
                 return
-            
+
             # 统一占位：未开放功能的提示
             if action == "aggregated_alerts":
                 placeholder_kb = InlineKeyboardMarkup([[
@@ -5616,7 +5601,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     parse_mode='Markdown'
                 )
                 return
-            
+
             # 信号开关界面
             if action == "signal_menu":
                 try:
@@ -5630,7 +5615,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     logger.error(f"信号界面失败: {e}")
                     await update.message.reply_text(_t("error.signal_failed", update))
                 return
-            
+
             if action == "position_ranking":
                 loop = asyncio.get_event_loop()
                 text = await loop.run_in_executor(None, lambda: user_handler.get_position_ranking(
@@ -5641,15 +5626,15 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 ))
                 text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
                 keyboard = user_handler.get_position_ranking_keyboard(
-                    current_sort=user_handler.user_states.get('position_sort', 'desc'), 
+                    current_sort=user_handler.user_states.get('position_sort', 'desc'),
                     current_limit=user_handler.user_states.get('position_limit', 10),
                     current_period=user_handler.user_states.get('position_period', '24h')
                 )
                 await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
-                
+
             elif action == "funding_rate_ranking":
-                await query.answer(_t("feature.coming_soon", update), show_alert=True)
-                
+                await update.message.reply_text(_t("feature.coming_soon", update), parse_mode='Markdown')
+
             elif action == "volume_ranking":
                 loop = asyncio.get_event_loop()
                 # 修复: 使用具体的参数而不是通用的[:3]切片
@@ -5662,12 +5647,12 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 ))
                 text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
                 keyboard = user_handler.get_volume_ranking_keyboard(
-                    current_period=user_states.get('volume_period', '24h'), 
-                    current_sort=user_states.get('volume_sort', 'desc'), 
+                    current_period=user_states.get('volume_period', '24h'),
+                    current_sort=user_states.get('volume_sort', 'desc'),
                     current_limit=user_states.get('volume_limit', 10)
                 )
                 await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
-                
+
             elif action == "liquidation_ranking":
                 loop = asyncio.get_event_loop()
                 # 修复: 使用具体的参数而不是通用的[:3]切片
@@ -5680,20 +5665,20 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 ))
                 text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
                 keyboard = user_handler.get_liquidation_ranking_keyboard(
-                    current_limit=user_states.get('liquidation_limit', 10), 
+                    current_limit=user_states.get('liquidation_limit', 10),
                     current_sort=user_states.get('liquidation_sort', 'desc'),
                     current_period=user_states.get('liquidation_period', '24h'),
                     current_type=user_states.get('liquidation_type', 'total')
                 )
                 await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
-                
+
             elif action == "market_sentiment":
                 await update.message.reply_text(
                     "⏸️ 市场情绪榜单已下线，敬请期待新的指标面板。",
                     reply_markup=user_handler.get_market_sentiment_keyboard(),
                     parse_mode='Markdown'
                 )
-                
+
             elif action == "basic_market":
                 loop = asyncio.get_event_loop()
                 # 修复: 使用具体的参数而不是通用的[:3]切片
@@ -5707,14 +5692,14 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 ))
                 text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
                 keyboard = user_handler.get_basic_market_keyboard(
-                    current_sort_type=user_states.get('basic_market_sort_type', 'change'), 
-                    current_period=user_states.get('basic_market_period', '24h'), 
-                    current_sort_order=user_states.get('basic_market_sort_order', 'desc'), 
+                    current_sort_type=user_states.get('basic_market_sort_type', 'change'),
+                    current_period=user_states.get('basic_market_period', '24h'),
+                    current_sort_order=user_states.get('basic_market_sort_order', 'desc'),
                     current_limit=user_states.get('basic_market_limit', 10),
                     current_market_type=user_states.get('basic_market_type', 'futures')
                 )
                 await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
-                
+
             elif action == "money_flow":
                 loop = asyncio.get_event_loop()
                 # 修复: 使用具体的参数而不是通用的[:3]切片
@@ -5728,14 +5713,14 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 ))
                 text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
                 keyboard = user_handler.get_money_flow_keyboard(
-                    current_period=user_states.get('money_flow_period', '24h'), 
-                    current_sort=user_states.get('money_flow_sort', 'net_inflow'), 
-                    current_limit=user_states.get('money_flow_limit', 10), 
+                    current_period=user_states.get('money_flow_period', '24h'),
+                    current_sort=user_states.get('money_flow_sort', 'net_inflow'),
+                    current_limit=user_states.get('money_flow_limit', 10),
                     current_flow_type=user_states.get('money_flow_type', 'all'),
                     current_market=user_states.get('money_flow_market', 'spot')
                 )
                 await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
-                
+
             elif action == "market_depth":
                 await update.message.reply_text(
                     "⏸️ 市场深度排行功能已下线，敬请期待替代方案。",
@@ -5748,33 +5733,33 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 text = _build_ranking_menu_text(user_handler.user_states.get("ranking_group", "basic"), update)
                 keyboard = user_handler.get_ranking_menu_keyboard()
                 await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
-                
+
             elif action == "main_menu":
                 # 修复: 使用与/start命令相同的逻辑，避免空字符串错误
                 reply_keyboard = user_handler.get_reply_keyboard(update)  # 常驻键盘
                 main_text = user_handler.get_main_menu_text(update)
                 main_keyboard = user_handler.get_main_menu_keyboard(update)  # 内联键盘
-                
+
                 # 确保文本不为空
                 main_text = ensure_valid_text(main_text, "⚡️欢迎使用交易猫")
-                
+
                 # 先发送简短欢迎消息和常驻键盘来激活常驻键盘
                 await update.message.reply_text(
                     "⚡️欢迎使用交易猫",
                     reply_markup=reply_keyboard,      # 激活常驻键盘
                     parse_mode='Markdown'
                 )
-                
+
                 # 再发送完整主菜单文本和内联键盘
                 await update.message.reply_text(
                     main_text,
                     reply_markup=main_keyboard,     # 使用内联键盘
                     parse_mode='Markdown'
                 )
-                
+
             elif action == "help":
                 await help_command(update, context)
-            
+
             elif action == "coin_query":
                 # 币种查询入口
                 from common.symbols import get_configured_symbols
@@ -5791,7 +5776,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 )
                 keyboard = InlineKeyboardMarkup([[_btn(update, "btn.back_home", "main_menu")]])
                 await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
-            
+
             elif action == "start_coin_analysis":
                 # AI 分析入口
                 try:
@@ -5805,7 +5790,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 except Exception as e:
                     logger.error(f"AI分析入口失败: {e}")
                     await update.message.reply_text(_t(update, "ai.failed", error=e))
-                
+
             elif action in {"aggregated_alerts", "coin_search"}:
                 await update.message.reply_text(_t(update, "feature.coming_soon"))
                 return
@@ -5814,7 +5799,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
             # 如果是斜杠开头但不是已知按钮，可能是命令，不做处理
             if message_text.startswith('/'):
                 return
-            
+
             # 未识别的消息，显示提示
             await update.message.reply_text(
                 "🤔 没有识别到您的指令，请使用下方按钮或输入 /help 查看帮助。",
@@ -5831,11 +5816,11 @@ async def initialize_bot_background():
     """后台非阻塞初始化机器人和缓存 - 并行启动版本"""
     try:
         print("🚀 开始并行启动所有后台服务...")
-        
+
         # 定义所有启动任务
         startup_tasks = []
         task_names = []
-        
+
         # 1. 后台缓存初始化任务
         async def cache_init_task():
             try:
@@ -5848,7 +5833,7 @@ async def initialize_bot_background():
 
         startup_tasks.append(cache_init_task())
         task_names.append("缓存初始化")
-        
+
         # 2. 后台刷新任务
         async def refresh_task():
             try:
@@ -5857,23 +5842,23 @@ async def initialize_bot_background():
                 logger.info("✅ 后台刷新任务已启动！")
             except Exception as e:
                 logger.error(f"❌ 后台刷新任务启动失败: {e}")
-        
+
         startup_tasks.append(refresh_task())
         task_names.append("后台刷新")
-        
+
         # 并行执行所有启动任务
         logger.info(f"🚀 开始并行执行 {len(startup_tasks)} 个启动任务...")
         start_time = time.time()
-        
+
         # 使用asyncio.gather并行执行，return_exceptions=True确保即使某个任务失败也不影响其他任务
         results = await asyncio.gather(*startup_tasks, return_exceptions=True)
-        
+
         elapsed_time = time.time() - start_time
-        
+
         # 统计结果
         success_count = 0
         error_count = 0
-        
+
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 error_count += 1
@@ -5882,14 +5867,14 @@ async def initialize_bot_background():
                 logger.error(f"{name}任务失败: {result}")
             else:
                 success_count += 1
-        
+
         print(f"🎉 并行启动完成! 成功: {success_count}/{len(startup_tasks)}, 用时: {elapsed_time:.2f}秒")
-        
+
         if error_count > 0:
             logger.warning(f"⚠️ 有 {error_count} 个任务启动失败，但系统将继续运行")
         else:
             logger.info("✅ 所有后台服务启动成功！")
-            
+
     except Exception as e:
         logger.error(f"❌ 并行启动过程发生异常: {e}")
         logger.error(f"并行启动过程发生异常: {e}")
@@ -5899,9 +5884,9 @@ async def initialize_bot_background():
 def initialize_bot_sync():
     """同步初始化机器人实例（不加载缓存）"""
     global user_handler, bot
-    
+
     print("🚀 启动tradecat加密市场情报机器人...")
-    
+
     try:
         user_handler = UserRequestHandler(card_registry=ensure_ranking_registry())
         bot = TradeCatBot()
@@ -5913,14 +5898,14 @@ def initialize_bot_sync():
 async def post_init(application):
     """应用启动后的初始化"""
     logger.info("✅ 应用启动完成")
-    
+
     # 延迟启动后台缓存加载任务
     async def delayed_init():
         await asyncio.sleep(5)
         await initialize_bot_background()
-    
+
     asyncio.create_task(delayed_init())
-    
+
     # 设置Telegram命令菜单
     from telegram import BotCommand
     commands = [
@@ -5931,7 +5916,7 @@ async def post_init(application):
         BotCommand("lang", "🌐 语言"),
         BotCommand("help", "ℹ️ 帮助")
     ]
-    
+
     try:
         await application.bot.set_my_commands(commands)
         logger.info("✅ Telegram命令菜单设置成功")
@@ -5947,18 +5932,18 @@ def cleanup_existing_processes():
         import platform
         import time
         import psutil
-        
+
         system = platform.system()
         current_pid = os.getpid()
-        
+
         print("🧹 正在强力检查并清理可能冲突的进程...")
         print(f"🔍 当前进程 PID: {current_pid}")
-        
+
         # 方法1：精确查找和终止冲突的Python进程（排除当前进程）
         if system == "Windows":
             try:
                 print("🔧 方法1: 查找并终止冲突的Python进程...")
-                
+
                 # 先查找所有Python进程
                 result = subprocess.run(
                     ['tasklist', '/FI', 'IMAGENAME eq python.exe', '/FO', 'CSV'],
@@ -5966,11 +5951,11 @@ def cleanup_existing_processes():
                     text=True,
                     timeout=10
                 )
-                
+
                 if result.returncode == 0 and result.stdout:
                     lines = result.stdout.strip().split('\n')
                     killed_count = 0
-                    
+
                     for line in lines[1:]:  # 跳过标题行
                         if 'python.exe' in line:
                             try:
@@ -5979,16 +5964,16 @@ def cleanup_existing_processes():
                                 if len(parts) >= 2:
                                     pid_str = parts[1].strip('"')
                                     pid = int(pid_str)
-                                    
+
                                     # 不终止当前进程
                                     if pid != current_pid:
-                                        subprocess.run(['taskkill', '/F', '/PID', str(pid)], 
+                                        subprocess.run(['taskkill', '/F', '/PID', str(pid)],
                                                      capture_output=True, timeout=5)
                                         killed_count += 1
                                         print(f"🔧 已终止进程 PID: {pid}")
                             except (ValueError, subprocess.TimeoutExpired):
                                 continue
-                    
+
                     if killed_count > 0:
                         print(f"✅ 已清理 {killed_count} 个冲突进程")
                         time.sleep(2)  # 等待进程完全终止
@@ -5996,15 +5981,15 @@ def cleanup_existing_processes():
                         print("✅ 未发现冲突进程")
                 else:
                     print("✅ 未发现Python进程")
-                    
+
             except Exception as e:
                 print(f"⚠️ 进程清理失败: {e}")
-        
+
         # 方法2：使用psutil精确查找和终止
         try:
             print("🔧 方法2: 使用psutil精确清理...")
             killed_count = 0
-            
+
             for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
                 try:
                     if proc.info['name'] and 'python' in proc.info['name'].lower():
@@ -6015,18 +6000,18 @@ def cleanup_existing_processes():
                             print(f"🔧 已终止Python进程 PID: {pid}")
                 except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                     continue
-            
+
             if killed_count > 0:
                 print(f"✅ 已精确清理 {killed_count} 个Python进程")
                 time.sleep(2)  # 等待进程完全终止
             else:
                 print("✅ 未发现需要清理的Python进程")
-                
+
         except ImportError:
             print("⚠️ psutil不可用，跳过精确清理")
         except Exception as e:
             print(f"⚠️ 精确清理失败: {e}")
-        
+
         # 方法3：验证清理结果
         try:
             print("🔍 方法3: 验证清理结果...")
@@ -6044,14 +6029,14 @@ def cleanup_existing_processes():
                         print(f"   {line.strip()}")
                 else:
                     print("✅ 确认：没有发现其他Python进程")
-            
+
         except Exception as e:
             print(f"⚠️ 验证失败: {e}")
-        
+
         print("🚀 进程清理完成，准备启动机器人...")
         print("⏳ 等待5秒确保进程完全终止...")
         time.sleep(5)
-        
+
     except Exception as e:
         print(f"⚠️ 进程清理过程中出现错误: {e}")
         print("🔄 继续启动机器人...")
@@ -6084,7 +6069,7 @@ def main():
 
         # 首先同步初始化机器人实例（快速，不阻塞）
         initialize_bot_sync()
-        
+
         # 创建应用（增加超时与重试容错）
         print("🏗️ 正在创建 Telegram Application...")
         # httpx 自动读取 HTTPS_PROXY/HTTP_PROXY 环境变量
@@ -6101,7 +6086,7 @@ def main():
         )
         application = Application.builder().token(BOT_TOKEN).request(request).build()
         logger.info("✅ Telegram Application 创建成功")
-        
+
         # 全局错误处理
         async def log_error(update, context):
             err = context.error
@@ -6127,7 +6112,7 @@ def main():
         logger.info("✅ /menu 命令处理器已注册")
         application.add_handler(CommandHandler("ping", health_command))
         logger.info("✅ /ping 命令处理器已注册")
-        
+
         # 命令系统
         application.add_handler(CommandHandler("subscribe", subscribe_command))
         logger.info("✅ /subscribe 命令处理器已注册")
@@ -6141,36 +6126,36 @@ def main():
         logger.info("✅ /ai 命令处理器已注册")
         application.add_handler(CommandHandler("lang", lang_command))
         logger.info("✅ /lang 命令处理器已注册")
-        
+
         # 保留旧命令兼容性
         application.add_handler(CommandHandler("stats", user_command))
         logger.info("✅ /stats 命令处理器已注册（兼容）")
-        
+
         logger.info("✅ 所有命令处理器已注册")
-        
+
         logger.info("🤖 AI分析暂未开放，跳过AI对话处理器注册")
-        
+
         application.add_handler(CallbackQueryHandler(button_callback))
         logger.info("✅ 全局回调查询处理器已注册")
-        
+
         # 添加消息处理器（处理常驻键盘按钮）
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_keyboard_message))
         logger.info("✅ 消息处理器已注册")
-        
+
         # 设置启动后初始化（后台异步加载缓存）
         application.post_init = post_init
-        
+
         # 启动机器人
         logger.info("✅ 机器人已启动，等待消息...")
-        print("🔗 数据源: Binance Futures API") 
+        print("🔗 数据源: Binance Futures API")
         print("💾 缓存策略: 机器人立即可用，数据后台异步加载")
         print("📞 现在可以发送 /start 命令测试机器人！")
         print("⚡ 注意：初次使用时数据功能可能需要几秒钟加载")
-        
+
         # 启动信号检测服务
         try:
             from signals import init_pusher, start_signal_loop
-            
+
             async def send_signal(user_id: int, text: str, reply_markup):
                 """发送信号消息"""
                 try:
@@ -6181,14 +6166,14 @@ def main():
                     )
                 except Exception as e:
                     logger.warning(f"发送信号给 {user_id} 失败: {e}")
-            
+
             init_pusher(send_signal)
             start_signal_loop(interval=60)
             logger.info("✅ 信号检测服务已启动")
             print("🔔 信号检测服务已启动，间隔60秒")
         except Exception as e:
             logger.warning(f"⚠️ 信号服务启动失败: {e}")
-        
+
         # 显式阻塞主线程：close_loop=True 交由库关闭事件循环，stop_signals=None 避免额外信号干扰
         application.run_polling(
             allowed_updates=Update.ALL_TYPES,
@@ -6196,7 +6181,7 @@ def main():
             close_loop=True,  # 允许库关闭循环（修复不阻塞问题）
             stop_signals=None  # 不注册信号处理，确保正常阻塞
         )
-        
+
     except Exception as e:
         logger.error(f"❌ 机器人启动失败: {e}")
         import traceback
@@ -6205,13 +6190,13 @@ def main():
 
 def add_signal_formatting_to_bot():
     """为TradeCatBot类添加信号格式化方法"""
-    
+
     def format_signal_message(self, signal_type: str, symbol: str, alert_value: float) -> str:
         """格式化信号消息"""
         try:
             if not self.signal_formatter:
-                return f"❌ 信号格式化器未初始化"
-            
+                return "❌ 信号格式化器未初始化"
+
             result = None
             if signal_type == "funding_rate":
                 result = self.signal_formatter.format_funding_rate_signal(symbol, alert_value)
@@ -6221,19 +6206,19 @@ def add_signal_formatting_to_bot():
                 result = self.signal_formatter.format_rsi_signal(symbol, alert_value)
             else:
                 return f"❌ 未知信号类型: {signal_type}"
-            
+
             # 如果信号格式化函数返回None，表示数据不可用，返回None而不是错误消息
             return result
-            
+
         except Exception as e:
             logger.error(f"格式化信号消息错误: {e}")
             return None  # 异常时也返回None而不是错误消息
-    
+
     def send_formatted_signal(self, signal_type: str, symbol: str, alert_value: float, chat_id: str = None):
         """发送格式化的信号消息"""
         try:
             message = self.format_signal_message(signal_type, symbol, alert_value)
-            
+
             # 只有在消息不为None时才发送
             if message:
                 if chat_id:
@@ -6248,10 +6233,10 @@ def add_signal_formatting_to_bot():
                     print(f"📡 广播信号:\n{message}")
             else:
                 logger.debug(f"📊 跳过 {symbol} 信号发送，数据不可用")
-                
+
         except Exception as e:
             logger.error(f"发送格式化信号错误: {e}")
-    
+
     def get_formatted_signal_preview(self, signal_type: str, symbol: str, alert_value: float) -> str:
         """获取格式化信号预览"""
         try:
@@ -6262,7 +6247,7 @@ def add_signal_formatting_to_bot():
         except Exception as e:
             logger.error(f"获取信号预览错误: {e}")
             return "📊 数据暂不可用，请稍后重试"
-    
+
     # 添加发送消息的方法
     async def send_message_to_user(self, user_id: int, message: str, parse_mode: str = 'HTML'):
         """发送消息给指定用户"""
@@ -6296,7 +6281,7 @@ def add_signal_formatting_to_bot():
         except Exception as e:
             logger.error(f"❌ 发送消息给用户 {user_id} 失败: {e}")
             raise e
-    
+
     async def send_signal_to_user(self, user_id: int, signal_type: str, symbol: str, alert_value: float, custom_message: str = None):
         """发送格式化信号给指定用户（带GIF动画）"""
         try:
@@ -6308,16 +6293,16 @@ def add_signal_formatting_to_bot():
                 if not message:
                     logger.warning(f"无法格式化信号 {signal_type} - {symbol}，跳过发送")
                     return
-            
+
             # 根据信号类型选择对应的GIF文件
             gif_file_map = {
                 'funding_rate': str((ANIMATION_DIR / '狙击信号.gif.mp4').resolve()),
                 'open_interest': str((ANIMATION_DIR / '趋势信号.gif.mp4').resolve()),
                 'rsi': str((ANIMATION_DIR / '情绪信号.gif.mp4').resolve())
             }
-            
+
             gif_file = gif_file_map.get(signal_type)
-            
+
             # 发送消息（带GIF动画）
             if gif_file and os.path.exists(gif_file):
                 try:
@@ -6345,21 +6330,21 @@ def add_signal_formatting_to_bot():
                 # 没有GIF文件时，发送纯文本消息
                 await self.send_message_to_user(user_id, message, 'HTML')
                 logger.info(f"✅ 成功发送 {signal_type} 信号给用户 {user_id}")
-                
+
         except Exception as e:
             logger.error(f"❌ 发送信号给用户 {user_id} 失败: {e}")
             raise e
-    
+
     async def start_bot(self):
         """启动机器人（占位符方法）"""
         logger.info("✅ 机器人启动完成")
         return True
-    
+
     async def stop_bot(self):
         """停止机器人（占位符方法）"""
         logger.info("🛑 机器人已停止")
         return True
-    
+
     # 将方法添加到TradeCatBot类
     TradeCatBot.format_signal_message = format_signal_message
     TradeCatBot.send_formatted_signal = send_formatted_signal
@@ -6368,7 +6353,7 @@ def add_signal_formatting_to_bot():
     TradeCatBot.send_signal_to_user = send_signal_to_user
     TradeCatBot.start_bot = start_bot
     TradeCatBot.stop_bot = stop_bot
-    
+
     logger.info("✅ 信号格式化和发送方法已添加到TradeCatBot类")
 
 # 调用函数添加方法
@@ -6378,4 +6363,4 @@ add_signal_formatting_to_bot()
 
 if __name__ == "__main__":
     # 使用完整启动模式，包含所有功能
-    main() 
+    main()

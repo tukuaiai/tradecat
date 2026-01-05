@@ -6,11 +6,11 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Dict, Iterator, List, Optional, Sequence
 
+from psycopg import sql
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
-from psycopg import sql
 
-from config import settings, normalize_interval
+from config import normalize_interval, settings
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ class TimescaleAdapter:
     def upsert_candles(self, interval: str, rows: Sequence[dict], batch_size: int = 2000) -> int:
         """
         使用 COPY 命令批量 upsert K线，实现最高性能。
-        
+
         工作流程:
         1. 创建一个与目标表结构相同的临时表。
         2. 使用高效的 COPY 命令将所有数据流式传输到临时表。
@@ -62,11 +62,11 @@ class TimescaleAdapter:
         """
         if not rows:
             return 0
-        
+
         interval = normalize_interval(interval)
         table_name = f"candles_{interval}"
         cols = list(rows[0].keys()) # 从第一行获取列名，确保顺序一致
-        
+
         # 确保关键列存在
         if "bucket_ts" not in cols or "symbol" not in cols or "exchange" not in cols:
             raise ValueError("Rows must contain bucket_ts, symbol, and exchange")
@@ -103,11 +103,11 @@ class TimescaleAdapter:
         with self.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(sql_create_temp)
-                
+
                 # 分批处理
                 for i in range(0, len(rows), batch_size):
                     batch = rows[i:i + batch_size]
-                    
+
                     # 使用 COPY 命令高效写入临时表
                     with cur.copy(sql.SQL("COPY {temp_table} ({cols}) FROM STDIN").format(
                         temp_table=sql.Identifier(temp_table_name),
@@ -115,13 +115,13 @@ class TimescaleAdapter:
                     )) as copy:
                         for row in batch:
                             copy.write_row(tuple(row.get(col) for col in cols))
-                
+
                 # 从临时表一次性 upsert 到目标表
                 cur.execute(sql_upsert_from_temp)
                 total_inserted = cur.rowcount if cur.rowcount > 0 else len(rows)
 
             conn.commit()
-            
+
         return total_inserted
 
     def upsert_metrics(self, rows: Sequence[dict], batch_size: int = 2000) -> int:
@@ -131,7 +131,7 @@ class TimescaleAdapter:
 
         table_name = "binance_futures_metrics_5m"
         cols = list(rows[0].keys())
-        
+
         if "create_time" not in cols or "symbol" not in cols:
             raise ValueError("Rows must contain create_time and symbol")
 
@@ -144,7 +144,7 @@ class TimescaleAdapter:
             temp_table=sql.Identifier(temp_table_name),
             target_table=sql.Identifier(self.schema, table_name)
         )
-        
+
         update_cols = [col for col in cols if col not in ("symbol", "create_time")]
         sql_upsert_from_temp = sql.SQL("""
             INSERT INTO {target_table} ({cols})
@@ -166,7 +166,7 @@ class TimescaleAdapter:
         with self.connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(sql_create_temp)
-                
+
                 for i in range(0, len(rows), batch_size):
                     batch = rows[i:i + batch_size]
                     with cur.copy(sql.SQL("COPY {temp_table} ({cols}) FROM STDIN").format(
@@ -175,14 +175,14 @@ class TimescaleAdapter:
                     )) as copy:
                         for row in batch:
                             copy.write_row(tuple(row.get(col) for col in cols))
-                
+
                 cur.execute(sql_upsert_from_temp)
                 total_inserted = cur.rowcount if cur.rowcount > 0 else len(rows)
 
             conn.commit()
-            
+
         return total_inserted
-    
+
     def _quote_val(self, v) -> str:
         """SQL 值转义 (在此重构中已不再需要，保留以兼容旧代码)"""
         if v is None:
