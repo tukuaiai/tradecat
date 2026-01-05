@@ -747,7 +747,7 @@ def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
             edge_color = "#ffffff"  # 白
 
         # 边框宽度随大小变化 - 更粗
-        edge_width = 2.0 + size_factor * 2.5
+        edge_width = 1.0 + size_factor * 1.2
 
         txt = ax.text(
             row["x"], row["y"], label,
