@@ -200,12 +200,19 @@ def _resolve_lang(update) -> str:
 def _t(update, message_id: str, **kwargs) -> str:
     """获取带语言的翻译"""
     lang = _resolve_lang(update)
-    return I18N.gettext(message_id, lang=lang, **kwargs)
+    try:
+        text = I18N.gettext(message_id, lang=lang, **kwargs)
+    except Exception as exc:  # pragma: no cover - 防御性兜底
+        logger.error("获取翻译失败: lang=%s key=%s err=%s", lang, message_id, exc)
+        return message_id
+    return text or message_id
 
 
 def _btn(update, key: str, callback: str, active: bool = False, prefix: str = "✅") -> InlineKeyboardButton:
     """国际化按钮工厂"""
     text = _t(update, key)
+    if not text:
+        text = key
     if active:
         text = prefix + text
     return InlineKeyboardButton(text, callback_data=callback)
@@ -214,6 +221,8 @@ def _btn(update, key: str, callback: str, active: bool = False, prefix: str = "�
 def _btn_lang(lang: str, key: str, callback: str, active: bool = False, prefix: str = "✅") -> InlineKeyboardButton:
     """按语言代码创建按钮（无update时使用）"""
     text = I18N.gettext(key, lang=lang)
+    if not text:
+        text = key
     if active:
         text = prefix + text
     return InlineKeyboardButton(text, callback_data=callback)
@@ -229,6 +238,27 @@ def _sort_text_lang(lang: str, order: str) -> str:
     """按语言获取排序文本"""
     key = "btn.desc" if order == "desc" else "btn.asc"
     return I18N.gettext(key, lang=lang)
+
+
+def _period_text(update, period: str) -> str:
+    """按语言获取周期展示文本，找不到则回退原始值"""
+    lang = _resolve_lang(update) if update else I18N.default_locale
+    key = f"period.{period}"
+    text = I18N.gettext(key, lang=lang)
+    if text == key:
+        logger.warning("⚠️ 周期翻译缺失，回退原值: lang=%s key=%s", lang, key)
+        return period
+    return text
+
+
+def _period_text_lang(lang: str, period: str) -> str:
+    """按给定语言获取周期文本，找不到则回退原始值"""
+    key = f"period.{period}"
+    text = I18N.gettext(key, lang=lang)
+    if text == key:
+        logger.warning("⚠️ 周期翻译缺失，回退原值: lang=%s key=%s", lang, key)
+        return period
+    return text
 
 
 # 统一 sys.path 优先级：本服务 src 放最前，并移除不存在的占位路径
@@ -1212,7 +1242,7 @@ class UserRequestHandler:
             parse_mode=parse_mode
         )
     
-    def get_position_ranking(self, limit=10, sort_order='desc', period='24h', sort_field: str = "position"):
+    def get_position_ranking(self, limit=10, sort_order='desc', period='24h', sort_field: str = "position", update=None):
         """获取持仓量排行榜 - 委托给TradeCatBot处理"""
         global bot
         if bot:
@@ -1226,14 +1256,15 @@ class UserRequestHandler:
                 logger.error(f"创建临时bot实例失败: {e}")
                 return "🔄 机器人正在初始化中，请稍后重试"
 
-    def get_position_ranking_keyboard(self, current_sort='desc', current_limit=10, current_period='24h'):
+    def get_position_ranking_keyboard(self, current_sort='desc', current_limit=10, current_period='24h', update=None):
         """获取持仓量排行榜键盘 - 委托给TradeCatBot处理"""
         global bot
         if bot:
             return bot.get_position_ranking_keyboard(
                 current_sort=current_sort, 
                 current_limit=current_limit, 
-                current_period=current_period
+                current_period=current_period,
+                update=update
             )
         else:
             # 如果全局bot不可用，创建临时实例
@@ -1242,14 +1273,13 @@ class UserRequestHandler:
                 return temp_bot.get_position_ranking_keyboard(
                     current_sort=current_sort, 
                     current_limit=current_limit, 
-                    current_period=current_period
+                    current_period=current_period,
+                    update=update
                 )
             except Exception as e:
                 logger.error(f"创建临时bot实例失败: {e}")
                 # 回退键盘
-                keyboard = [
-                    [InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]
-                ]
+                keyboard = [[_btn(None, "btn.back_home", "main_menu")]]
                 return InlineKeyboardMarkup(keyboard)
     
     def get_funding_rate_ranking(self, limit=10, sort_order='desc', sort_type='funding_rate'):
@@ -1263,15 +1293,15 @@ class UserRequestHandler:
     def get_funding_rate_keyboard(self, current_sort='desc', current_limit=10, current_sort_type='funding_rate'):
         """资金费率排行已下线的占位键盘。"""
         return InlineKeyboardMarkup([
-            [InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]
+            [_btn(None, "btn.back_home", "main_menu")]
         ])
     
-    def get_volume_ranking(self, limit=10, period='24h', sort_order='desc', market_type='futures', sort_field: str = "volume"):
+    def get_volume_ranking(self, limit=10, period='24h', sort_order='desc', market_type='futures', sort_field: str = "volume", update=None):
         """获取交易量排行榜"""
         if market_type == 'futures':
-            return self.get_futures_volume_ranking(limit, period, sort_order, sort_field=sort_field)
+            return self.get_futures_volume_ranking(limit, period, sort_order, sort_field=sort_field, update=update)
         elif market_type == 'spot':
-            return self.get_spot_volume_ranking(limit, period, sort_order, sort_field=sort_field)
+            return self.get_spot_volume_ranking(limit, period, sort_order, sort_field=sort_field, update=update)
         else:
             return "❌ 不支持的市场类型"
 
@@ -1305,7 +1335,7 @@ class UserRequestHandler:
             return f"{prefix}${abs_value/1e3:.2f}K"
         return f"{prefix}${abs_value:.0f}"
 
-    def get_futures_volume_ranking(self, limit=10, period='24h', sort_order='desc', sort_field: str = "volume"):
+    def get_futures_volume_ranking(self, limit=10, period='24h', sort_order='desc', sort_field: str = "volume", update=None):
         """基于TimescaleDB生成合约交易量排行榜"""
         allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '24h'}
         if period not in allowed_periods:
@@ -1352,24 +1382,22 @@ class UserRequestHandler:
 
         aligned_data = self.dynamic_align_format(data_rows)
         time_info = self.get_current_time_display()
-        period_display = {
-            '5m': '5分钟', '15m': '15分钟', '30m': '30分钟',
-            '1h': '1小时', '4h': '4小时', '12h': '12小时', '24h': '24小时'
-        }
-        period_text = period_display.get(period, period)
+        period_text = _period_text(update, period)
         sort_symbol = "⬇️" if sort_order == 'desc' else "🔼"
-        sort_text = "降序" if sort_order == 'desc' else "升序"
+        sort_text = _sort_text(update, sort_order)
 
-        return f"""📈 成交量排行 - 成交额热度榜 📈
-⏰ 更新 {time_info['full']}
+        return (
+            f"""{_t(update, "ranking.volume")}
+{_t(update, "time.update", time=time_info['full'])}
 📊 排序 {period_text}交易量(USDT)({sort_symbol}) / {sort_text}
 ```
 {aligned_data}
 ```
-⏰ 最后更新 {time_info['full']}"""
+{_t(update, "time.last_update", time=time_info['full'])}"""
+        )
     
 
-    def get_spot_volume_ranking(self, limit=10, period='24h', sort_order='desc', sort_field: str = "volume"):
+    def get_spot_volume_ranking(self, limit=10, period='24h', sort_order='desc', sort_field: str = "volume", update=None):
         """基于TimescaleDB生成现货交易量排行榜"""
         allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '24h', '1w'}
         if period not in allowed_periods:
@@ -1416,26 +1444,22 @@ class UserRequestHandler:
 
         aligned_data = self.dynamic_align_format(data_rows)
         time_info = self.get_current_time_display()
-        period_display = {
-            '5m': '5分钟', '15m': '15分钟', '30m': '30分钟',
-            '1h': '1小时', '4h': '4小时', '12h': '12小时', '24h': '24小时', '1w': '1周'
-        }
-        period_text = period_display.get(period, period)
+        period_text = _period_text(update, period)
         sort_symbol = "⬇️" if sort_order == 'desc' else "🔼"
-        sort_text = "降序" if sort_order == 'desc' else "升序"
+        sort_text = _sort_text(update, sort_order)
 
         return (
-            f"""💹 {period_text}现货交易量排行榜 💹
-⏰ 更新 {time_info['full']}
+            f"""{_t(update, "ranking.spot_volume", period=period_text)}
+{_t(update, "time.update", time=time_info['full'])}
 📊 排序 {period_text}交易量(USDT)({sort_symbol}) / {sort_text}
 ```
 {aligned_data}
 ```
-⏰ 最后更新 {time_info['full']}"""
+{_t(update, "time.last_update", time=time_info['full'])}"""
         )
 
 
-    def get_position_market_ratio(self, limit=10, sort_order='desc'):
+    def get_position_market_ratio(self, limit=10, sort_order='desc', update=None):
         """获取持仓/市值比排行榜"""
         # 获取市场缓存数据
         coinglass_data = self.get_coinglass_cache_data()
@@ -1504,20 +1528,20 @@ class UserRequestHandler:
         
         # 排序方式显示
         sort_symbol = "⬇️" if sort_order == 'desc' else "🔼"
-        sort_text = "降序" if sort_order == 'desc' else "升序"
+        sort_text = _sort_text(update, sort_order)
         
-        text = f"""📊 持仓/市值比排行榜 📊
-⏰ 更新 {time_info['full']}
+        text = f"""{_t(update, "ranking.ratio.position_market")}
+{_t(update, "time.update", time=time_info['full'])}
 📊 排序 比率({sort_symbol}) / {sort_text}
 ```
 {aligned_data}
 ```
 💡 持仓/市值比 = 持仓量 / 市值
-⏰ 最后更新 {time_info['full']}"""
+{_t(update, "time.last_update", time=time_info['full'])}"""
         
         return text
     
-    def get_volume_market_ratio(self, limit=10, sort_order='desc'):
+    def get_volume_market_ratio(self, limit=10, sort_order='desc', update=None):
         """获取交易量/市值比排行榜"""
         # 获取市场缓存数据
         coinglass_data = self.get_coinglass_cache_data()
@@ -1596,20 +1620,20 @@ class UserRequestHandler:
         
         # 排序方式显示
         sort_symbol = "⬇️" if sort_order == 'desc' else "🔼"
-        sort_text = "降序" if sort_order == 'desc' else "升序"
+        sort_text = _sort_text(update, sort_order)
         
-        text = f"""📊 交易量/市值比排行榜 📊
-⏰ 更新 {time_info['full']}
+        text = f"""{_t(update, "ranking.ratio.volume_market")}
+{_t(update, "time.update", time=time_info['full'])}
 📊 排序 比率({sort_symbol}) / {sort_text}
 ```
 {aligned_data}
 ```
 💡 交易量/市值比 = 24h交易量 / 市值
-⏰ 最后更新 {time_info['full']}"""
+{_t(update, "time.last_update", time=time_info['full'])}"""
         
         return text
     
-    def get_volume_oi_ratio(self, limit=10, sort_order='desc'):
+    def get_volume_oi_ratio(self, limit=10, sort_order='desc', update=None):
         """获取交易量/持仓量比排行榜"""
         # 获取市场缓存数据
         coinglass_data = self.get_coinglass_cache_data()
@@ -1684,16 +1708,16 @@ class UserRequestHandler:
         
         # 排序方式显示
         sort_symbol = "⬇️" if sort_order == 'desc' else "🔼"
-        sort_text = "降序" if sort_order == 'desc' else "升序"
+        sort_text = _sort_text(update, sort_order)
         
-        text = f"""📊 交易量/持仓量比排行榜 📊
-⏰ 更新 {time_info['full']}
+        text = f"""{_t(update, "ranking.ratio.volume_oi")}
+{_t(update, "time.update", time=time_info['full'])}
 📊 排序 比率({sort_symbol}) / {sort_text}
 ```
 {aligned_data}
 ```
 💡 交易量/持仓量比 = 24h交易量 / 持仓量
-⏰ 最后更新 {time_info['full']}"""
+{_t(update, "time.last_update", time=time_info['full'])}"""
         
         return text
     
@@ -1736,46 +1760,41 @@ class UserRequestHandler:
         """CoinGlass 缓存已下线，返回空列表。"""
         return []
     
-    def get_unified_ratio_keyboard(self, current_sort='desc', current_limit=10, current_ratio_type='position_market'):
+    def get_unified_ratio_keyboard(self, current_sort='desc', current_limit=10, current_ratio_type='position_market', update=None):
         """获取统一的比率键盘布局"""
-        # 第一行：比率类型按钮
+        lang = _resolve_lang(update) if update else I18N.default_locale
+
+        def _btn_active(key: str, callback: str, active: bool) -> InlineKeyboardButton:
+            text = I18N.gettext(key, lang=lang)
+            return InlineKeyboardButton(f"✅{text}" if active else text, callback_data=callback)
+
         ratio_buttons = [
-            InlineKeyboardButton("✅持仓/市值" if current_ratio_type == 'position_market' else "持仓/市值", callback_data="ratio_type_position_market"),
-            InlineKeyboardButton("✅交易量/市值" if current_ratio_type == 'volume_market' else "交易量/市值", callback_data="ratio_type_volume_market"),
-            InlineKeyboardButton("✅交易量/持仓" if current_ratio_type == 'volume_oi' else "交易量/持仓", callback_data="ratio_type_volume_oi")
+            _btn_active("ratio.position_market", "ratio_type_position_market", current_ratio_type == 'position_market'),
+            _btn_active("ratio.volume_market", "ratio_type_volume_market", current_ratio_type == 'volume_market'),
+            _btn_active("ratio.volume_oi", "ratio_type_volume_oi", current_ratio_type == 'volume_oi'),
         ]
-        
-        # 第二行：排序按钮和数量按钮合并为一行
+
         sort_limit_buttons = []
-        
-        # 排序按钮
-        if current_sort == 'desc':
-            sort_limit_buttons.append(InlineKeyboardButton("✅降序", callback_data="unified_ratio_sort_desc"))
-            sort_limit_buttons.append(InlineKeyboardButton("升序", callback_data="unified_ratio_sort_asc"))
-        else:
-            sort_limit_buttons.append(InlineKeyboardButton("降序", callback_data="unified_ratio_sort_desc"))
-            sort_limit_buttons.append(InlineKeyboardButton("✅升序", callback_data="unified_ratio_sort_asc"))
-        
-        # 数量按钮
+        sort_limit_buttons.append(_btn_active("btn.desc", "unified_ratio_sort_desc", current_sort == 'desc'))
+        sort_limit_buttons.append(_btn_active("btn.asc", "unified_ratio_sort_asc", current_sort == 'asc'))
+
         limits = [10, 20, 30]
         for limit_val in limits:
-            if limit_val == current_limit:
-                sort_limit_buttons.append(InlineKeyboardButton(f"✅{limit_val}条", callback_data=f"unified_ratio_{limit_val}"))
-            else:
-                sort_limit_buttons.append(InlineKeyboardButton(f"{limit_val}条", callback_data=f"unified_ratio_{limit_val}"))
-        
-        # 第三行：返回和刷新按钮
+            label = I18N.gettext("sort.items", lang=lang, n=limit_val)
+            sort_limit_buttons.append(
+                InlineKeyboardButton(
+                    f"✅{label}" if limit_val == current_limit else label,
+                    callback_data=f"unified_ratio_{limit_val}"
+                )
+            )
+
         control_buttons = [
-            InlineKeyboardButton("🔙 返回主菜单", callback_data="main_menu"),
-            InlineKeyboardButton("🔄 刷新", callback_data="unified_ratio_refresh")
+            _btn_lang(lang, "btn.back_home", "main_menu"),
+            _btn_lang(lang, "btn.refresh", "unified_ratio_refresh"),
         ]
-        
-        keyboard = [
-            ratio_buttons,
-            sort_limit_buttons,
-            control_buttons
-        ]
-        
+
+        keyboard = [ratio_buttons, sort_limit_buttons, control_buttons]
+
         return InlineKeyboardMarkup(keyboard)
 
     def get_position_market_ratio_keyboard(self, current_sort='desc', current_limit=10):
@@ -1790,16 +1809,16 @@ class UserRequestHandler:
         """获取交易量/持仓量比键盘 - 兼容性保持"""
         return self.get_unified_ratio_keyboard(current_sort, current_limit, 'volume_oi')
     
-    def get_money_flow(self, limit=10, period='24h', sort_order='desc', flow_type='absolute', market='futures'):
+    def get_money_flow(self, limit=10, period='24h', sort_order='desc', flow_type='absolute', market='futures', update=None):
         """获取资金流向排行榜 - 支持合约和现货数据"""
         if market == 'spot':
             # 现货数据支持多时间周期
-            return self.get_spot_money_flow(limit, sort_order, flow_type, period)
+            return self.get_spot_money_flow(limit, sort_order, flow_type, period, update=update)
         else:
             # 合约数据（原有逻辑）
-            return self.get_futures_money_flow(limit, period, sort_order, flow_type)
+            return self.get_futures_money_flow(limit, period, sort_order, flow_type, update=update)
     
-    def get_option_money_flow(self, limit=10, sort_order='desc', flow_type='absolute'):
+    def get_option_money_flow(self, limit=10, sort_order='desc', flow_type='absolute', update=None):
         """获取期权资金流向排行榜"""
         option_data, error = self.get_cached_data_safely('coinglass_option_flow_data')
         
@@ -1873,38 +1892,39 @@ class UserRequestHandler:
         
         # 根据流向类型设置标题和说明
         if flow_type == 'inflow':
-            title = "💰 期权资金流入排行榜 💰"
-            sort_desc = "资金流入强度(🔽)"
-            type_desc = "🟢 仅显示资金流入的币种"
-            flow_desc = "💡 所有数值均为正值，表示资金净流入"
+            title = _t(update, "flow.option.inflow")
+            sort_desc = _t(update, "flow.option.sort_inflow")
+            type_desc = _t(update, "flow.option.type_inflow")
+            flow_desc = _t(update, "flow.option.desc_inflow")
         elif flow_type == 'outflow':
-            title = "💰 期权资金流出排行榜 💰"
-            sort_desc = "资金流出强度(🔼)"
-            type_desc = "🔴 仅显示资金流出的币种"
-            flow_desc = "💡 所有数值均为负值，表示资金净流出"
+            title = _t(update, "flow.option.outflow")
+            sort_desc = _t(update, "flow.option.sort_outflow")
+            type_desc = _t(update, "flow.option.type_outflow")
+            flow_desc = _t(update, "flow.option.desc_outflow")
         else:  # flow_type == 'absolute'
-            title = "💰 期权资金流向排行榜 💰"
+            title = _t(update, "flow.option.absolute")
             sort_symbol = "⬇️" if sort_order == 'desc' else "🔼"
-            sort_text = "降序" if sort_order == 'desc' else "升序"
-            sort_desc = f"资金流向强度({sort_symbol}) / {sort_text}"
-            type_desc = "📊 按绝对值排序，显示所有币种"
-            flow_desc = "💡 +表示资金流入，-表示流出"
-        
+            sort_text = _sort_text(update, sort_order)
+            sort_desc = _t(update, "flow.option.sort_absolute", symbol=sort_symbol, sort=sort_text)
+            type_desc = _t(update, "flow.option.type_absolute")
+            flow_desc = _t(update, "flow.option.desc_absolute")
+
         text = f"""{title}
-⏰ 更新 {time_info['full']}
+{_t(update, "time.update", time=time_info['full'])}
 ```
 {aligned_data}
 ```
+{sort_desc}
 {type_desc}
 {flow_desc}
 💡 净流量 = 持仓量变化(70%) + 成交量变化(30%)
-⏰ 最后更新 {time_info['full']}{cache_info}"""
+{_t(update, "time.last_update", time=time_info['full'])}{cache_info}"""
         
         return text
     
 
 
-    def get_futures_money_flow(self, limit=10, period='24h', sort_order='desc', flow_type='absolute'):
+    def get_futures_money_flow(self, limit=10, period='24h', sort_order='desc', flow_type='absolute', update=None):
         """基于TimescaleDB的合约资金流向排行榜（CVD）"""
         allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '24h'}
         if period not in allowed_periods:
@@ -1961,39 +1981,35 @@ class UserRequestHandler:
 
         aligned_data = self.dynamic_align_format(data_rows)
         time_info = self.get_current_time_display()
-        period_names = {
-            '5m': '5分钟', '15m': '15分钟', '30m': '30分钟', '1h': '1小时',
-            '4h': '4小时', '12h': '12小时', '24h': '24小时'
-        }
-        period_name = period_names.get(period, period)
+        period_name = _period_text(update, period)
         sort_symbol = "⬇️" if sort_order == 'desc' else "🔼"
-        sort_text = "降序" if sort_order == 'desc' else "升序"
+        sort_text = _sort_text(update, sort_order)
 
         if flow_type == 'inflow':
-            title = f"🟢 合约多头资金流入({period_name})"
-            desc = "仅保留多头占优，按净流降序"
+            title = _t(update, "flow.title.futures_long", period=period_name)
+            desc = _t(update, "flow.desc.futures_long")
         elif flow_type == 'outflow':
-            title = f"🔴 合约空头资金流出({period_name})"
-            desc = "仅保留空头占优，按净流升序"
+            title = _t(update, "flow.title.futures_short", period=period_name)
+            desc = _t(update, "flow.desc.futures_short")
         elif flow_type == 'volume':
-            title = f"📦 合约交易量排行({period_name})"
-            desc = "按该周期成交额排序"
+            title = _t(update, "flow.title.futures_volume", period=period_name)
+            desc = _t(update, "flow.desc.volume")
         else:
-            title = f"💧 资金流向排行 - 合约({period_name})"
-            desc = f"按 |CVD| ({sort_symbol}) / {sort_text}"
+            title = _t(update, "flow.title.futures", period=period_name)
+            desc = _t(update, "flow.desc.absolute", symbol=sort_symbol, sort=sort_text)
 
         return (
             f"""{title}
-⏰ 更新 {time_info['full']}
+{_t(update, "time.update", time=time_info['full'])}
 排名/币种/净流(CVD)/买卖比/涨跌幅
 ```
 {aligned_data}
 ```
-💡 净流(CVD)=Taker买入 - Taker卖出，数据来自 Binance 合约
-⏰ 最后更新 {time_info['full']}"""
+💡 {_t(update, "flow.desc.definition_futures")}
+{_t(update, "time.last_update", time=time_info['full'])}"""
         )
 
-    def get_spot_money_flow(self, limit=10, period='24h', sort_order='desc', flow_type='absolute'):
+    def get_spot_money_flow(self, limit=10, period='24h', sort_order='desc', flow_type='absolute', update=None):
         """基于TimescaleDB的现货资金流向排行榜"""
         allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '24h', '1w'}
         if period not in allowed_periods:
@@ -2050,209 +2066,144 @@ class UserRequestHandler:
 
         aligned_data = self.dynamic_align_format(data_rows)
         time_info = self.get_current_time_display()
-        period_names = {
-            '5m': '5分钟', '15m': '15分钟', '30m': '30分钟', '1h': '1小时',
-            '4h': '4小时', '12h': '12小时', '24h': '24小时', '1w': '1周'
-        }
-        period_name = period_names.get(period, period)
+        period_name = _period_text(update, period)
         sort_symbol = "⬇️" if sort_order == 'desc' else "🔼"
-        sort_text = "降序" if sort_order == 'desc' else "升序"
+        sort_text = _sort_text(update, sort_order)
 
         if flow_type == 'inflow':
-            title = f"🟢 现货多头资金流入({period_name})"
-            desc = "仅保留多头占优"
+            title = _t(update, "flow.title.spot_long", period=period_name)
+            desc = _t(update, "flow.desc.spot_long")
         elif flow_type == 'outflow':
-            title = f"🔴 现货空头资金流出({period_name})"
-            desc = "仅保留空头占优"
+            title = _t(update, "flow.title.spot_short", period=period_name)
+            desc = _t(update, "flow.desc.spot_short")
         elif flow_type == 'volume':
-            title = f"📦 现货交易量排行({period_name})"
-            desc = "按成交额排序"
+            title = _t(update, "flow.title.spot_volume", period=period_name)
+            desc = _t(update, "flow.desc.volume")
         else:
-            title = f"💧 现货资金流向排行({period_name})"
-            desc = f"按 |CVD| ({sort_symbol}) / {sort_text}"
+            title = _t(update, "flow.title.spot", period=period_name)
+            desc = _t(update, "flow.desc.absolute", symbol=sort_symbol, sort=sort_text)
 
         return (
             f"""{title}
-⏰ 更新 {time_info['full']}
+{_t(update, "time.update", time=time_info['full'])}
 排名/币种/净流(CVD)/买卖比/涨跌幅
 ```
 {aligned_data}
 ```
-💡 净流(CVD)=Taker买入 - Taker卖出，数据来自 Binance 现货
-⏰ 最后更新 {time_info['full']}"""
+💡 {_t(update, "flow.desc.definition_spot")}
+{_t(update, "time.last_update", time=time_info['full'])}"""
         )
 
 
-    def get_money_flow_keyboard(self, current_period='24h', current_sort='desc', current_limit=10, current_flow_type='absolute', current_market='futures'):
+    def get_money_flow_keyboard(self, current_period='24h', current_sort='desc', current_limit=10, current_flow_type='absolute', current_market='futures', update=None):
         """获取资金流向键盘"""
-        # 第一行：市场类型选择按钮（现货/合约）
-        market_buttons = []
-        if current_market == 'spot':
-            market_buttons.append(InlineKeyboardButton("✅现货", callback_data="money_flow_market_spot"))
-            market_buttons.append(InlineKeyboardButton("合约", callback_data="money_flow_market_futures"))
-        else:  # current_market == 'futures' 
-            market_buttons.append(InlineKeyboardButton("现货", callback_data="money_flow_market_spot"))
-            market_buttons.append(InlineKeyboardButton("✅合约", callback_data="money_flow_market_futures"))
-        
-        # 第二行：流向类型选择按钮
-        flow_type_buttons = []
-        if current_market == 'spot':
-            # 现货支持绝对值、流入、流出、市值
-            if current_flow_type == 'absolute':
-                flow_type_buttons.append(InlineKeyboardButton("✅绝对值", callback_data="money_flow_type_absolute"))
-                flow_type_buttons.append(InlineKeyboardButton("流入", callback_data="money_flow_type_inflow"))
-                flow_type_buttons.append(InlineKeyboardButton("流出", callback_data="money_flow_type_outflow"))
-                flow_type_buttons.append(InlineKeyboardButton("市值", callback_data="money_flow_type_volume"))
-            elif current_flow_type == 'inflow':
-                flow_type_buttons.append(InlineKeyboardButton("绝对值", callback_data="money_flow_type_absolute"))
-                flow_type_buttons.append(InlineKeyboardButton("✅流入", callback_data="money_flow_type_inflow"))
-                flow_type_buttons.append(InlineKeyboardButton("流出", callback_data="money_flow_type_outflow"))
-                flow_type_buttons.append(InlineKeyboardButton("市值", callback_data="money_flow_type_volume"))
-            elif current_flow_type == 'outflow':
-                flow_type_buttons.append(InlineKeyboardButton("绝对值", callback_data="money_flow_type_absolute"))
-                flow_type_buttons.append(InlineKeyboardButton("流入", callback_data="money_flow_type_inflow"))
-                flow_type_buttons.append(InlineKeyboardButton("✅流出", callback_data="money_flow_type_outflow"))
-                flow_type_buttons.append(InlineKeyboardButton("市值", callback_data="money_flow_type_volume"))
-            elif current_flow_type == 'volume':
-                flow_type_buttons.append(InlineKeyboardButton("绝对值", callback_data="money_flow_type_absolute"))
-                flow_type_buttons.append(InlineKeyboardButton("流入", callback_data="money_flow_type_inflow"))
-                flow_type_buttons.append(InlineKeyboardButton("流出", callback_data="money_flow_type_outflow"))
-                flow_type_buttons.append(InlineKeyboardButton("✅市值", callback_data="money_flow_type_volume"))
-            else:  # 如果是其他类型，重置为absolute
-                flow_type_buttons.append(InlineKeyboardButton("✅绝对值", callback_data="money_flow_type_absolute"))
-                flow_type_buttons.append(InlineKeyboardButton("流入", callback_data="money_flow_type_inflow"))
-                flow_type_buttons.append(InlineKeyboardButton("流出", callback_data="money_flow_type_outflow"))
-                flow_type_buttons.append(InlineKeyboardButton("市值", callback_data="money_flow_type_volume"))
-        else:
-            # 合约支持所有类型
-            if current_flow_type == 'absolute':
-                flow_type_buttons.append(InlineKeyboardButton("✅绝对值", callback_data="money_flow_type_absolute"))
-                flow_type_buttons.append(InlineKeyboardButton("流入", callback_data="money_flow_type_inflow"))
-                flow_type_buttons.append(InlineKeyboardButton("流出", callback_data="money_flow_type_outflow"))
-                flow_type_buttons.append(InlineKeyboardButton("市值", callback_data="money_flow_type_volume"))
-            elif current_flow_type == 'inflow':
-                flow_type_buttons.append(InlineKeyboardButton("绝对值", callback_data="money_flow_type_absolute"))
-                flow_type_buttons.append(InlineKeyboardButton("✅流入", callback_data="money_flow_type_inflow"))
-                flow_type_buttons.append(InlineKeyboardButton("流出", callback_data="money_flow_type_outflow"))
-                flow_type_buttons.append(InlineKeyboardButton("市值", callback_data="money_flow_type_volume"))
-            elif current_flow_type == 'outflow':
-                flow_type_buttons.append(InlineKeyboardButton("绝对值", callback_data="money_flow_type_absolute"))
-                flow_type_buttons.append(InlineKeyboardButton("流入", callback_data="money_flow_type_inflow"))
-                flow_type_buttons.append(InlineKeyboardButton("✅流出", callback_data="money_flow_type_outflow"))
-                flow_type_buttons.append(InlineKeyboardButton("市值", callback_data="money_flow_type_volume"))
-            else:  # current_flow_type == 'volume'
-                flow_type_buttons.append(InlineKeyboardButton("绝对值", callback_data="money_flow_type_absolute"))
-                flow_type_buttons.append(InlineKeyboardButton("流入", callback_data="money_flow_type_inflow"))
-                flow_type_buttons.append(InlineKeyboardButton("流出", callback_data="money_flow_type_outflow"))
-                flow_type_buttons.append(InlineKeyboardButton("✅市值", callback_data="money_flow_type_volume"))
-        
-        # 第三行：排序按钮（在绝对值和市值模式下显示）
+        lang = _resolve_lang(update) if update else I18N.default_locale
+
+        def _btn_active(key: str, callback: str, active: bool) -> InlineKeyboardButton:
+            text = I18N.gettext(key, lang=lang)
+            label = f"✅{text}" if active else text
+            return InlineKeyboardButton(label, callback_data=callback)
+
+        # 市场类型
+        market_buttons = [
+            _btn_active("market.spot", "money_flow_market_spot", current_market == "spot"),
+            _btn_active("market.futures", "money_flow_market_futures", current_market == "futures"),
+        ]
+
+        # 流向类型
+        flow_keys = [
+            ("flow.absolute", "money_flow_type_absolute", "absolute"),
+            ("flow.inflow", "money_flow_type_inflow", "inflow"),
+            ("flow.outflow", "money_flow_type_outflow", "outflow"),
+            ("flow.volume", "money_flow_type_volume", "volume"),
+        ]
+        flow_type_buttons = [
+            _btn_active(key, cb, current_flow_type == value)
+            for key, cb, value in flow_keys
+            if current_market == "spot" or value in {"absolute", "inflow", "outflow", "volume"}
+        ]
+
+        # 排序按钮（仅绝对值/市值）
         sort_buttons = []
         if current_flow_type in ['absolute', 'volume']:
-            if current_sort == 'desc':
-                sort_buttons.append(InlineKeyboardButton("✅降序", callback_data="money_flow_sort_desc"))
-                sort_buttons.append(InlineKeyboardButton("升序", callback_data="money_flow_sort_asc"))
-            else:
-                sort_buttons.append(InlineKeyboardButton("降序", callback_data="money_flow_sort_desc"))
-                sort_buttons.append(InlineKeyboardButton("✅升序", callback_data="money_flow_sort_asc"))
-        
-        # 第三行：时间周期按钮（现货和合约模式都显示）
+            sort_buttons.append(
+                _btn_active("btn.desc", "money_flow_sort_desc", current_sort == 'desc')
+            )
+            sort_buttons.append(
+                _btn_active("btn.asc", "money_flow_sort_asc", current_sort == 'asc')
+            )
+
+        # 周期按钮
         period_buttons = []
         if current_market in ['spot', 'futures']:
+            periods = [
+                ('5m',), ('15m',), ('30m',), ('1h',), ('4h',), ('12h',), ('24h',)
+            ]
             if current_market == 'spot':
-                # 现货支持所有时间周期
-                periods = [
-                    ('5m', '5分'),
-                    ('15m', '15分'),
-                    ('30m', '30分'),
-                    ('1h', '1时'),
-                    ('4h', '4时'),
-                    ('12h', '12时'),
-                    ('24h', '24时'),
-                    ('1w', '1周')
-                ]
-            else:  # futures
-                # 合约支持主要时间周期
-                periods = [
-                    ('5m', '5分'),
-                    ('15m', '15分'),
-                    ('30m', '30分'),
-                    ('1h', '1时'),
-                    ('4h', '4时'),
-                    ('12h', '12时'),
-                    ('24h', '24时')
-                ]
-            
-            for period_val, period_name in periods:
-                if period_val == current_period:
-                    period_buttons.append(InlineKeyboardButton(f"✅{period_name}", callback_data=f"money_flow_period_{period_val}"))
-                else:
-                    period_buttons.append(InlineKeyboardButton(f"{period_name}", callback_data=f"money_flow_period_{period_val}"))
-        
-        # 排序和数量按钮合并为一行
+                periods.append(('1w',))
+
+            for period_val, in periods:
+                label = _period_text_lang(lang, period_val)
+                active_label = f"✅{label}"
+                period_buttons.append(
+                    InlineKeyboardButton(
+                        active_label if period_val == current_period else label,
+                        callback_data=f"money_flow_period_{period_val}"
+                    )
+                )
+
+        # 排序 + 数量
         sort_limit_buttons = []
-        
-        # 排序按钮（在绝对值和市值模式下显示）
-        if current_flow_type in ['absolute', 'volume']:
-            if current_sort == 'desc':
-                sort_limit_buttons.append(InlineKeyboardButton("✅降序", callback_data="money_flow_sort_desc"))
-                sort_limit_buttons.append(InlineKeyboardButton("升序", callback_data="money_flow_sort_asc"))
-            else:
-                sort_limit_buttons.append(InlineKeyboardButton("降序", callback_data="money_flow_sort_desc"))
-                sort_limit_buttons.append(InlineKeyboardButton("✅升序", callback_data="money_flow_sort_asc"))
-        
-        # 数量按钮
+        if sort_buttons:
+            sort_limit_buttons.extend(sort_buttons)
+
         limits = [10, 20, 30]
         for limit_val in limits:
-            if limit_val == current_limit:
-                sort_limit_buttons.append(InlineKeyboardButton(f"✅{limit_val}条", callback_data=f"money_flow_{limit_val}"))
-            else:
-                sort_limit_buttons.append(InlineKeyboardButton(f"{limit_val}条", callback_data=f"money_flow_{limit_val}"))
-        
-        # 构建键盘布局
+            label = I18N.gettext("sort.items", lang=lang, n=limit_val)
+            sort_limit_buttons.append(
+                InlineKeyboardButton(
+                    f"✅{label}" if limit_val == current_limit else label,
+                    callback_data=f"money_flow_{limit_val}"
+                )
+            )
+
         keyboard = [
-            # 第一行：市场类型选择
             market_buttons,
-            # 第二行：流向类型选择
             flow_type_buttons,
         ]
-        
-        # 第三行：时间周期选择（仅在现货模式下显示）
+
         if period_buttons:
-            # 分成两行显示，每行4个按钮
-            keyboard.append(period_buttons[:4])  # 5分、15分、30分、1时
-            keyboard.append(period_buttons[4:])  # 4时、12时、24时、1周
-        
-        # 排序和数量选择合并为一行
+            keyboard.append(period_buttons[:4])
+            keyboard.append(period_buttons[4:])
+
         if sort_limit_buttons:
             keyboard.append(sort_limit_buttons)
-        
-        # 第四行：功能按钮
+
         keyboard.append([
-            InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu"),
-            InlineKeyboardButton("🔄 刷新", callback_data="money_flow")
+            _btn_lang(lang, "btn.back_home", "main_menu"),
+            _btn_lang(lang, "btn.refresh", "money_flow"),
         ])
-        
+
         return InlineKeyboardMarkup(keyboard)
     
     def get_market_depth(self, limit=10, sort_type='ratio', sort_order='desc'):
         """市场深度排行已下线占位。"""
         return "⏸️ 市场深度排行功能已下线，敬请期待替代方案。"
     
-    def get_market_depth_keyboard(self, current_limit=10, current_sort_type='ratio', current_sort='desc'):
+    def get_market_depth_keyboard(self, current_limit=10, current_sort_type='ratio', current_sort='desc', update=None):
         """市场深度排行已下线的占位键盘。"""
         return InlineKeyboardMarkup([
-            [InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]
+            [_btn(update, "btn.back_home", "main_menu")]
         ])
 
     def get_market_sentiment(self):
         """市场情绪（基于Binance行情）已下线占位。"""
         return "⏸️ 市场情绪榜单已下线，敬请期待新的指标面板。"
 
-    def get_market_sentiment_keyboard(self):
+    def get_market_sentiment_keyboard(self, update=None):
         """市场情绪占位键盘。"""
         return InlineKeyboardMarkup([
-            [InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]
+            [_btn(update, "btn.back_home", "main_menu")]
         ])
 
 class TradeCatBot:
@@ -3345,7 +3296,7 @@ class TradeCatBot:
         lang = _resolve_lang(update) if update else I18N.default_locale
         return I18N.gettext("menu.main_text", lang=lang, time=time_info["full"])
 
-    def get_position_ranking(self, limit=10, sort_order='desc', period='24h', sort_field: str = "position"):
+    def get_position_ranking(self, limit=10, sort_order='desc', period='24h', sort_field: str = "position", update=None):
         """获取持仓量排行榜"""
         # 加载最新的合约数据
         futures_data = self.load_latest_futures_data()
@@ -3465,72 +3416,78 @@ class TradeCatBot:
         time_info = self.get_current_time_display()
         
         # 时间周期显示
-        period_display = {
-            '5m': '5分钟', '15m': '15分钟', '30m': '30分钟',
-            '1h': '1小时', '4h': '4小时', '24h': '24小时'
-        }
-        period_text = period_display.get(period, period)
+        period_text = _period_text(update, period)
         
         # 排序方式显示
         sort_symbol = "⬇️" if sort_order == 'desc' else "🔼"
-        sort_text = "降序" if sort_order == 'desc' else "升序"
+        sort_text = _sort_text(update, sort_order)
         
         cache_info = ""
-        text = f"""🐋 持仓量排行 - 大鲸追踪，资金嗅探 🐋
-⏰ 更新 {time_info['full']}
+        text = f"""{_t(update, "ranking.position")}
+{_t(update, "time.update", time=time_info['full'])}
 📊 排序 {period_text}变化金额({sort_symbol}) / {sort_text}
 ```
 {aligned_data}
 ```
-⏰ 最后更新 {time_info['full']}{cache_info}"""
+{_t(update, "time.last_update", time=time_info['full'])}{cache_info}"""
         
         return text
-    def get_position_ranking_keyboard(self, current_sort='desc', current_limit=10, current_period='24h'):
+    def get_position_ranking_keyboard(self, current_sort='desc', current_limit=10, current_period='24h', update=None):
         """获取持仓量排行榜键盘"""
+        lang = _resolve_lang(update) if update else I18N.default_locale
         # 时间周期按钮（第一行和第二行）- 新增更多周期
         period_buttons_row1 = []
         period_buttons_row2 = []
-        periods_row1 = [('5m', '5分'), ('15m', '15分'), ('30m', '30分')]
-        periods_row2 = [('1h', '1小时'), ('4h', '4小时'), ('24h', '24小时')]
+        periods_row1 = ['5m', '15m', '30m']
+        periods_row2 = ['1h', '4h', '24h']
         
-        for period_value, period_text in periods_row1:
-            if period_value == current_period:
-                period_buttons_row1.append(InlineKeyboardButton(f"✅{period_text}", callback_data=f"position_period_{period_value}"))
-            else:
-                period_buttons_row1.append(InlineKeyboardButton(period_text, callback_data=f"position_period_{period_value}"))
+        for period_value in periods_row1:
+            label = _period_text_lang(lang, period_value)
+            period_buttons_row1.append(
+                InlineKeyboardButton(
+                    f"✅{label}" if period_value == current_period else label,
+                    callback_data=f"position_period_{period_value}"
+                )
+            )
         
-        for period_value, period_text in periods_row2:
-            if period_value == current_period:
-                period_buttons_row2.append(InlineKeyboardButton(f"✅{period_text}", callback_data=f"position_period_{period_value}"))
-            else:
-                period_buttons_row2.append(InlineKeyboardButton(period_text, callback_data=f"position_period_{period_value}"))
+        for period_value in periods_row2:
+            label = _period_text_lang(lang, period_value)
+            period_buttons_row2.append(
+                InlineKeyboardButton(
+                    f"✅{label}" if period_value == current_period else label,
+                    callback_data=f"position_period_{period_value}"
+                )
+            )
         
         # 排序和数量按钮合并为一行（第三行）
         sort_limit_buttons = []
         
         # 排序按钮
         if current_sort == 'desc':
-            sort_limit_buttons.append(InlineKeyboardButton("✅降序", callback_data="position_sort_desc"))
-            sort_limit_buttons.append(InlineKeyboardButton("升序", callback_data="position_sort_asc"))
+            sort_limit_buttons.append(_btn_lang(lang, "btn.desc", "position_sort_desc", active=True))
+            sort_limit_buttons.append(_btn_lang(lang, "btn.asc", "position_sort_asc"))
         else:
-            sort_limit_buttons.append(InlineKeyboardButton("降序", callback_data="position_sort_desc"))
-            sort_limit_buttons.append(InlineKeyboardButton("✅升序", callback_data="position_sort_asc"))
+            sort_limit_buttons.append(_btn_lang(lang, "btn.desc", "position_sort_desc"))
+            sort_limit_buttons.append(_btn_lang(lang, "btn.asc", "position_sort_asc", active=True))
         
         # 数量按钮
         limits = [10, 20, 30]
         for limit_val in limits:
-            if limit_val == current_limit:
-                sort_limit_buttons.append(InlineKeyboardButton(f"✅{limit_val}条", callback_data=f"position_{limit_val}"))
-            else:
-                sort_limit_buttons.append(InlineKeyboardButton(f"{limit_val}条", callback_data=f"position_{limit_val}"))
+            label = I18N.gettext("sort.items", lang=lang, n=limit_val)
+            sort_limit_buttons.append(
+                InlineKeyboardButton(
+                    f"✅{label}" if limit_val == current_limit else label,
+                    callback_data=f"position_{limit_val}"
+                )
+            )
         
         keyboard = [
             period_buttons_row1,  # 第一行：5分 15分 30分
             period_buttons_row2,  # 第二行：1小时 4小时 24小时
             sort_limit_buttons,   # 第三行：排序和数量按钮合并
             [                     # 第四行：功能按钮
-                InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu"),
-                InlineKeyboardButton("🔄 刷新", callback_data="position_ranking")
+                _btn_lang(lang, "btn.back_home", "main_menu"),
+                _btn_lang(lang, "btn.refresh", "position_ranking"),
             ]
         ]
         return InlineKeyboardMarkup(keyboard)
@@ -3703,14 +3660,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.warning(f"AI模块未安装: {e}")
             await query.edit_message_text(
                 _t(update, "ai.not_installed"),
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]])
+                reply_markup=InlineKeyboardMarkup([[ _btn(update, "btn.back_home", "main_menu") ]])
             )
             return
         except Exception as e:
             logger.error(f"AI分析启动失败: {e}")
             await query.edit_message_text(
                 _t(update, "ai.failed", error=e),
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]])
+                reply_markup=InlineKeyboardMarkup([[ _btn(update, "btn.back_home", "main_menu") ]])
             )
             return
 
@@ -3971,7 +3928,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("⚖️ 卡片已下线", show_alert=False)
         await query.message.reply_text(
             "⚖️ 超买超卖卡片已下线，敬请期待替代方案。",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]]),
+            reply_markup=InlineKeyboardMarkup([[_btn(update, "btn.back_home", "main_menu")]]),
             parse_mode='Markdown'
         )
         return
@@ -4129,7 +4086,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu"),
+                    _btn(update, "btn.back_home", "main_menu"),
                 ]
             ])
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
@@ -4158,7 +4115,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif query.data == "market_sentiment":
             await query.message.reply_text(
                 "⏸️ 市场情绪榜单已下线，敬请期待新的指标面板。",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]]),
+                reply_markup=InlineKeyboardMarkup([[_btn(update, "btn.back_home", "main_menu")]]),
                 parse_mode='Markdown'
             )
             await query.answer()
@@ -4195,19 +4152,23 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 异步获取数据
             loop = asyncio.get_event_loop()
             text = await loop.run_in_executor(
-                None, user_handler.get_money_flow,
-                user_handler.user_states['money_flow_limit'], 
-                user_handler.user_states['money_flow_period'],
-                user_handler.user_states['money_flow_sort'], 
-                user_handler.user_states['money_flow_type'],
-                user_handler.user_states['money_flow_market']
+                None,
+                lambda: user_handler.get_money_flow(
+                    limit=user_handler.user_states['money_flow_limit'],
+                    period=user_handler.user_states['money_flow_period'],
+                    sort_order=user_handler.user_states['money_flow_sort'],
+                    flow_type=user_handler.user_states['money_flow_type'],
+                    market=user_handler.user_states['money_flow_market'],
+                    update=update,
+                ),
             )
             keyboard = user_handler.get_money_flow_keyboard(
                 current_period=user_handler.user_states['money_flow_period'],
                 current_sort=user_handler.user_states['money_flow_sort'], 
                 current_limit=user_handler.user_states['money_flow_limit'], 
                 current_flow_type=user_handler.user_states['money_flow_type'],
-                current_market=user_handler.user_states['money_flow_market']
+                current_market=user_handler.user_states['money_flow_market'],
+                update=update,
             )
             text = ensure_valid_text(text, "💰 资金流向数据加载中，请稍后重试...")
             
@@ -4247,10 +4208,20 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if feature_type == "position":
                 user_handler.user_states['position_limit'] = limit
                 text = await loop.run_in_executor(
-                    None, user_handler.get_position_ranking, 
-                    limit, user_handler.user_states['position_sort'], user_handler.user_states['position_period']
+                    None,
+                    lambda: user_handler.get_position_ranking(
+                        limit=limit,
+                        sort_order=user_handler.user_states['position_sort'],
+                        period=user_handler.user_states['position_period'],
+                        update=update,
+                    ),
                 )
-                keyboard = user_handler.get_position_ranking_keyboard(current_sort=user_handler.user_states['position_sort'], current_limit=limit, current_period=user_handler.user_states['position_period'])
+                keyboard = user_handler.get_position_ranking_keyboard(
+                    current_sort=user_handler.user_states['position_sort'],
+                    current_limit=limit,
+                    current_period=user_handler.user_states['position_period'],
+                    update=update,
+                )
             elif feature_type == "funding":
                 user_handler.user_states['funding_limit'] = limit
                 text = await loop.run_in_executor(
@@ -4277,19 +4248,23 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif feature_type == "money_flow":
                 user_handler.user_states['money_flow_limit'] = limit
                 text = await loop.run_in_executor(
-                    None, user_handler.get_money_flow,
-                    limit, 
-                    user_handler.user_states['money_flow_period'],
-                    user_handler.user_states['money_flow_sort'], 
-                    user_handler.user_states['money_flow_type'],
-                    user_handler.user_states['money_flow_market']
+                    None,
+                    lambda: user_handler.get_money_flow(
+                        limit=limit,
+                        period=user_handler.user_states['money_flow_period'],
+                        sort_order=user_handler.user_states['money_flow_sort'],
+                        flow_type=user_handler.user_states['money_flow_type'],
+                        market=user_handler.user_states['money_flow_market'],
+                        update=update,
+                    ),
                 )
                 keyboard = user_handler.get_money_flow_keyboard(
                     current_period=user_handler.user_states['money_flow_period'],
                     current_sort=user_handler.user_states['money_flow_sort'], 
                     current_limit=limit, 
                     current_flow_type=user_handler.user_states['money_flow_type'],
-                    current_market=user_handler.user_states['money_flow_market']
+                    current_market=user_handler.user_states['money_flow_market'],
+                    update=update,
                 )
             elif feature_type == "market_depth":
                 user_handler.user_states['market_depth_limit'] = limit
@@ -4576,7 +4551,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 period=user_handler.user_states['money_flow_period'], 
                 sort_order=user_handler.user_states['money_flow_sort'],
                 flow_type=flow_type,
-                market=user_handler.user_states['money_flow_market']
+                market=user_handler.user_states['money_flow_market'],
+                update=update,
             ))
 
             text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
@@ -4585,7 +4561,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 current_sort=user_handler.user_states['money_flow_sort'], 
                 current_limit=user_handler.user_states['money_flow_limit'], 
                 current_flow_type=flow_type,
-                current_market=user_handler.user_states['money_flow_market']
+                current_market=user_handler.user_states['money_flow_market'],
+                update=update,
             )
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
             
@@ -4601,7 +4578,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 period=user_handler.user_states['money_flow_period'], 
                 sort_order=user_handler.user_states['money_flow_sort'],
                 flow_type=user_handler.user_states['money_flow_type'],
-                market=market
+                market=market,
+                update=update,
             ))
 
             text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
@@ -4610,7 +4588,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 current_sort=user_handler.user_states['money_flow_sort'], 
                 current_limit=user_handler.user_states['money_flow_limit'], 
                 current_flow_type=user_handler.user_states['money_flow_type'],
-                current_market=market
+                current_market=market,
+                update=update,
             )
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
             
@@ -4625,7 +4604,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 period=user_handler.user_states['money_flow_period'], 
                 sort_order=sort_order,
                 flow_type=user_handler.user_states['money_flow_type'],
-                market=user_handler.user_states['money_flow_market']
+                market=user_handler.user_states['money_flow_market'],
+                update=update,
             ))
 
             text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
@@ -4634,7 +4614,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 current_sort=sort_order, 
                 current_limit=user_handler.user_states['money_flow_limit'], 
                 current_flow_type=user_handler.user_states['money_flow_type'],
-                current_market=user_handler.user_states['money_flow_market']
+                current_market=user_handler.user_states['money_flow_market'],
+                update=update,
             )
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
             
@@ -4649,7 +4630,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 period=period, 
                 sort_order=user_handler.user_states['money_flow_sort'],
                 flow_type=user_handler.user_states['money_flow_type'],
-                market=user_handler.user_states['money_flow_market']
+                market=user_handler.user_states['money_flow_market'],
+                update=update,
             ))
 
             text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
@@ -4658,7 +4640,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 current_sort=user_handler.user_states['money_flow_sort'], 
                 current_limit=user_handler.user_states['money_flow_limit'], 
                 current_flow_type=user_handler.user_states['money_flow_type'],
-                current_market=user_handler.user_states['money_flow_market']
+                current_market=user_handler.user_states['money_flow_market'],
+                update=update,
             )
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
             
@@ -4895,7 +4878,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "• `BTC!` - 交互式查询\n"
                     "• `BTC!!` - 导出完整TXT文件"
                 )
-                keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]])
+                keyboard = InlineKeyboardMarkup([[_btn(update, "btn.back_home", "main_menu")]])
                 await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
                 return
             else:
@@ -4914,7 +4897,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"- 📈 主动买卖比分析\n\n"
                     f"其他功能正在快速开发中...",
                     reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")
+                        _btn(update, "btn.back_home", "main_menu")
                     ]]),
                     parse_mode='Markdown'
                 )
@@ -4933,7 +4916,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"- 📈 主动买卖比分析\n\n"
                     f"其他功能正在快速开发中...",
                     reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")
+                        _btn(update, "btn.back_home", "main_menu")
                     ]]),
                     parse_mode='Markdown'
                 )
@@ -4950,7 +4933,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(
                 _t(update, "feature.coming_soon"),
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")
+                    _btn(update, "btn.back_home", "main_menu")
                 ]]),
                 parse_mode='Markdown'
             )
@@ -4960,7 +4943,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text(
                 "🚧 该功能正在开发中，敬请期待！",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")
+                    _btn(update, "btn.back_home", "main_menu")
                 ]]),
                 parse_mode='Markdown'
             )
@@ -4991,23 +4974,38 @@ async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_lang = _resolve_lang(update)
     new_lang = "en" if current_lang == "zh_CN" else "zh_CN"
     _save_user_locale(user_id, new_lang)
+    context.user_data["lang_preference"] = new_lang
     
     display_names = {"zh_CN": "简体中文", "en": "English"}
     msg = I18N.gettext("lang.set", lang=new_lang, lang_name=display_names.get(new_lang, new_lang))
+    main_text = None
+    main_keyboard = None
+    reply_keyboard = None
+    if user_handler:
+        # 预构建主菜单与常驻键盘，避免重复调用时语言不一致
+        reply_keyboard = user_handler.get_reply_keyboard(update)
+        main_text = user_handler.get_main_menu_text(update)
+        main_keyboard = user_handler.get_main_menu_keyboard(update)
     
     if getattr(update, "callback_query", None):
         await update.callback_query.answer(msg)
         if user_handler:
-            # 发送新消息刷新底部键盘
+            # 发送新消息刷新底部键盘与主菜单
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
                 text=msg,
-                reply_markup=user_handler.get_reply_keyboard(update)
+                reply_markup=reply_keyboard
+            )
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=main_text,
+                reply_markup=main_keyboard
             )
     elif getattr(update, "message", None):
         if user_handler:
-            # 发送带底部键盘的消息
-            await update.message.reply_text(msg, reply_markup=user_handler.get_reply_keyboard(update))
+            # 发送带底部键盘与主菜单的消息
+            await update.message.reply_text(msg, reply_markup=reply_keyboard)
+            await update.message.reply_text(main_text, reply_markup=main_keyboard)
 
 async def vol_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """交易量数据查询指令 /vol"""
@@ -5021,7 +5019,18 @@ async def vol_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         loop = asyncio.get_event_loop()
 
-        text = await loop.run_in_executor(None, lambda: user_handler.get_volume_ranking(*[user_handler.user_states.get(k, None) for k in ['volume_limit', 'volume_period', 'volume_sort', 'position_limit', 'position_sort', 'funding_limit', 'funding_sort', 'liquidation_limit', 'liquidation_sort', 'liquidation_period', 'liquidation_type', 'money_flow_limit', 'money_flow_period', 'money_flow_sort', 'money_flow_type', 'money_flow_market', 'market_depth_limit', 'market_depth_sort_type', 'market_depth_sort', 'position_market_limit', 'position_market_sort', 'basic_market_sort_type', 'basic_market_period', 'basic_market_sort_order', 'basic_market_limit'] if k is not None][:3]))
+        vol_limit = user_handler.user_states.get('volume_limit', 10)
+        vol_period = user_handler.user_states.get('volume_period', '24h')
+        vol_sort = user_handler.user_states.get('volume_sort', 'desc')
+        text = await loop.run_in_executor(
+            None,
+            lambda: user_handler.get_volume_ranking(
+                limit=vol_limit,
+                period=vol_period,
+                sort_order=vol_sort,
+                update=update
+            )
+        )
 
         text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
         keyboard = user_handler.get_volume_ranking_keyboard(current_period=user_handler.user_states['volume_period'], current_sort=user_handler.user_states['volume_sort'], current_limit=user_handler.user_states['volume_limit'])
@@ -5103,10 +5112,32 @@ async def flow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         loop = asyncio.get_event_loop()
 
-        text = await loop.run_in_executor(None, lambda: user_handler.get_money_flow(*[user_handler.user_states.get(k, None) for k in ['volume_limit', 'volume_period', 'volume_sort', 'position_limit', 'position_sort', 'funding_limit', 'funding_sort', 'liquidation_limit', 'liquidation_sort', 'liquidation_period', 'liquidation_type', 'money_flow_limit', 'money_flow_period', 'money_flow_sort', 'money_flow_type', 'money_flow_market', 'market_depth_limit', 'market_depth_sort_type', 'market_depth_sort', 'position_market_limit', 'position_market_sort', 'basic_market_sort_type', 'basic_market_period', 'basic_market_sort_order', 'basic_market_limit'] if k is not None][:3]))
+        mf_limit = user_handler.user_states.get('money_flow_limit', 10)
+        mf_period = user_handler.user_states.get('money_flow_period', '24h')
+        mf_sort = user_handler.user_states.get('money_flow_sort', 'desc')
+        mf_type = user_handler.user_states.get('money_flow_type', 'absolute')
+        mf_market = user_handler.user_states.get('money_flow_market', 'futures')
+        text = await loop.run_in_executor(
+            None,
+            lambda: user_handler.get_money_flow(
+                limit=mf_limit,
+                period=mf_period,
+                sort_order=mf_sort,
+                flow_type=mf_type,
+                market=mf_market,
+                update=update,
+            ),
+        )
 
         text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
-        keyboard = user_handler.get_money_flow_keyboard(current_sort=user_handler.user_states['money_flow_sort'], current_limit=user_handler.user_states['money_flow_limit'], current_flow_type=user_handler.user_states['money_flow_type'])
+        keyboard = user_handler.get_money_flow_keyboard(
+            current_period=mf_period,
+            current_sort=mf_sort,
+            current_limit=mf_limit,
+            current_flow_type=mf_type,
+            current_market=mf_market,
+            update=update,
+        )
         await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
     except Exception as e:
         logger.error(f"资金流向数据查询错误: {e}")
@@ -5190,7 +5221,7 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"- 客服2: xiaocaixing\n"
                     f"- 客服3: wangbw123",
         reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")
+            _btn(update, "btn.back_home", "main_menu")
         ]]),
         parse_mode='Markdown'
     )
@@ -5288,7 +5319,7 @@ async def query_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• `BTC!` - 交互式查询\n"
             "• `BTC!!` - 导出完整TXT文件"
         )
-        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]])
+        keyboard = InlineKeyboardMarkup([[_btn(update, "btn.back_home", "main_menu")]])
         await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
 
 
@@ -5306,13 +5337,13 @@ async def ai_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.warning(f"AI模块未安装: {e}")
         await update.message.reply_text(
             _t(update, "ai.not_installed"),
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]])
+            reply_markup=InlineKeyboardMarkup([[_btn(update, "btn.back_home", "main_menu")]])
         )
     except Exception as e:
         logger.error(f"AI分析启动失败: {e}")
         await update.message.reply_text(
             _t(update, "ai.failed", error=e),
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]])
+            reply_markup=InlineKeyboardMarkup([[_btn(update, "btn.back_home", "main_menu")]])
         )
 
 
@@ -5382,7 +5413,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             status_text,
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")
+                _btn(update, "btn.back_home", "main_menu")
             ]]),
             parse_mode='Markdown'
         )
@@ -5553,8 +5584,8 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
             # 统一占位：未开放功能的提示
             if action == "aggregated_alerts":
                 placeholder_kb = InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu"),
-                    InlineKeyboardButton("🔄 刷新", callback_data="main_menu")
+                    _btn(update, "btn.back_home", "main_menu"),
+                    _btn(update, "btn.refresh", "main_menu")
                 ]])
                 await update.message.reply_text(
                     "🚨 信号功能暂未开发",
@@ -5582,7 +5613,8 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 text = await loop.run_in_executor(None, lambda: user_handler.get_position_ranking(
                     limit=user_handler.user_states.get('position_limit', 10),
                     sort_order=user_handler.user_states.get('position_sort', 'desc'),
-                    period=user_handler.user_states.get('position_period', '24h')
+                    period=user_handler.user_states.get('position_period', '24h'),
+                    update=update
                 ))
                 text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
                 keyboard = user_handler.get_position_ranking_keyboard(
@@ -5600,14 +5632,15 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 # 修复: 使用具体的参数而不是通用的[:3]切片
                 user_states = user_handler.user_states.get(update.effective_user.id, {})
                 text = await loop.run_in_executor(None, lambda: user_handler.get_volume_ranking(
+                    limit=user_states.get('volume_limit', 10),
                     period=user_states.get('volume_period', '24h'),
-                    sort=user_states.get('volume_sort', 'volume'),
-                    limit=user_states.get('volume_limit', 10)
+                    sort_order=user_states.get('volume_sort', 'desc'),
+                    update=update
                 ))
                 text = ensure_valid_text(text, "📊 数据加载中，请稍后重试...")
                 keyboard = user_handler.get_volume_ranking_keyboard(
                     current_period=user_states.get('volume_period', '24h'), 
-                    current_sort=user_states.get('volume_sort', 'volume'), 
+                    current_sort=user_states.get('volume_sort', 'desc'), 
                     current_limit=user_states.get('volume_limit', 10)
                 )
                 await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
@@ -5733,7 +5766,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     "• `BTC!` - 交互式查询\n"
                     "• `BTC!!` - 导出完整TXT文件"
                 )
-                keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")]])
+                keyboard = InlineKeyboardMarkup([[_btn(update, "btn.back_home", "main_menu")]])
                 await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
             
             elif action == "start_coin_analysis":

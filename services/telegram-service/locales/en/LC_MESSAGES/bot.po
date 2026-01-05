@@ -172,6 +172,37 @@ msgstr "Spot"
 msgid "market.futures"
 msgstr "Futures"
 
+# ============ Period ============
+msgid "period.1m"
+msgstr "1min"
+
+msgid "period.5m"
+msgstr "5min"
+
+msgid "period.15m"
+msgstr "15min"
+
+msgid "period.30m"
+msgstr "30min"
+
+msgid "period.1h"
+msgstr "1hour"
+
+msgid "period.4h"
+msgstr "4hours"
+
+msgid "period.12h"
+msgstr "12hours"
+
+msgid "period.24h"
+msgstr "24hours"
+
+msgid "period.1d"
+msgstr "1day"
+
+msgid "period.1w"
+msgstr "1week"
+
 # ============ Sort/Filter ============
 msgid "sort.by_volume"
 msgstr "Volume"
@@ -244,6 +275,9 @@ msgstr "🚧 Signal subscription coming soon!"
 msgid "ranking.volume"
 msgstr "📈 Volume Ranking 📈"
 
+msgid "ranking.spot_volume"
+msgstr "💹 {period} Spot Volume Ranking 💹"
+
 msgid "ranking.position"
 msgstr "🐋 Open Interest Ranking 🐋"
 
@@ -299,6 +333,62 @@ msgstr "📦 Spot Volume ({period})"
 
 msgid "flow.title.spot"
 msgstr "💧 Money Flow - Spot ({period})"
+
+# ============ Flow Descriptions ============
+msgid "flow.desc.futures_long"
+msgstr "Keep long-dominant coins, sorted by net inflow (desc)"
+
+msgid "flow.desc.futures_short"
+msgstr "Keep short-dominant coins, sorted by net outflow (asc)"
+
+msgid "flow.desc.volume"
+msgstr "Sorted by traded quote volume for the period"
+
+msgid "flow.desc.absolute"
+msgstr "Sorted by |CVD| ({symbol}) / {sort}"
+
+msgid "flow.desc.definition_futures"
+msgstr "Net flow (CVD)=Taker buy - Taker sell, source: Binance Futures"
+
+msgid "flow.desc.definition_spot"
+msgstr "Net flow (CVD)=Taker buy - Taker sell, source: Binance Spot"
+
+# ============ Option Flow ============
+msgid "flow.option.inflow"
+msgstr "💰 Options Inflow Ranking 💰"
+
+msgid "flow.option.sort_inflow"
+msgstr "Inflow strength (🔽)"
+
+msgid "flow.option.type_inflow"
+msgstr "🟢 Showing symbols with net inflow only"
+
+msgid "flow.option.desc_inflow"
+msgstr "💡 Values are positive, meaning net inflow"
+
+msgid "flow.option.outflow"
+msgstr "💰 Options Outflow Ranking 💰"
+
+msgid "flow.option.sort_outflow"
+msgstr "Outflow strength (🔼)"
+
+msgid "flow.option.type_outflow"
+msgstr "🔴 Showing symbols with net outflow only"
+
+msgid "flow.option.desc_outflow"
+msgstr "💡 Values are negative, meaning net outflow"
+
+msgid "flow.option.absolute"
+msgstr "💰 Options Money Flow Ranking 💰"
+
+msgid "flow.option.sort_absolute"
+msgstr "Money flow strength ({symbol}) / {sort}"
+
+msgid "flow.option.type_absolute"
+msgstr "📊 Sorted by absolute value, show all symbols"
+
+msgid "flow.option.desc_absolute"
+msgstr "💡 + for inflow, - for outflow"
 
 # ============ Time Display ============
 msgid "time.update"

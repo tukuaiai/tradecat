@@ -69,9 +69,23 @@ for service in data-service trading-service; do
     fi
 done
 
-# 4. 文档链接检查
+# 4. i18n 翻译检查
 echo ""
-echo "4. 文档链接检查..."
+echo "4. i18n 翻译检查..."
+if command -v msgfmt &> /dev/null; then
+    if msgfmt --check services/telegram-service/locales/zh_CN/LC_MESSAGES/bot.po >/dev/null && \
+       msgfmt --check services/telegram-service/locales/en/LC_MESSAGES/bot.po >/dev/null; then
+        success "i18n 词条检查通过"
+    else
+        fail "i18n 词条检查失败，请修复缺失或语法错误"
+    fi
+else
+    warn "未安装 gettext/msgfmt，跳过 i18n 检查"
+fi
+
+# 5. 文档链接检查
+echo ""
+echo "5. 文档链接检查..."
 if [ -f "docs/index.md" ]; then
     BROKEN_LINKS=0
     while IFS= read -r line; do
@@ -96,9 +110,9 @@ else
     fail "docs/index.md 不存在"
 fi
 
-# 5. ADR 编号检查
+# 6. ADR 编号检查
 echo ""
-echo "5. ADR 编号检查..."
+echo "6. ADR 编号检查..."
 if [ -d "docs/decisions/adr" ]; then
     ADR_COUNT=$(ls docs/decisions/adr/*.md 2>/dev/null | wc -l)
     success "ADR 文件数: $ADR_COUNT"
@@ -106,9 +120,9 @@ else
     warn "docs/decisions/adr 目录不存在"
 fi
 
-# 6. Prompt 模板检查
+# 7. Prompt 模板检查
 echo ""
-echo "6. Prompt 模板检查..."
+echo "7. Prompt 模板检查..."
 if [ -d "docs/prompts" ]; then
     PROMPT_COUNT=$(ls docs/prompts/*.md 2>/dev/null | wc -l)
     success "Prompt 文件数: $PROMPT_COUNT"
@@ -116,9 +130,9 @@ else
     warn "docs/prompts 目录不存在"
 fi
 
-# 7. 单元测试 (如有)
+# 8. 单元测试 (如有)
 echo ""
-echo "7. 单元测试..."
+echo "8. 单元测试..."
 if command -v pytest &> /dev/null; then
     if [ -d "tests" ] && [ "$(ls -A tests 2>/dev/null)" ]; then
         if pytest tests/ -q --tb=no 2>/dev/null; then

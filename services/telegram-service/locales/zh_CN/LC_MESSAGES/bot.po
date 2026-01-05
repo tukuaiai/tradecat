@@ -172,6 +172,37 @@ msgstr "现货"
 msgid "market.futures"
 msgstr "合约"
 
+# ============ 周期 ============
+msgid "period.1m"
+msgstr "1分钟"
+
+msgid "period.5m"
+msgstr "5分钟"
+
+msgid "period.15m"
+msgstr "15分钟"
+
+msgid "period.30m"
+msgstr "30分钟"
+
+msgid "period.1h"
+msgstr "1小时"
+
+msgid "period.4h"
+msgstr "4小时"
+
+msgid "period.12h"
+msgstr "12小时"
+
+msgid "period.24h"
+msgstr "24小时"
+
+msgid "period.1d"
+msgstr "1天"
+
+msgid "period.1w"
+msgstr "1周"
+
 # ============ 排序/筛选 ============
 msgid "sort.by_volume"
 msgstr "成交额"
@@ -244,6 +275,9 @@ msgstr "🚧 信号订阅功能开发中，敬请期待！"
 msgid "ranking.volume"
 msgstr "📈 成交量排行 - 成交额热度榜 📈"
 
+msgid "ranking.spot_volume"
+msgstr "💹 {period}现货交易量排行榜 💹"
+
 msgid "ranking.position"
 msgstr "🐋 持仓量排行 - 大鲸追踪，资金嗅探 🐋"
 
@@ -299,6 +333,62 @@ msgstr "📦 现货交易量排行({period})"
 
 msgid "flow.title.spot"
 msgstr "💧 现货资金流向排行({period})"
+
+# ============ 资金流向描述 ============
+msgid "flow.desc.futures_long"
+msgstr "仅保留多头占优，按净流降序"
+
+msgid "flow.desc.futures_short"
+msgstr "仅保留空头占优，按净流升序"
+
+msgid "flow.desc.volume"
+msgstr "按该周期成交额排序"
+
+msgid "flow.desc.absolute"
+msgstr "按 |CVD| ({symbol}) / {sort}"
+
+msgid "flow.desc.definition_futures"
+msgstr "净流(CVD)=Taker买入 - Taker卖出，数据来自 Binance 合约"
+
+msgid "flow.desc.definition_spot"
+msgstr "净流(CVD)=Taker买入 - Taker卖出，数据来自 Binance 现货"
+
+# ============ 期权流向 ============
+msgid "flow.option.inflow"
+msgstr "💰 期权资金流入排行榜 💰"
+
+msgid "flow.option.sort_inflow"
+msgstr "资金流入强度(🔽)"
+
+msgid "flow.option.type_inflow"
+msgstr "🟢 仅显示资金流入的币种"
+
+msgid "flow.option.desc_inflow"
+msgstr "💡 所有数值均为正值，表示资金净流入"
+
+msgid "flow.option.outflow"
+msgstr "💰 期权资金流出排行榜 💰"
+
+msgid "flow.option.sort_outflow"
+msgstr "资金流出强度(🔼)"
+
+msgid "flow.option.type_outflow"
+msgstr "🔴 仅显示资金流出的币种"
+
+msgid "flow.option.desc_outflow"
+msgstr "💡 所有数值均为负值，表示资金净流出"
+
+msgid "flow.option.absolute"
+msgstr "💰 期权资金流向排行榜 💰"
+
+msgid "flow.option.sort_absolute"
+msgstr "资金流向强度({symbol}) / {sort}"
+
+msgid "flow.option.type_absolute"
+msgstr "📊 按绝对值排序，显示所有币种"
+
+msgid "flow.option.desc_absolute"
+msgstr "💡 +表示资金流入，-表示流出"
 
 # ============ 时间显示 ============
 msgid "time.update"
