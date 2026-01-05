@@ -3747,7 +3747,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         except Exception as e:
             logger.error(f"信号界面失败: {e}")
-            await query.answer(f"信号界面失败: {e}", show_alert=True)
+            await query.answer(_t("error.signal_failed", update), show_alert=True)
             return
 
     # 信号推送的币种分析跳转
@@ -3786,11 +3786,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 点击频率限制
     can_click, remaining_cooldown = check_click_rate_limit(user_id)
     if not can_click:
-        await query.answer("⏳ 请稍等", show_alert=False)
+        await query.answer(_t("ui.please_wait", update), show_alert=False)
         return
 
     try:
-        await query.answer("处理中...")
+        await query.answer(_t("ui.processing", update))
     except Exception:
         pass
     
@@ -3839,7 +3839,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if button_data.startswith("single_toggle_"):
             period = button_data.replace("single_toggle_", "")
             if panel == "futures" and period == "1m":
-                await query.answer("合约视图不支持1m", show_alert=False)
+                await query.answer(_t("ui.futures_no_1m", update), show_alert=False)
             else:
                 enabled[period] = not enabled.get(period, False)
                 reset_page = True
@@ -3940,7 +3940,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "position_market_",
     )
     if any(button_data.startswith(prefix) for prefix in ratio_callbacks):
-        await query.answer("⚖️ 卡片已下线", show_alert=False)
+        await query.answer(_t("ui.card_offline", update), show_alert=False)
         await query.message.reply_text(
             "⚖️ 超买超卖卡片已下线，敬请期待替代方案。",
             reply_markup=InlineKeyboardMarkup([[_btn(update, "btn.back_home", "main_menu")]]),
@@ -4059,7 +4059,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         ])
                     )
                 except Exception:
-                    await query.answer("系统正在重新加载，请稍后重试")
+                    await query.answer(_t("ui.system_reloading", update))
             
         elif query.data == "cancel_analysis":
             # 处理AI点位分析中的"返回主菜单"按钮
@@ -5535,7 +5535,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     )
                 except Exception as e:
                     logger.error(f"完整TXT导出失败: {e}")
-                    await update.message.reply_text(f"❌ 导出失败: {e}")
+                    await update.message.reply_text(_t("error.export_failed", update))
                 return
 
         # -------- 单币感叹号触发：如 "btc!" 或 "BTC！" --------
@@ -5628,7 +5628,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     )
                 except Exception as e:
                     logger.error(f"信号界面失败: {e}")
-                    await update.message.reply_text(f"❌ 信号界面失败: {e}")
+                    await update.message.reply_text(_t("error.signal_failed", update))
                 return
             
             if action == "position_ranking":
@@ -5648,7 +5648,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
                 
             elif action == "funding_rate_ranking":
-                await query.answer("功能暂未开放", show_alert=True)
+                await query.answer(_t("feature.coming_soon", update), show_alert=True)
                 
             elif action == "volume_ranking":
                 loop = asyncio.get_event_loop()
