@@ -132,7 +132,7 @@ msgid "btn.back_home"
 msgstr "🏠 返回主菜单"
 
 msgid "btn.back"
-msgstr "🔙 返回"
+msgstr "⬅️ 返回"
 
 msgid "btn.refresh"
 msgstr "🔄 刷新"
@@ -471,6 +471,16 @@ msgstr "20条"
 
 msgid "btn.limit.30"
 msgstr "30条"
+
+msgid "btn.settings"
+msgstr "⚙️ 设置"
+
+# 信号开关
+msgid "signal.push.on"
+msgstr "开启推送"
+
+msgid "signal.push.off"
+msgstr "关闭推送"
 
 # ============ 期货情绪分歧榜 ============
 msgid "card.divergence.title"

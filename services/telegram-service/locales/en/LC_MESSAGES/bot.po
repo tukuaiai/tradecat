@@ -132,7 +132,7 @@ msgid "btn.back_home"
 msgstr "🏠 Back to menu"
 
 msgid "btn.back"
-msgstr "🔙 Back"
+msgstr "⬅️ Back"
 
 msgid "btn.refresh"
 msgstr "🔄 Refresh"
@@ -471,6 +471,16 @@ msgstr "Top 20"
 
 msgid "btn.limit.30"
 msgstr "Top 30"
+
+msgid "btn.settings"
+msgstr "⚙️ Settings"
+
+# Signal toggle
+msgid "signal.push.on"
+msgstr "Enable alerts"
+
+msgid "signal.push.off"
+msgstr "Disable alerts"
 
 # ============ Futures divergence ============
 msgid "card.divergence.title"

@@ -13,6 +13,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.base import RankingCard
+from cards.i18n import btn as _btn, gettext as _t, resolve_lang
 
 
 # 从环境变量读取卡片配置
@@ -305,7 +306,7 @@ class RankingRegistry:
                 row.append(InlineKeyboardButton(show_label, callback_data=cb))
             rows.append(row)
 
-        rows.append([InlineKeyboardButton("⬅️ 返回", callback_data=back_cb)])
+        rows.append([_btn(None, "btn.back", back_cb)])
         return InlineKeyboardMarkup(rows)
 
     def _inject_settings_row(
@@ -331,11 +332,11 @@ class RankingRegistry:
                     refresh_btn = btn
                     control_row_idx = idx
         if main_btn is None:
-            main_btn = InlineKeyboardButton("🏠主菜单", callback_data="ranking_menu")
+            main_btn = _btn(None, "menu.home", "ranking_menu")
         if refresh_btn is None:
-            refresh_btn = InlineKeyboardButton("🔄刷新", callback_data=getattr(card, "card_id", "refresh"))
+            refresh_btn = _btn(None, "btn.refresh", getattr(card, "card_id", "refresh"))
 
-        settings_btn = InlineKeyboardButton("⚙️设置", callback_data=settings_cb)
+        settings_btn = _btn(None, "btn.settings", settings_cb)
 
         if control_row_idx is not None:
             row = rows[control_row_idx]

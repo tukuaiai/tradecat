@@ -8,6 +8,8 @@ import logging
 from typing import Dict, Set
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+from cards.i18n import btn as _btn, gettext as _t, resolve_lang
+
 from .rules import RULES_BY_TABLE
 
 logger = logging.getLogger(__name__)
@@ -151,6 +153,7 @@ def get_menu_text(uid: int) -> str:
 
 def get_menu_kb(uid: int) -> InlineKeyboardMarkup:
     sub = get_sub(uid)
+    lang = resolve_lang()
     rows = []
     
     # 表开关 每行3个，选中的有✅，未选的只有文字
@@ -169,16 +172,16 @@ def get_menu_kb(uid: int) -> InlineKeyboardMarkup:
     # 开启/关闭
     if sub["enabled"]:
         rows.append([
-            InlineKeyboardButton("✅开启推送", callback_data="sig_nop"),
-            InlineKeyboardButton("关闭推送", callback_data="sig_toggle"),
+            _btn(None, "signal.push.on", "sig_nop", active=True),
+            _btn(None, "signal.push.off", "sig_toggle"),
         ])
     else:
         rows.append([
-            InlineKeyboardButton("开启推送", callback_data="sig_toggle"),
-            InlineKeyboardButton("✅关闭推送", callback_data="sig_nop"),
+            _btn(None, "signal.push.on", "sig_toggle"),
+            _btn(None, "signal.push.off", "sig_nop", active=True),
         ])
     
-    rows.append([InlineKeyboardButton("🏠 返回", callback_data="main_menu")])
+    rows.append([_btn(None, "btn.back_home", "main_menu")])
     
     return InlineKeyboardMarkup(rows)
 
