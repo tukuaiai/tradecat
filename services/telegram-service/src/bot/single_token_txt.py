@@ -11,6 +11,7 @@ import unicodedata
 from typing import Dict, List, Tuple, Any, Optional
 
 from cards.data_provider import format_symbol, get_ranking_provider
+from cards.i18n import gettext as _t
 
 
 # ==================== psql 表格格式化 ====================
@@ -296,15 +297,15 @@ class SingleTokenTxtExporter:
         
         return format_psql_table(headers, rows, config["title"])
     
-    def export_full(self, symbol: str) -> str:
+    def export_full(self, symbol: str, lang: str = "zh_CN") -> str:
         """导出完整的 4 面板 TXT"""
         sym = format_symbol(symbol)
         if not sym:
-            return "❌ 无效币种"
+            return _t("snapshot.error.no_symbol", lang=lang)
         
         sections = [
             f"{'='*50}",
-            f"  {sym} 完整数据报告",
+            f"  {_t('export.title', lang=lang, symbol=sym)}",
             f"{'='*50}",
             "",
         ]
