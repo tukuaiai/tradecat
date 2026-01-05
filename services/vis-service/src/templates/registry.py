@@ -790,22 +790,18 @@ def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
     ax.set_yticklabels(["0%", "20%", "40%", "60%", "80%", "100%"], fontsize=9, color="#333333")
     ax.set_ylabel("Position in Value Area", fontsize=10, color="#333333", labelpad=8)
 
-    # 右下角图例 - 放大
-    legend_y_start = 0.32
-    legend_x = 0.88
-    legend_items = [
-        ("Overbought", band_colors[-1], 80, "#333"),
-        ("POC Zone", band_colors[len(band_colors)//2], 80, "#333"),
-        ("Oversold", band_colors[0], 80, "#333"),
-        ("High Vol", "#b71c1c", 90, "#333"),
-        ("Low Vol", "#ffffcc", 60, "#333"),
-        ("Up", "#ffcc80", 80, "#1a9850"),
-        ("Down", "#ffcc80", 80, "#d73027"),
+    # 图例 - matplotlib 原生方案
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Line2D([0], [0], marker='o', color='w', markerfacecolor=band_colors[-1], markersize=10, label='Overbought'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor=band_colors[len(band_colors)//2], markersize=10, label='POC Zone'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor=band_colors[0], markersize=10, label='Oversold'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#b71c1c', markersize=11, label='High Vol'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#ffffcc', markersize=8, label='Low Vol'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#ffcc80', markeredgecolor='#1a9850', markersize=10, markeredgewidth=2, label='Up'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#ffcc80', markeredgecolor='#d73027', markersize=10, markeredgewidth=2, label='Down'),
     ]
-    for i, (lbl, color, size, edge) in enumerate(legend_items):
-        y_pos = legend_y_start - i * 0.045
-        ax.scatter([legend_x], [y_pos], s=size, c=[color], edgecolors=edge, linewidths=2, transform=ax.transAxes, zorder=9)
-        ax.text(legend_x + 0.03, y_pos, lbl, fontsize=9, va="center", ha="left", transform=ax.transAxes, color="#333333", zorder=9)
+    ax.legend(handles=legend_elements, loc='lower right', fontsize=9, framealpha=0.9, edgecolor='#cccccc')
 
     ax.set_xlim(-0.01, 1.01)
     ax.set_ylim(-0.02, 1.02)
