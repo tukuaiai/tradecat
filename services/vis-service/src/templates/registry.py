@@ -717,10 +717,10 @@ def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
     df["x"] = df["x"].clip(0.03, 0.97)
 
     # 绘制圆圈 - 参数调大
-    base_font = 5.0  # 基础字号放大
+    # 气泡大小只由市值决定，字体固定比例缩放
+    base_size = 6.0  # 基础气泡大小
     texts = []
 
-    # 成交量排序映射颜色：深红 -> 橙 -> 黄 -> 浅黄
     vol_cmap = plt.cm.YlOrRd_r
 
     for _, row in df.iterrows():
@@ -728,9 +728,10 @@ def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
         if len(label) > 6:
             label = label[:6] + ".."
 
-        # 市值决定大小 - 放大系数
-        size_factor = row.get("size_factor", 1.0)
-        font_size = base_font * (0.8 + size_factor * 0.7)  # 更大范围
+        # 市值决定气泡大小
+        size_factor = row.get("size_factor", 1.0)  # 0.4 ~ 1.2
+        bubble_size = base_size * size_factor  # 气泡大小
+        font_size = bubble_size * 0.8  # 字体固定为气泡的 80%
 
         # 成交量决定填充颜色
         vol_factor = row.get("vol_factor", 0.5)
@@ -740,14 +741,14 @@ def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
         # 涨跌决定边框颜色
         chg = row.get("price_change")
         if chg is not None and chg > 0.005:
-            edge_color = "#1a9850"  # 绿
+            edge_color = "#1a9850"
         elif chg is not None and chg < -0.005:
-            edge_color = "#d73027"  # 红
+            edge_color = "#d73027"
         else:
-            edge_color = "#ffffff"  # 白
+            edge_color = "#ffffff"
 
-        # 边框宽度随大小变化 - 更粗
-        edge_width = 1.0 + size_factor * 1.2
+        # 边框宽度固定比例
+        edge_width = bubble_size * 0.25
 
         txt = ax.text(
             row["x"], row["y"], label,
