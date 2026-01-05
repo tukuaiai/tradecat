@@ -12,6 +12,7 @@ CODE_LOCATIONS.md
 CODE_OF_CONDUCT.md
 OPTIMIZATION_TODO.md
 MARKETING.md
+book/
 
 # ====================
 # Python
@@ -104,3 +105,4 @@ services/telegram-service/.venv
 services/trading-service/.venv
 
 
+book/
