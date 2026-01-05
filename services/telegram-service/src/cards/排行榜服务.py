@@ -14,7 +14,7 @@ import logging
 from typing import Dict, List, Sequence
 
 from cards.data_provider import get_ranking_provider, format_symbol
-from cards.i18n import btn_auto as _btn_auto
+from cards.i18n import btn_auto as _btn_auto, gettext as _t
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -174,7 +174,7 @@ class VolumeRankingService(BaseService):
             row_cells.append(change_str)
             data_rows.append(row_cells)
 
-        aligned = self.handler.dynamic_align_format(data_rows) if data_rows else "暂无数据"
+        aligned = self.handler.dynamic_align_format(data_rows) if data_rows else _t("data.no_data", None)
         time_info = self.handler.get_current_time_display()
         title = f"🎪 热币排行 - {market_text}{period_text}交易量"
         header_parts = ["排名", "币种"]
@@ -591,7 +591,7 @@ class BuySellRatioService(BaseService):
                 period,
             ])
 
-        aligned = self.handler.dynamic_align_format(data_rows) if data_rows else "暂无数据"
+        aligned = self.handler.dynamic_align_format(data_rows) if data_rows else _t("data.no_data", None)
         time_info = self.handler.get_current_time_display()
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         sort_text = "降序" if sort_order == "desc" else "升序"

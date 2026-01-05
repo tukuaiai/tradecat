@@ -7,7 +7,6 @@ from typing import Dict
 
 
 from cards.base import RankingCard
-from cards.i18n import gettext as _t, resolve_lang
 
 
 class LiquidationRankingCard(RankingCard):
