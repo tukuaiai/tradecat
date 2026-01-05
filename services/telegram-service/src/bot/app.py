@@ -219,6 +219,18 @@ def _btn_lang(lang: str, key: str, callback: str, active: bool = False, prefix: 
     return InlineKeyboardButton(text, callback_data=callback)
 
 
+def _sort_text(update, order: str) -> str:
+    """获取排序文本"""
+    key = "btn.desc" if order == "desc" else "btn.asc"
+    return _t(update, key) if update else I18N.gettext(key, lang=I18N.default_locale)
+
+
+def _sort_text_lang(lang: str, order: str) -> str:
+    """按语言获取排序文本"""
+    key = "btn.desc" if order == "desc" else "btn.asc"
+    return I18N.gettext(key, lang=lang)
+
+
 # 统一 sys.path 优先级：本服务 src 放最前，并移除不存在的占位路径
 sys.path = [p for p in sys.path if p != str(SRC_ROOT)]
 sys.path.insert(0, str(SRC_ROOT))
