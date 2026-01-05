@@ -168,7 +168,7 @@ class KDJ排行卡片(RankingCard):
             f"{_t('time.update', update, lang=lang, time=time_info['full'])}\n"
             f"{_t('card.common.sort', update, lang=lang, period=period, field=display_sort_field, symbol=sort_symbol)}\n"
             f"{header}\n"
-            f\"\"\"\n{aligned}\n\"\"\"\n"
+            f"```\n{aligned}\n```\n"
             f"{_t('card.kdj.hint', update, lang=lang)}\n"
             f"{_t('time.last_update', update, lang=lang, time=time_info['full'])}"
         )
@@ -193,7 +193,7 @@ class KDJ排行卡片(RankingCard):
             f"{_t('time.update', update, lang=lang, time=time_info['full'])}\n"
             f"{_t('card.common.sort', update, lang=lang, period=period, field=display_sort_field, symbol=sort_symbol)}\n"
             f"{header}\n"
-            f\"\"\"\n{aligned}\n\"\"\"\n"
+            f"```\n{aligned}\n```\n"
             f"{_t('card.kdj.settings.hint', update, lang=lang)}"
         )
         if callable(ensure):
