@@ -260,7 +260,6 @@ def _period_text_lang(lang: str, period: str) -> str:
         return period
     return text
 
-
 # 统一 sys.path 优先级：本服务 src 放最前，并移除不存在的占位路径
 sys.path = [p for p in sys.path if p != str(SRC_ROOT)]
 sys.path.insert(0, str(SRC_ROOT))
@@ -3781,7 +3780,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(text, reply_markup=kb, parse_mode='Markdown')
         except Exception as e:
             logger.error(f"单币查询跳转失败: {e}")
-            await query.edit_message_text(f"❌ 查询失败: {e}")
+            await query.edit_message_text(_t("error.query_failed", update))
         return
 
     # 点击频率限制
@@ -3981,7 +3980,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await query.edit_message_text(
                         "🚀 机器人正在初始化中，请稍等...\n\n💡 如果问题持续，请联系管理员",
                         reply_markup=InlineKeyboardMarkup([[
-                            InlineKeyboardButton("🔄 重试", callback_data="main_menu")
+                            _btn(update, "btn.retry", "main_menu")
                         ]])
                     )
                     return
@@ -3990,7 +3989,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_text(
                     "❌ 机器人初始化失败，请联系管理员\n\n🔧 错误信息已记录",
                     reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("🔄 重试", callback_data="main_menu")
+                        _btn(update, "btn.retry", "main_menu")
                     ]])
                 )
                 return
@@ -4035,15 +4034,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     logger.warning("⚠️ 主菜单键盘为空，使用强制默认键盘")
                     keyboard = InlineKeyboardMarkup([
                         [
-                            InlineKeyboardButton("🐋 持仓量排行", callback_data="position_ranking"),
-                            InlineKeyboardButton("📈 成交量排行", callback_data="volume_ranking")
+                            _btn(update, "btn.position_ranking", "position_ranking"),
+                            _btn(update, "btn.volume_ranking", "volume_ranking")
                         ],
                         [
-                            InlineKeyboardButton("💥 爆仓排行", callback_data="liquidation_ranking"),
-                            InlineKeyboardButton("📈 市场总览", callback_data="basic_market")
+                            _btn(update, "btn.liquidation_ranking", "liquidation_ranking"),
+                            _btn(update, "btn.market_overview", "basic_market")
                         ],
                         [
-                            InlineKeyboardButton("🔄 刷新主菜单", callback_data="main_menu")
+                            _btn(update, "btn.refresh_menu", "main_menu")
                         ]
                     ])
                 
@@ -4056,7 +4055,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await query.edit_message_text(
                         "⚡️欢迎使用交易猫\n\n✅ 系统正常运行",
                         reply_markup=InlineKeyboardMarkup([
-                            [InlineKeyboardButton("🔄 重试", callback_data="main_menu")]
+                            [_btn(update, "btn.retry", "main_menu")]
                         ])
                     )
                 except Exception:
@@ -5532,7 +5531,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     await update.message.reply_document(
                         document=file_obj,
                         filename=file_obj.name,
-                        caption=f"📊 {sym} 完整数据报告"
+                        caption=_t("export.caption", update, symbol=sym)
                     )
                 except Exception as e:
                     logger.error(f"完整TXT导出失败: {e}")
