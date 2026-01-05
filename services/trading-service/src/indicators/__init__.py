@@ -17,37 +17,38 @@ from .base import (
 )
 
 # === 增量指标（可递推/单行）===
-from .incremental import macd
-from .incremental import kdj
-from .incremental import atr
-from .incremental import ema_gc
-from .incremental import obv
-from .incremental import cvd
-from .incremental import base_data
-from .incremental import buy_sell_ratio
-from .incremental import futures_sentiment
+# 导入用于注册，非直接使用
+from .incremental import macd  # noqa: F401
+from .incremental import kdj  # noqa: F401
+from .incremental import atr  # noqa: F401
+from .incremental import ema_gc  # noqa: F401
+from .incremental import obv  # noqa: F401
+from .incremental import cvd  # noqa: F401
+from .incremental import base_data  # noqa: F401
+from .incremental import buy_sell_ratio  # noqa: F401
+from .incremental import futures_sentiment  # noqa: F401
 
 # === 批量指标（需要窗口）===
-from .batch import k_pattern
-from .batch import trend_line
-from .batch import support_resistance
-from .batch import vpvr
-from .batch import super_trend
-from .batch import bollinger
-from .batch import vwap
-from .batch import volume_ratio
-from .batch import mfi
-from .batch import liquidity
-from .batch import tv_rsi
-from .batch import tv_trend_cloud
-from .batch import tv_big_money
-from .batch import tv_fib_sniper
-from .batch import tv_zero_lag
-from .batch import tv_volume_signal
-from .batch import tv_long_short
-from .batch import scalping
-from .batch import harmonic
-from .batch import futures_aggregate
+from .batch import k_pattern  # noqa: F401
+from .batch import trend_line  # noqa: F401
+from .batch import support_resistance  # noqa: F401
+from .batch import vpvr  # noqa: F401
+from .batch import super_trend  # noqa: F401
+from .batch import bollinger  # noqa: F401
+from .batch import vwap  # noqa: F401
+from .batch import volume_ratio  # noqa: F401
+from .batch import mfi  # noqa: F401
+from .batch import liquidity  # noqa: F401
+from .batch import tv_rsi  # noqa: F401
+from .batch import tv_trend_cloud  # noqa: F401
+from .batch import tv_big_money  # noqa: F401
+from .batch import tv_fib_sniper  # noqa: F401
+from .batch import tv_zero_lag  # noqa: F401
+from .batch import tv_volume_signal  # noqa: F401
+from .batch import tv_long_short  # noqa: F401
+from .batch import scalping  # noqa: F401
+from .batch import harmonic  # noqa: F401
+from .batch import futures_aggregate  # noqa: F401
 from .batch import lean_indicators
 from .batch import data_monitor
 from .batch import futures_gap_monitor

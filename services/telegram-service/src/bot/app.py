@@ -31,7 +31,7 @@ except ImportError:
 
 # Windows SSL证书支持
 try:
-    import wincertstore
+    import wincertstore  # noqa: F401
     WINCERTSTORE_AVAILABLE = True
     print("[OK] wincertstore库已加载，支持Windows证书存储")
 except ImportError:
