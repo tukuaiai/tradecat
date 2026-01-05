@@ -4,10 +4,14 @@
 对外提供 get_settings()，统一读取环境变量并做最小校验。
 """
 
+import os
 from functools import lru_cache
 from typing import Optional
 
 from pydantic import BaseSettings, Field
+
+
+DEFAULT_SQLITE = "libs/database/services/telegram-service/market_data.db"
 
 
 class Settings(BaseSettings):
@@ -18,11 +22,17 @@ class Settings(BaseSettings):
     port: int = Field(8087, description="服务监听端口")
     token: Optional[str] = Field(None, description="访问令牌，用于简易鉴权")
 
+    # env 优先级：VIS_SERVICE_DATABASE_URL > DATABASE_URL
     database_url: Optional[str] = Field(
-        default=None, description="TimescaleDB 连接串，复用上游 DATABASE_URL"
+        default_factory=lambda: os.getenv("DATABASE_URL"),
+        description="TimescaleDB 连接串，默认继承全局 DATABASE_URL",
+        env=["VIS_SERVICE_DATABASE_URL", "DATABASE_URL"],
     )
-    indicator_sqlite_path: Optional[str] = Field(
-        default=None, description="SQLite 指标库路径，默认复用 telegram-service 库"
+    # env 优先级：VIS_SERVICE_INDICATOR_SQLITE_PATH > INDICATOR_SQLITE_PATH > 默认路径
+    indicator_sqlite_path: str = Field(
+        default_factory=lambda: os.getenv("INDICATOR_SQLITE_PATH", DEFAULT_SQLITE),
+        description="SQLite 指标库路径，默认复用 telegram-service 库",
+        env=["VIS_SERVICE_INDICATOR_SQLITE_PATH", "INDICATOR_SQLITE_PATH"],
     )
 
     cache_ttl_seconds: int = Field(300, description="渲染结果缓存时间，秒")

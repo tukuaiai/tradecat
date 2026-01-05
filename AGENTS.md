@@ -167,7 +167,7 @@ zstd -d futures_metrics_5m.bin.zst -c | psql -h localhost -p 5433 -U postgres -d
 
 - **微服务独立**：每个服务有独立的 `.venv`、`requirements.txt`
 - **配置统一**：所有配置集中在 `config/.env`，各服务共用
-- **数据流向**：`data-service → TimescaleDB → trading-service → SQLite → telegram-service`
+- **数据流向**：`data-service → TimescaleDB → trading-service → SQLite → telegram-service / ai-service / vis-service`
 
 ### 4.2 模块边界
 
@@ -178,6 +178,8 @@ zstd -d futures_metrics_5m.bin.zst -c | psql -h localhost -p 5433 -U postgres -d
 | trading-service | 指标计算、写入 SQLite | 禁止直接推送消息 |
 | telegram-service | Bot 交互、读取 SQLite | 禁止写入数据库 |
 | ai-service | AI 分析、Wyckoff 方法论 | 作为 telegram-service 子模块 |
+| predict-service | 预测市场信号、策略推送 | 禁止改动主数据采集链路 |
+| vis-service | 可视化渲染（只读 DB/SQLite，输出 PNG/JSON） | 禁止写入数据库、禁止采集数据 |
 | order-service | 交易执行、做市 | 禁止修改数据采集逻辑 |
 
 ### 4.3 依赖添加规则
@@ -250,7 +252,7 @@ tradecat/
 │   ├── export_timescaledb.sh   # 数据导出
 │   └── timescaledb_compression.sh  # 压缩管理
 │
-├── services/                   # 6个微服务
+├── services/                   # 8个微服务
 │   ├── data-service/           # 加密货币数据采集服务
 │   │   ├── src/
 │   │   │   ├── collectors/     # 采集器（backfill/ws/metrics）
@@ -299,6 +301,14 @@ tradecat/
 │   │   ├── scripts/start.sh
 │   │   └── requirements.txt
 │   │
+│   ├── predict-service/        # 预测市场信号微服务
+│   │   └── docs/               # 需求/设计/ADR/Prompt 文档
+│   │
+│   ├── vis-service/            # 可视化渲染服务（FastAPI）
+│   │   ├── src/                # 模板注册与渲染
+│   │   ├── scripts/start.sh
+│   │   └── requirements.txt
+│   │
 │   └── order-service/          # 交易执行服务
 │       ├── src/
 │       │   └── market-maker/   # A-S 做市系统
@@ -328,6 +338,7 @@ tradecat/
 | `services/telegram-service/src/main.py` | telegram-service 入口 |
 | `services/telegram-service/src/bot/app.py` | Bot 主逻辑 |
 | `services/ai-service/src/bot/handler.py` | AI 分析处理器 |
+| `services/vis-service/src/main.py` | vis-service FastAPI 入口 |
 
 ### 6.2 核心模块
 

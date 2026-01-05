@@ -1,22 +1,29 @@
 """
 模板注册与示例渲染器。
 
-当前仅内置一个示例模板（line-basic），用于验证渲染链路。
-后续可在此目录添加更多模板，并在 register_defaults 中注册。
+内置 4 个即用模板：
+- line-basic：基础折线（示例）
+- kline-basic：K 线 + 均线 + 量能
+- macd: 价格 + MACD
+- equity-drawdown: 权益曲线 + 回撤
 """
 
 from __future__ import annotations
 
 import io
 import logging
-from dataclasses import dataclass
+import math
 from typing import Callable, Dict, Iterable, List, Tuple
 
 import matplotlib
+import mplfinance as mpf
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import seaborn as sns
+from pydantic import BaseModel
 
+from adjustText import adjust_text
 # 使用无界面后端，避免服务器缺乏显示设备时报错
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
@@ -27,14 +34,15 @@ logger = logging.getLogger(__name__)
 RenderFn = Callable[[Dict, str], Tuple[object, str]]
 
 
-@dataclass
-class TemplateMeta:
+class TemplateMeta(BaseModel):
     """模板元信息，用于对外展示与路由校验。"""
 
     template_id: str
     name: str
     description: str
     outputs: List[str]
+    params: List[str]
+    sample: Dict
 
 
 class TemplateRegistry:
@@ -96,6 +104,633 @@ def render_line_basic(params: Dict, output: str) -> Tuple[object, str]:
     return buffer.read(), "image/png"
 
 
+def _fig_to_png(fig) -> bytes:
+    """通用 PNG 导出。"""
+
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format="png", dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    buffer.seek(0)
+    return buffer.read()
+
+
+def render_kline_basic(params: Dict, output: str) -> Tuple[object, str]:
+    """
+    基础 K 线图（含均线、量能）。
+
+    必填：
+    - open, high, low, close: 等长数列
+    可选：
+    - volume: 数列
+    - ma_periods: 均线周期列表（默认 [7, 25]）
+    - title: 标题
+    - timestamps: 时间戳字符串数组（可选，长度一致则用于 X 轴）
+    """
+
+    required = ["open", "high", "low", "close"]
+    for key in required:
+        if key not in params:
+            raise ValueError(f"缺少参数 {key}")
+
+    df = pd.DataFrame(
+        {
+            "Open": params["open"],
+            "High": params["high"],
+            "Low": params["low"],
+            "Close": params["close"],
+        }
+    )
+
+    if "volume" in params:
+        df["Volume"] = params["volume"]
+
+    if "timestamps" in params and len(params["timestamps"]) == len(df):
+        df.index = pd.to_datetime(params["timestamps"])
+    else:
+        df.index = pd.RangeIndex(len(df))
+
+    ma_periods = params.get("ma_periods", [7, 25])
+    title = params.get("title", "Kline")
+
+    if output == "json":
+        fig = go.Figure(
+            data=[
+                go.Candlestick(
+                    x=df.index,
+                    open=df["Open"],
+                    high=df["High"],
+                    low=df["Low"],
+                    close=df["Close"],
+                    name="Kline",
+                )
+            ]
+        )
+        for period in ma_periods:
+            if period < len(df):
+                fig.add_trace(
+                    go.Scatter(
+                        x=df.index,
+                        y=df["Close"].rolling(period).mean(),
+                        mode="lines",
+                        name=f"MA{period}",
+                    )
+                )
+        if "Volume" in df:
+            fig.add_trace(
+                go.Bar(x=df.index, y=df["Volume"], name="Volume", yaxis="y2", opacity=0.3)
+            )
+            fig.update_layout(
+                yaxis2=dict(overlaying="y", side="right", showgrid=False, title="Volume")
+            )
+        fig.update_layout(title=title, template="plotly_white")
+        return fig.to_dict(), "application/json"
+
+    mpf_kwargs = {
+        "type": "candle",
+        "style": "yahoo",
+        "mav": [p for p in ma_periods if p < len(df)],
+        "volume": "Volume" in df.columns,
+        "title": title,
+        "returnfig": True,
+        "figratio": (16, 9),
+        "figscale": 1.1,
+    }
+    fig, _ = mpf.plot(df, **mpf_kwargs)
+    return _fig_to_png(fig), "image/png"
+
+
+def render_macd(params: Dict, output: str) -> Tuple[object, str]:
+    """
+    价格 + MACD 双面板。
+
+    必填：
+    - close: 收盘价序列
+    可选：
+    - fast: 快线周期（默认12）
+    - slow: 慢线周期（默认26）
+    - signal: 信号线周期（默认9）
+    - title: 标题
+    """
+
+    close = params.get("close")
+    if not close:
+        raise ValueError("缺少参数 close")
+    fast = int(params.get("fast", 12))
+    slow = int(params.get("slow", 26))
+    signal = int(params.get("signal", 9))
+    title = params.get("title", "MACD")
+
+    s = pd.Series(close)
+    ema_fast = s.ewm(span=fast, adjust=False).mean()
+    ema_slow = s.ewm(span=slow, adjust=False).mean()
+    macd_line = ema_fast - ema_slow
+    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+    hist = macd_line - signal_line
+    x = list(range(len(s)))
+
+    if output == "json":
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=x, y=s, mode="lines", name="Close"))
+        fig.add_trace(go.Bar(x=x, y=hist, name="Hist", marker_color="rgba(99,102,241,0.5)"))
+        fig.add_trace(go.Scatter(x=x, y=macd_line, mode="lines", name="MACD"))
+        fig.add_trace(go.Scatter(x=x, y=signal_line, mode="lines", name="Signal"))
+        fig.update_layout(title=title, template="plotly_white")
+        return fig.to_dict(), "application/json"
+
+    sns.set_theme(style="whitegrid")
+    fig, axes = plt.subplots(2, 1, sharex=True, figsize=(10, 6), gridspec_kw={"height_ratios": [2, 1]})
+    axes[0].plot(x, s, color="#2563eb", linewidth=1.6, label="Close")
+    axes[0].set_title(title)
+    axes[0].legend()
+
+    axes[1].bar(x, hist, color="#a5b4fc", alpha=0.8, label="Hist")
+    axes[1].plot(x, macd_line, color="#111827", linewidth=1.2, label="MACD")
+    axes[1].plot(x, signal_line, color="#ef4444", linewidth=1.2, label="Signal")
+    axes[1].legend()
+    fig.tight_layout()
+    return _fig_to_png(fig), "image/png"
+
+
+def render_equity_drawdown(params: Dict, output: str) -> Tuple[object, str]:
+    """
+    权益曲线 + 回撤面板。
+
+    必填：
+    - equity: 权益序列
+    可选：
+    - title: 标题
+    - timestamps: 时间索引
+    """
+
+    equity = params.get("equity")
+    if not equity:
+        raise ValueError("缺少参数 equity")
+    title = params.get("title", "Equity & Drawdown")
+
+    s = pd.Series(equity)
+    roll_max = s.cummax()
+    drawdown = (s - roll_max) / roll_max
+    x = params.get("timestamps")
+    if x and len(x) == len(s):
+        x_axis = pd.to_datetime(x)
+    else:
+        x_axis = list(range(len(s)))
+
+    if output == "json":
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=x_axis, y=s, mode="lines", name="Equity"))
+        fig.add_trace(
+            go.Scatter(
+                x=x_axis,
+                y=drawdown,
+                mode="lines",
+                name="Drawdown",
+                fill="tozeroy",
+                fillcolor="rgba(239,68,68,0.25)",
+            )
+        )
+        fig.update_layout(title=title, template="plotly_white")
+        return fig.to_dict(), "application/json"
+
+    sns.set_theme(style="whitegrid")
+    fig, axes = plt.subplots(2, 1, sharex=True, figsize=(10, 6), gridspec_kw={"height_ratios": [2, 1]})
+    axes[0].plot(x_axis, s, color="#10b981", linewidth=1.6, label="Equity")
+    axes[0].set_title(title)
+    axes[0].legend()
+
+    axes[1].fill_between(x_axis, drawdown, 0, color="#fca5a5")
+    axes[1].plot(x_axis, drawdown, color="#ef4444", linewidth=1.2, label="Drawdown")
+    axes[1].legend()
+    fig.tight_layout()
+    return _fig_to_png(fig), "image/png"
+
+
+def _build_bin_edges(prices: List[float], bins: int, mode: str) -> np.ndarray:
+    """根据模式构建统一的 bin 边界。"""
+
+    arr = np.asarray(prices, dtype=float)
+    arr = arr[np.isfinite(arr)]
+    if arr.size == 0:
+        raise ValueError("无有效价格数据")
+
+    if mode == "percentile":
+        edges = np.percentile(arr, np.linspace(0, 100, bins + 1))
+    else:
+        median = np.median(arr)
+        span = abs(median) * 0.05 if median != 0 else 1.0
+        edges = np.linspace(median - span, median + span, bins + 1)
+
+    # 防止重复边界导致直方图异常
+    edges = np.maximum.accumulate(edges)
+    for i in range(1, len(edges)):
+        if edges[i] <= edges[i - 1]:
+            edges[i] = edges[i - 1] + 1e-9
+    return edges
+
+
+def render_market_vpvr_heat(params: Dict, output: str) -> Tuple[object, str]:
+    """
+    全市场 VPVR 热力图。
+
+    必填：
+    - data: [{symbol, price/list or close/list, volume/list}, ...]
+
+    可选：
+    - bins: 分桶数，默认 40
+    - bin_mode: percentile|relative，默认 percentile
+    - top_n: 仅保留成交量总和前 N 个
+    - scale: linear|log，默认 linear
+    """
+
+    data = params.get("data")
+    if not data or not isinstance(data, list):
+        raise ValueError("缺少 data 列表")
+
+    bins = int(params.get("bins", 40))
+    bin_mode = params.get("bin_mode", "percentile")
+    scale = params.get("scale", "linear")
+    top_n = params.get("top_n")
+
+    # 收集全部价格用于统一分桶
+    all_prices: List[float] = []
+    prepared: List[Tuple[str, np.ndarray, np.ndarray]] = []
+    for item in data:
+        symbol = item.get("symbol")
+        prices = item.get("price") or item.get("close") or []
+        volumes = item.get("volume") or item.get("volumes") or []
+        if not symbol or not prices or not volumes:
+            continue
+        if len(prices) != len(volumes):
+            continue
+        p_arr = np.asarray(prices, dtype=float)
+        v_arr = np.asarray(volumes, dtype=float)
+        mask = np.isfinite(p_arr) & np.isfinite(v_arr) & (v_arr > 0)
+        p_arr = p_arr[mask]
+        v_arr = v_arr[mask]
+        if p_arr.size == 0:
+            continue
+        all_prices.extend(p_arr.tolist())
+        prepared.append((symbol, p_arr, v_arr))
+
+    if not prepared:
+        raise ValueError("无有效的价格/成交量数据")
+
+    edges = _build_bin_edges(all_prices, bins=bins, mode=bin_mode)
+
+    rows = []
+    symbols = []
+    total_volumes = []
+    for symbol, p_arr, v_arr in prepared:
+        hist, _ = np.histogram(p_arr, bins=edges, weights=v_arr)
+        total = hist.sum()
+        if total <= 0:
+            continue
+        total_volumes.append((symbol, total))
+        rows.append(hist / total)
+        symbols.append(symbol)
+
+    if not rows:
+        raise ValueError("无有效聚合结果")
+
+    # 按总成交量排序、截断 top_n
+    if top_n:
+        order = sorted(total_volumes, key=lambda x: x[1], reverse=True)[: int(top_n)]
+        keep = {s for s, _ in order}
+        mask_rows = [i for i, s in enumerate(symbols) if s in keep]
+        rows = [rows[i] for i in mask_rows]
+        symbols = [symbols[i] for i in mask_rows]
+
+    mat = np.vstack(rows)
+    if scale == "log":
+        mat = np.log10(mat + 1e-9)
+
+    # 生成列标签
+    col_labels = []
+    for i in range(len(edges) - 1):
+        col_labels.append(f"{edges[i]:.4g}-{edges[i+1]:.4g}")
+
+    if output == "json":
+        fig = go.Figure(
+            data=go.Heatmap(
+                z=mat,
+                x=col_labels,
+                y=symbols,
+                colorscale="Viridis",
+                colorbar=dict(title="vol% (log)" if scale == "log" else "vol%"),
+            )
+        )
+        fig.update_layout(
+            title=params.get("title", "Market VPVR"),
+            xaxis_title="Price bins",
+            yaxis_title="Symbol",
+            template="plotly_white",
+        )
+        return fig.to_dict(), "application/json"
+
+    sns.set_theme(style="white")
+    fig, ax = plt.subplots(figsize=(12, max(4, len(symbols) * 0.4)))
+    sns.heatmap(
+        mat,
+        ax=ax,
+        yticklabels=symbols,
+        xticklabels=False,
+        cmap="viridis",
+        cbar_kws={"label": "vol% (log)" if scale == "log" else "vol%"},
+    )
+    ax.set_title(params.get("title", "Market VPVR"))
+    ax.set_xlabel("Price bins")
+    ax.set_ylabel("Symbol")
+    fig.tight_layout()
+    return _fig_to_png(fig), "image/png"
+
+
+def render_vpvr_zone_dot(params: Dict, output: str) -> Tuple[object, str]:
+    """
+    VPVR 价值区点阵图。
+
+    使用聚合后的价值区上下沿与控制点，绘制横向带（VAH–VAL）+ 控制点标记。
+
+    必填：
+    - data: [{symbol, value_area_low, value_area_high, poc}]
+
+    可选：
+    - coverage: 覆盖率/占比，用于颜色深浅
+    - title: 图表标题
+    """
+
+    data = params.get("data")
+    if not data or not isinstance(data, list):
+        raise ValueError("缺少 data 列表")
+
+    records = []
+    for item in data:
+        try:
+            symbol = item["symbol"]
+            val_low = float(item.get("value_area_low"))
+            val_high = float(item.get("value_area_high"))
+            poc = float(item.get("poc"))
+        except Exception:
+            continue
+        coverage = item.get("coverage")
+        try:
+            coverage = float(coverage) if coverage is not None else None
+        except Exception:
+            coverage = None
+        if val_high <= val_low:
+            continue
+        records.append((symbol, val_low, val_high, poc, coverage))
+
+    if not records:
+        raise ValueError("无有效 VPVR 数据")
+
+    df = pd.DataFrame(records, columns=["symbol", "val_low", "val_high", "poc", "coverage"])
+    df.sort_values("poc", inplace=True)
+    y_positions = range(len(df))
+
+    if output == "json":
+        return (
+            {
+                "title": params.get("title", "VPVR Value Area"),
+                "points": [
+                    {
+                        "symbol": row.symbol,
+                        "value_area_low": row.val_low,
+                        "value_area_high": row.val_high,
+                        "poc": row.poc,
+                        "coverage": row.coverage,
+                        "y": idx,
+                    }
+                    for idx, row in df.reset_index(drop=True).itertuples()
+                ],
+            },
+            "application/json",
+        )
+
+    sns.set_theme(style="white")
+    fig, ax = plt.subplots(figsize=(12, max(4, len(df) * 0.35)))
+    cmap = sns.color_palette("viridis", as_cmap=True)
+
+    for y, row in zip(y_positions, df.itertuples()):
+        width = row.val_high - row.val_low
+        ax.broken_barh([(row.val_low, width)], (y - 0.25, 0.5), facecolors="lightblue", alpha=0.6)
+        color = cmap(row.coverage) if row.coverage is not None else "#1d4ed8"
+        ax.scatter(row.poc, y, color=color, s=30, zorder=3)
+        ax.text(row.val_high, y, f" POC {row.poc:.4g}", va="center", fontsize=8, color="#111")
+
+    ax.set_xlabel("Price")
+    ax.set_yticks(list(y_positions))
+    ax.set_yticklabels(df["symbol"])
+    ax.set_title(params.get("title", "VPVR Value Area & POC"))
+    ax.grid(True, axis="x", linestyle="--", alpha=0.3)
+    fig.tight_layout()
+    return _fig_to_png(fig), "image/png"
+
+
+def render_vpvr_zone_grid(params: Dict, output: str) -> Tuple[object, str]:
+    """
+    VPVR 价值区小卡片网格（横向多卡片）。
+
+    每个币种一张卡：背景矩形 = 价值区 (VAL→VAH)，点 = POC，卡片标题标注币种与覆盖率。
+
+    必填：
+    - data: [{symbol, value_area_low, value_area_high, poc, coverage?}]
+
+    可选：
+    - cols: 每行卡片数，默认 3
+    - title: 总标题
+    """
+
+    data = params.get("data")
+    if not data or not isinstance(data, list):
+        raise ValueError("缺少 data 列表")
+
+    cards = []
+    for item in data:
+        try:
+            symbol = item["symbol"]
+            val_low = float(item.get("value_area_low"))
+            val_high = float(item.get("value_area_high"))
+            poc = float(item.get("poc"))
+        except Exception:
+            continue
+        if val_high <= val_low:
+            continue
+        cov = item.get("coverage")
+        try:
+            cov = float(cov) if cov is not None else None
+        except Exception:
+            cov = None
+        cards.append((symbol, val_low, val_high, poc, cov))
+
+    if not cards:
+        raise ValueError("无有效 VPVR 数据")
+
+    cols = max(1, int(params.get("cols", 3)))
+    rows = math.ceil(len(cards) / cols)
+    width = 4 * cols
+    height = max(2.8 * rows, 3)
+
+    sns.set_theme(style="white")
+    fig, axes = plt.subplots(rows, cols, figsize=(width, height), squeeze=False)
+    cmap = sns.color_palette("viridis", as_cmap=True)
+
+    for idx, (symbol, val_low, val_high, poc, cov) in enumerate(cards):
+        r, c = divmod(idx, cols)
+        ax = axes[r][c]
+        band_width = val_high - val_low
+        ax.broken_barh([(val_low, band_width)], (0.2, 0.6), facecolors="#bfdbfe", alpha=0.7)
+        color = cmap(cov) if cov is not None else "#1d4ed8"
+        ax.scatter(poc, 0.5, color=color, s=30, zorder=3)
+        ax.text(
+            poc,
+            0.65,
+            f"POC {poc:.4g}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+            color="#0f172a",
+        )
+        subtitle = f"{symbol}" + (f"  cov {cov:.0%}" if cov is not None else "")
+        ax.set_title(subtitle, fontsize=10, pad=6)
+        ax.set_yticks([])
+        ax.set_ylim(0, 1)
+        ax.grid(True, axis="x", linestyle="--", alpha=0.3)
+    # 隐藏空白轴
+    for idx in range(len(cards), rows * cols):
+        r, c = divmod(idx, cols)
+        axes[r][c].axis("off")
+
+    fig.suptitle(params.get("title", "VPVR 价值区卡片"), fontsize=12)
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+
+    if output == "json":
+        return (
+            {
+                "title": params.get("title", "VPVR 价值区卡片"),
+                "cards": [
+                    {
+                        "symbol": symbol,
+                        "value_area_low": val_low,
+                        "value_area_high": val_high,
+                        "poc": poc,
+                        "coverage": cov,
+                    }
+                    for (symbol, val_low, val_high, poc, cov) in cards
+                ],
+                "cols": cols,
+            },
+            "application/json",
+        )
+
+    return _fig_to_png(fig), "image/png"
+
+
+def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
+    """
+    手绘风格的 VPVR 条带散点图。
+
+    - 纵轴：价格归一化后的相对位置（依据 value_area_low/high）
+    - 横向：窄条带，随机抖动散点，标签在右侧
+    """
+
+    data = params.get("data")
+    if not data or not isinstance(data, list):
+        raise ValueError("缺少 data 列表")
+
+    bands = max(2, int(params.get("bands", 6)))
+    dots_per_symbol = max(1, int(params.get("dots_per_symbol", 8)))
+
+    import pandas as pd
+
+    df = pd.DataFrame(data)
+    required_cols = {"symbol", "value_area_low", "value_area_high"}
+    if not required_cols.issubset(df.columns):
+        raise ValueError("data 需包含 symbol, value_area_low, value_area_high")
+    df = df.dropna(subset=["value_area_low", "value_area_high"])
+    df["mid"] = (df["value_area_low"].astype(float) + df["value_area_high"].astype(float)) / 2
+    df["span"] = (df["value_area_high"] - df["value_area_low"]).astype(float)
+    df = df[df["span"] > 0]
+    if df.empty:
+        raise ValueError("无有效 VPVR 数据")
+
+    # 全量统一归一化（单组展示）
+    pmin, pmax = df["value_area_low"].min(), df["value_area_high"].max()
+    span = pmax - pmin if pmax > pmin else 1.0
+    df["y_low"] = (df["value_area_low"] - pmin) / span
+    df["y_high"] = (df["value_area_high"] - pmin) / span
+    df["poc_norm"] = (df["mid"] - pmin) / span
+
+    sns.set_theme(style="white")
+    fig, ax = plt.subplots(1, 1, figsize=(4, 6))
+    band_colors = ["#e0f2fe", "#d1fae5", "#fef9c3", "#fae8ff"]
+
+    rng = np.random.default_rng(42)
+
+    # 背景条带
+    for i in range(bands):
+        y0 = i / bands
+        color = band_colors[i % len(band_colors)]
+        ax.add_patch(
+            plt.Rectangle(
+                (0.0, y0),
+                1.0,
+                1 / bands,
+                facecolor=color,
+                alpha=0.55,
+                edgecolor="none",
+            )
+        )
+
+    for _, row in df.iterrows():
+        ys = rng.uniform(row["y_low"], row["y_high"], size=dots_per_symbol)
+        xs = rng.uniform(0.05, 0.95, size=dots_per_symbol)
+        ax.scatter(xs, ys, color="#0ea5e9", s=18, alpha=0.9)
+        label = str(row["symbol"]).replace("USDT", "")
+        x_mean, y_mean = float(xs.mean()), float(ys.mean())
+        label_y = min(y_mean + 0.08, 0.97)
+        label_x = min(max(x_mean, 0.05), 0.95)
+        ax.annotate(
+            label,
+            xy=(x_mean, y_mean),
+            xytext=(label_x, label_y),
+            textcoords="data",
+            ha="center",
+            va="center",
+            fontsize=8,
+            color="#0f172a",
+            bbox=dict(boxstyle="round,pad=0.15", facecolor="#ffffff", edgecolor="none", alpha=0.85),
+            arrowprops=dict(arrowstyle="->", color="#0f172a", lw=0.7, shrinkA=4, shrinkB=4),
+        )
+
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xlim(0, 1)
+    ax.set_ylim(-0.02, 1.02)
+
+    fig.suptitle(params.get("title", "VPVR 条带"), fontsize=12, color="#0f172a", y=1.02)
+    fig.tight_layout()
+
+    if output == "json":
+        return (
+            {
+                "title": params.get("title", "VPVR 条带"),
+                "bands": bands,
+                "points": [
+                    {
+                        "symbol": symbol,
+                        "ys": [float(y) for y in rng.uniform(norm(vl), norm(vh), size=dots_per_symbol)],
+                    }
+                    for symbol, vl, vh, _ in records
+                ],
+            },
+            "application/json",
+        )
+
+    return _fig_to_png(fig), "image/png"
+
+
 def register_defaults() -> TemplateRegistry:
     """注册内置模板，并返回注册表实例。"""
 
@@ -106,7 +741,177 @@ def register_defaults() -> TemplateRegistry:
             name="基础折线图",
             description="示例模板：输入一组数值，输出基础折线图（PNG 或 plotly JSON）。",
             outputs=["png", "json"],
+            params=["series(list[float])", "title?"],
+            sample={"template_id": "line-basic", "output": "png", "params": {"series": [1, 3, 2, 5, 4]}},
         ),
         render_line_basic,
+    )
+    registry.register(
+        TemplateMeta(
+            template_id="kline-basic",
+            name="K线+均线+量能",
+            description="金融行情图：OHLC 必填，均线周期可选，支持量能",
+            outputs=["png", "json"],
+            params=[
+                "open(list[float])",
+                "high(list[float])",
+                "low(list[float])",
+                "close(list[float])",
+                "volume?(list[float])",
+                "ma_periods?(list[int])",
+                "timestamps?(list[str])",
+                "title?",
+            ],
+            sample={
+                "template_id": "kline-basic",
+                "output": "png",
+                "params": {
+                    "open": [10, 11, 12, 12.5, 12.2],
+                    "high": [11, 12, 12.6, 13, 12.8],
+                    "low": [9.8, 10.5, 11.5, 12, 12],
+                    "close": [10.5, 11.8, 12.3, 12.7, 12.1],
+                    "volume": [100, 120, 130, 90, 110],
+                    "ma_periods": [3],
+                    "title": "示例K线",
+                },
+            },
+        ),
+        render_kline_basic,
+    )
+    registry.register(
+        TemplateMeta(
+            template_id="macd",
+            name="价格 + MACD",
+            description="双面板显示收盘价与 MACD/Signal/Hist",
+            outputs=["png", "json"],
+            params=["close(list[float])", "fast?(int)", "slow?(int)", "signal?(int)", "title?"],
+            sample={
+                "template_id": "macd",
+                "output": "png",
+                "params": {"close": [1, 2, 3, 2.5, 3.2, 3.8, 3.5], "title": "示例MACD"},
+            },
+        ),
+        render_macd,
+    )
+    registry.register(
+        TemplateMeta(
+            template_id="equity-drawdown",
+            name="权益+回撤",
+            description="上方权益曲线，下方回撤百分比阴影",
+            outputs=["png", "json"],
+            params=["equity(list[float])", "timestamps?(list[str])", "title?"],
+            sample={
+                "template_id": "equity-drawdown",
+                "output": "png",
+                "params": {"equity": [100, 105, 103, 110, 107, 120]},
+            },
+        ),
+        render_equity_drawdown,
+    )
+    registry.register(
+        TemplateMeta(
+            template_id="market-vpvr-heat",
+            name="全市场 VPVR 热力图",
+            description="价格分桶的成交量占比热力图，X=价格区间，Y=币种",
+            outputs=["png", "json"],
+            params=[
+                "data(list[ {symbol, price|close: list, volume|volumes: list} ])",
+                "bins?(int, default 40)",
+                "bin_mode?(percentile|relative)",
+                "top_n?(int)",
+                "scale?(linear|log)",
+                "title?",
+            ],
+            sample={
+                "template_id": "market-vpvr-heat",
+                "output": "png",
+                "params": {
+                    "bins": 20,
+                    "data": [
+                        {"symbol": "BTCUSDT", "close": [100, 101, 102, 101.5], "volume": [10, 12, 9, 11]},
+                        {"symbol": "ETHUSDT", "close": [50, 51, 50.5, 52], "volume": [8, 9, 7, 10]},
+                    ],
+                },
+            },
+        ),
+        render_market_vpvr_heat,
+    )
+    registry.register(
+        TemplateMeta(
+            template_id="vpvr-zone-dot",
+            name="VPVR 价值区点阵",
+            description="使用价值区上下沿 + 控制点绘制横向带和点阵，适合全市场对比",
+            outputs=["png", "json"],
+            params=[
+                "data(list[{symbol, value_area_low, value_area_high, poc, coverage?}])",
+                "title?",
+            ],
+            sample={
+                "template_id": "vpvr-zone-dot",
+                "output": "png",
+                "params": {
+                    "data": [
+                        {"symbol": "BTCUSDT", "value_area_low": 100, "value_area_high": 105, "poc": 102.5, "coverage": 0.68},
+                        {"symbol": "ETHUSDT", "value_area_low": 50, "value_area_high": 52, "poc": 51.2, "coverage": 0.63},
+                    ]
+                },
+            },
+        ),
+        render_vpvr_zone_dot,
+    )
+    registry.register(
+        TemplateMeta(
+            template_id="vpvr-zone-grid",
+            name="VPVR 价值区卡片",
+            description="横向多卡片：每个币种一条价值区带 + POC 点，方便快速扫描",
+            outputs=["png", "json"],
+            params=[
+                "data(list[{symbol, value_area_low, value_area_high, poc, coverage?}])",
+                "cols?(int, default 3)",
+                "title?",
+            ],
+            sample={
+                "template_id": "vpvr-zone-grid",
+                "output": "png",
+                "params": {
+                    "cols": 3,
+                    "data": [
+                        {"symbol": "BTCUSDT", "value_area_low": 100, "value_area_high": 105, "poc": 102.5, "coverage": 0.68},
+                        {"symbol": "ETHUSDT", "value_area_low": 50, "value_area_high": 52, "poc": 51.2, "coverage": 0.63},
+                        {"symbol": "SOLUSDT", "value_area_low": 8.3, "value_area_high": 9.1, "poc": 8.7, "coverage": 0.7},
+                        {"symbol": "XRPUSDT", "value_area_low": 0.5, "value_area_high": 0.56, "poc": 0.53, "coverage": 0.6},
+                    ],
+                },
+            },
+        ),
+        render_vpvr_zone_grid,
+    )
+    registry.register(
+        TemplateMeta(
+            template_id="vpvr-zone-strip",
+            name="VPVR 条带散点",
+            description="按价值区在纵轴定位，右侧散点+标签，仿手绘条带图",
+            outputs=["png", "json"],
+            params=[
+                "data(list[{symbol, value_area_low, value_area_high, poc?}])",
+                "bands?(int, default 6)",
+                "dots_per_symbol?(int, default 8)",
+                "title?",
+            ],
+            sample={
+                "template_id": "vpvr-zone-strip",
+                "output": "png",
+                "params": {
+                    "bands": 6,
+                    "dots_per_symbol": 8,
+                    "data": [
+                        {"symbol": "ETH", "value_area_low": 1500, "value_area_high": 1700, "poc": 1620},
+                        {"symbol": "BTC", "value_area_low": 33000, "value_area_high": 36000, "poc": 34500},
+                        {"symbol": "SOL", "value_area_low": 120, "value_area_high": 140, "poc": 132},
+                    ],
+                },
+            },
+        ),
+        render_vpvr_zone_strip,
     )
     return registry

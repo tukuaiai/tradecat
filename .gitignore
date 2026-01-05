@@ -5,6 +5,7 @@
 .env.*
 !.env.example
 1
+2
 3
 AUDIT_REPORT.md
 CODE_LOCATIONS.md
@@ -101,3 +102,5 @@ services/markets-service/.venv
 services/order-service/.venv
 services/telegram-service/.venv
 services/trading-service/.venv
+
+
