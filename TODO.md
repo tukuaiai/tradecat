@@ -20,3 +20,7 @@
 
 
 [ ] 新建专业的可视化数据分析微服务，内置有常用可视化类型/模板
+
+\\wsl.localhost\Ubuntu\home\lenovo\.projects\tradecat\image.png
+
+vpvr可视化的山脊图版本
