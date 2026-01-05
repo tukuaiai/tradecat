@@ -601,11 +601,18 @@ def build_pattern_keyboard_with_periods(enabled_periods: dict, update=None) -> I
     ])
 
 
-def render_single_snapshot(symbol: str, panel: str, enabled_periods: dict, enabled_cards: dict, page: int = 0) -> tuple[str, object, int, int]:
+def render_single_snapshot(symbol: str, panel: str, enabled_periods: dict, enabled_cards: dict, page: int = 0, lang: str | None = None) -> tuple[str, object, int, int]:
     """封装渲染 + 键盘构建，便于重用。返回(text, keyboard, pages, page_used)。"""
     from bot.single_token_snapshot import SingleTokenSnapshot
     snap = SingleTokenSnapshot()
-    text, pages = snap.render_table(symbol, panel=panel, enabled_periods=enabled_periods, enabled_cards=enabled_cards, page=page)
+    text, pages = snap.render_table(
+        symbol,
+        panel=panel,
+        enabled_periods=enabled_periods,
+        enabled_cards=enabled_cards,
+        page=page,
+        lang=lang,
+    )
     keyboard = build_single_snapshot_keyboard(enabled_periods, panel, enabled_cards, page=page, pages=pages)
     return text, keyboard, pages, page
 
@@ -3761,7 +3768,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ustate["single_cards"] = {}
             ustate["single_page"] = 0
             snap = SingleTokenSnapshot()
-            text, pages = snap.render_table(symbol, panel="basic", enabled_periods=enabled_periods, enabled_cards={}, page=0)
+            lang = _resolve_lang(update)
+            text, pages = snap.render_table(
+                symbol,
+                panel="basic",
+                enabled_periods=enabled_periods,
+                enabled_cards={},
+                page=0,
+                lang=lang,
+            )
             kb = build_single_snapshot_keyboard(enabled_periods, "basic", {}, page=0, pages=pages)
             await query.edit_message_text(text, reply_markup=kb, parse_mode='Markdown')
         except Exception as e:
@@ -3887,12 +3902,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         states["single_cards"] = enabled_cards
         states["single_page"] = page
 
-        text, keyboard, pages, page_used = render_single_snapshot(sym, panel, enabled, enabled_cards, page=page)
+        lang = _resolve_lang(update)
+        text, keyboard, pages, page_used = render_single_snapshot(sym, panel, enabled, enabled_cards, page=page, lang=lang)
         # 如果翻到超界页，回退最后一页再渲染一次
         if page_used >= pages:
             page_used = max(0, pages - 1)
             states["single_page"] = page_used
-            text, keyboard, pages, page_used = render_single_snapshot(sym, panel, enabled, enabled_cards, page=page_used)
+            text, keyboard, pages, page_used = render_single_snapshot(sym, panel, enabled, enabled_cards, page=page_used, lang=lang)
         try:
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
         except BadRequest as e:
@@ -5555,7 +5571,15 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 from bot.single_token_snapshot import SingleTokenSnapshot
                 kb = build_single_snapshot_keyboard(enabled_periods, "basic", ustate["single_cards"], page=0, pages=1)
                 snap = SingleTokenSnapshot()
-                text, pages = snap.render_table(sym, panel="basic", enabled_periods=enabled_periods, enabled_cards=ustate["single_cards"], page=0)
+                lang = _resolve_lang(update)
+                text, pages = snap.render_table(
+                    sym,
+                    panel="basic",
+                    enabled_periods=enabled_periods,
+                    enabled_cards=ustate["single_cards"],
+                    page=0,
+                    lang=lang,
+                )
                 kb = build_single_snapshot_keyboard(enabled_periods, "basic", ustate["single_cards"], page=0, pages=pages)
                 try:
                     await update.message.reply_text(text, reply_markup=kb, parse_mode='Markdown')

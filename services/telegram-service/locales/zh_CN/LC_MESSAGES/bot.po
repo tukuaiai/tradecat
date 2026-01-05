@@ -415,3 +415,85 @@ msgstr "🔄 数据准备中"
 
 msgid "data.coins_count"
 msgstr "📊 可查询币种 ({count} 个)"
+
+# ============ 单币快照 ============
+msgid "snapshot.error.no_symbol"
+msgstr "未提供有效币种"
+
+msgid "snapshot.error.no_period"
+msgstr "请至少开启一个周期列"
+
+msgid "snapshot.header.field"
+msgstr "字段\\周期"
+
+msgid "snapshot.header.compact"
+msgstr "字段\\周期/{columns}"
+
+msgid "snapshot.title.basic"
+msgstr "💵 {symbol} 基础数据"
+
+msgid "snapshot.title.futures"
+msgstr "📑 {symbol} 合约数据"
+
+msgid "snapshot.title.advanced"
+msgstr "🧠 {symbol} 高级数据"
+
+msgid "snapshot.title.default"
+msgstr "{symbol} 数据快照"
+
+msgid "snapshot.footer.hint"
+msgstr "💡 按钮可开关卡片/周期/面板；合约不含1m；高级默认少列防超长"
+
+msgid "snapshot.footer.page"
+msgstr "📑 页 {current}/{total}"
+
+# ============ 排行卡片通用 ============
+msgid "card.header.rank"
+msgstr "排名"
+
+msgid "card.header.symbol"
+msgstr "币种"
+
+msgid "card.header.rank_symbol"
+msgstr "排名/币种"
+
+msgid "btn.sort.desc"
+msgstr "降序"
+
+msgid "btn.sort.asc"
+msgstr "升序"
+
+msgid "btn.limit.10"
+msgstr "10条"
+
+msgid "btn.limit.20"
+msgstr "20条"
+
+msgid "btn.limit.30"
+msgstr "30条"
+
+# ============ 期货情绪分歧榜 ============
+msgid "card.divergence.title"
+msgstr "⚖️ 情绪分歧榜"
+
+msgid "card.divergence.sort"
+msgstr "📊 排序 {period} {field}({symbol})"
+
+msgid "card.divergence.source"
+msgstr "💡 数据源：期货情绪聚合表（情绪差值）"
+
+msgid "card.divergence.fallback"
+msgstr "⚖️ 情绪分歧数据加载中，请稍后重试..."
+
+# ============ 趋势线榜 ============
+msgid "card.trendline.title"
+msgstr "📈 趋势线"
+
+msgid "card.trendline.sort"
+msgstr "📊 排序 {period} {field}({symbol})"
+
+msgid "card.trendline.source"
+msgstr "💡 指标仅保留方向与距离（Pine 等价）"
+
+msgid "card.trendline.fallback"
+msgstr "🔄 趋势线数据准备中"

@@ -12,12 +12,13 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.base import RankingCard
 from cards.data_provider import get_ranking_provider, format_symbol
+from cards.i18n import gettext as _t, btn as _btn, resolve_lang
 
 
 class FuturesDivergenceCard(RankingCard):
     """⚖️ 情绪分歧榜"""
 
-    FALLBACK = "⚖️ 情绪分歧数据加载中，请稍后重试..."
+    FALLBACK = "card.divergence.fallback"
     provider = get_ranking_provider()
     SHOW_MARKET_SWITCH = False
     DEFAULT_MARKET = "futures"
@@ -109,47 +110,49 @@ class FuturesDivergenceCard(RankingCard):
                 h.user_states["div_fields"] = fields_state
             await self._edit(query, h, ensure)
             return True
-        return False
+            return False
 
     async def _reply(self, query, h, ensure):
-        text, kb = await self._build_payload(h, ensure)
+        lang = resolve_lang(query)
+        text, kb = await self._build_payload(h, ensure, lang, query)
         await query.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
     async def _edit(self, query, h, ensure):
-        text, kb = await self._build_payload(h, ensure)
+        lang = resolve_lang(query)
+        text, kb = await self._build_payload(h, ensure, lang, query)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
 
-    async def _build_payload(self, h, ensure):
+    async def _build_payload(self, h, ensure, lang: str, update=None):
         period = h.user_states.get("div_period", "15m")
         sort_order = h.user_states.get("div_sort", "desc")
         limit = h.user_states.get("div_limit", 10)
         sort_field = h.user_states.get("div_sort_field", "div_abs")
         fields_state = self._ensure_field_state(h)
 
-        rows, header = self._load_rows(period, sort_order, limit, sort_field, fields_state)
-        aligned = h.dynamic_align_format(rows) if rows else "暂无数据"
+        rows, header = self._load_rows(period, sort_order, limit, sort_field, fields_state, lang)
+        aligned = h.dynamic_align_format(rows) if rows else _t("data.no_data", update, lang=lang)
 
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         display_sort_field = sort_field.replace("_", "\\_")
         time_info = h.get_current_time_display()
 
         text = (
-            "⚖️ 情绪分歧榜\n"
-            f"⏰ 更新 {time_info['full']}\n"
-            f"📊 排序 {period} {display_sort_field}({sort_symbol})\n"
+            f"{_t('card.divergence.title', update, lang=lang)}\n"
+            f"{_t('time.update', update, lang=lang, time=time_info['full'])}\n"
+            f"{_t('card.divergence.sort', update, lang=lang, period=period, field=display_sort_field, symbol=sort_symbol)}\n"
             f"{header}\n"
             "```\n"
             f"{aligned}\n"
             "```\n"
-            "💡 数据源：期货情绪聚合表（情绪差值）\n"
-            f"⏰ 最后更新 {time_info['full']}"
+            f"{_t('card.divergence.source', update, lang=lang)}\n"
+            f"{_t('time.last_update', update, lang=lang, time=time_info['full'])}"
         )
         if callable(ensure):
-            text = ensure(text, self.FALLBACK)
-        kb = self._build_keyboard(h)
+            text = ensure(text, _t(self.FALLBACK, update, lang=lang))
+        kb = self._build_keyboard(h, lang, update)
         return text, kb
 
-    def _build_keyboard(self, h):
+    def _build_keyboard(self, h, lang: str, update=None):
         fields_state = self._ensure_field_state(h)
         period = h.user_states.get("div_period", "15m")
         sort_order = h.user_states.get("div_sort", "desc")
@@ -197,16 +200,16 @@ class FuturesDivergenceCard(RankingCard):
         kb.append([b(p, f"div_period_{p}", active=p == period) for p in periods])
 
         kb.append([
-            b("降序", "div_sort_desc", active=sort_order == "desc"),
-            b("升序", "div_sort_asc", active=sort_order == "asc"),
-            b("10条", "div_limit_10", active=current_limit == 10),
-            b("20条", "div_limit_20", active=current_limit == 20),
-            b("30条", "div_limit_30", active=current_limit == 30),
+            _btn(update, "btn.sort.desc", "div_sort_desc", active=sort_order == "desc"),
+            _btn(update, "btn.sort.asc", "div_sort_asc", active=sort_order == "asc"),
+            _btn(update, "btn.limit.10", "div_limit_10", active=current_limit == 10),
+            _btn(update, "btn.limit.20", "div_limit_20", active=current_limit == 20),
+            _btn(update, "btn.limit.30", "div_limit_30", active=current_limit == 30),
         ])
 
         kb.append([
-            InlineKeyboardButton("🏠主菜单", callback_data="ranking_menu"),
-            InlineKeyboardButton("🔄刷新", callback_data="futures_divergence_refresh"),
+            _btn(update, "menu.home", "ranking_menu"),
+            _btn(update, "btn.refresh", "futures_divergence_refresh"),
         ])
         return InlineKeyboardMarkup(kb)
 
@@ -217,6 +220,7 @@ class FuturesDivergenceCard(RankingCard):
         limit: int,
         sort_field: str,
         field_state: Dict[str, bool],
+        lang: str,
     ):
         items: List[Dict] = []
         try:
@@ -239,14 +243,17 @@ class FuturesDivergenceCard(RankingCard):
                 })
         except Exception as exc:  # pragma: no cover
             self._logger.warning("读取期货情绪聚合表失败: %s", exc)
-            return [], "排名/币种"
+            return [], _t("card.header.rank_symbol", lang=lang)
 
         reverse = sort_order != "asc"
         items.sort(key=lambda x: x.get(sort_field, 0), reverse=reverse)
 
         active_special = [f for f in self.special_display_fields if field_state.get(f[0], True)]
         active_general = [f for f in self.general_display_fields if field_state.get(f[0], True)]
-        header_parts = ["排名", "币种"] + [lab for _, lab, _ in active_special] + [lab for _, lab, _ in active_general]
+        header_parts = [
+            _t("card.header.rank", lang=lang),
+            _t("card.header.symbol", lang=lang),
+        ] + [lab for _, lab, _ in active_special] + [lab for _, lab, _ in active_general]
 
         rows: List[List[str]] = []
         for idx, item in enumerate(items[:limit], 1):

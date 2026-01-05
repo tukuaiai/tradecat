@@ -13,10 +13,11 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.base import RankingCard
 from cards.data_provider import format_symbol, get_ranking_provider
+from cards.i18n import gettext as _t, btn as _btn, resolve_lang
 
 
 class 趋势线排行卡片(RankingCard):
-    FALLBACK = "🔄 趋势线数据准备中"
+    FALLBACK = "card.trendline.fallback"
     provider = get_ranking_provider()
 
     def __init__(self) -> None:
@@ -119,14 +120,16 @@ class 趋势线排行卡片(RankingCard):
 
     # ========== 输出渲染 ==========
     async def _reply(self, query, h, ensure):
-        text, kb = await self._build_payload(h, ensure)
+        lang = resolve_lang(query)
+        text, kb = await self._build_payload(h, ensure, lang, query)
         await query.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
     async def _edit(self, query, h, ensure):
-        text, kb = await self._build_payload(h, ensure)
+        lang = resolve_lang(query)
+        text, kb = await self._build_payload(h, ensure, lang, query)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
 
-    async def _build_payload(self, h, ensure):
+    async def _build_payload(self, h, ensure, lang: str, update=None):
         period = h.user_states.get("tl_period", "15m")
         sort_order = h.user_states.get("tl_sort", "desc")
         limit = h.user_states.get("tl_limit", 10)
@@ -137,26 +140,26 @@ class 趋势线排行卡片(RankingCard):
             h.user_states["tl_sort_field"] = sort_field
         fields_state = self._ensure_field_state(h)
 
-        rows, header = self._load_rows(period, sort_order, limit, sort_field, fields_state)
-        aligned = h.dynamic_align_format(rows) if rows else "暂无数据"
+        rows, header = self._load_rows(period, sort_order, limit, sort_field, fields_state, lang)
+        aligned = h.dynamic_align_format(rows) if rows else _t("data.no_data", update, lang=lang)
         time_info = h.get_current_time_display()
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         display_sort_field = sort_field.replace("_", "\\_")
         text = (
-            f"📈 趋势线\n"
-            f"⏰ 更新 {time_info['full']}\n"
-            f"📊 排序 {period} {display_sort_field}({sort_symbol})\n"
+            f"{_t('card.trendline.title', update, lang=lang)}\n"
+            f"{_t('time.update', update, lang=lang, time=time_info['full'])}\n"
+            f"{_t('card.trendline.sort', update, lang=lang, period=period, field=display_sort_field, symbol=sort_symbol)}\n"
             f"{header}\n"
             f"```\n{aligned}\n```\n"
-            f"💡 指标仅保留方向与距离（Pine 等价）\n"
-            f"⏰ 最后更新 {time_info['full']}"
+            f"{_t('card.trendline.source', update, lang=lang)}\n"
+            f"{_t('time.last_update', update, lang=lang, time=time_info['full'])}"
         )
         if callable(ensure):
-            text = ensure(text, self.FALLBACK)
-        kb = self._build_keyboard(h)
+            text = ensure(text, _t(self.FALLBACK, update, lang=lang))
+        kb = self._build_keyboard(h, lang, update)
         return text, kb
 
-    def _build_keyboard(self, h):
+    def _build_keyboard(self, h, lang: str, update=None):
         fields_state = self._ensure_field_state(h)
         period = h.user_states.get("tl_period", "15m")
         sort_order = h.user_states.get("tl_sort", "asc")
@@ -213,16 +216,16 @@ class 趋势线排行卡片(RankingCard):
         kb.append([b(p, f"tl_period_{p}", active=p == period) for p in periods])
 
         kb.append([
-            b("降序", "tl_sort_desc", active=sort_order == "desc"),
-            b("升序", "tl_sort_asc", active=sort_order == "asc"),
-            b("10条", "tl_limit_10", active=current_limit == 10),
-            b("20条", "tl_limit_20", active=current_limit == 20),
-            b("30条", "tl_limit_30", active=current_limit == 30),
+            _btn(update, "btn.sort.desc", "tl_sort_desc", active=sort_order == "desc"),
+            _btn(update, "btn.sort.asc", "tl_sort_asc", active=sort_order == "asc"),
+            _btn(update, "btn.limit.10", "tl_limit_10", active=current_limit == 10),
+            _btn(update, "btn.limit.20", "tl_limit_20", active=current_limit == 20),
+            _btn(update, "btn.limit.30", "tl_limit_30", active=current_limit == 30),
         ])
 
         kb.append([
-            InlineKeyboardButton("🏠主菜单", callback_data="ranking_menu"),
-            InlineKeyboardButton("🔄刷新", callback_data="trendline_ranking_refresh"),
+            _btn(update, "menu.home", "ranking_menu"),
+            _btn(update, "btn.refresh", "trendline_ranking_refresh"),
         ])
 
         return InlineKeyboardMarkup(kb)
@@ -235,6 +238,7 @@ class 趋势线排行卡片(RankingCard):
         limit: int,
         sort_field: str,
         field_state: Dict[str, bool],
+        lang: str,
     ):
         items: List[Dict] = []
         try:
@@ -259,7 +263,7 @@ class 趋势线排行卡片(RankingCard):
                 })
         except Exception as exc:  # pragma: no cover
             self._logger.warning("读取趋势线榜单.py失败: %s", exc)
-            return [], "排名/币种"
+            return [], _t("card.header.rank_symbol", lang=lang)
 
         reverse = sort_order != "asc"
         items.sort(key=lambda x: x.get(sort_field, 0), reverse=reverse)
@@ -267,7 +271,10 @@ class 趋势线排行卡片(RankingCard):
         active_special = [f for f in self.special_display_fields if field_state.get(f[0], True)]
         active_general = [f for f in self.general_display_fields if field_state.get(f[0], True)]
 
-        header_parts = ["排名", "币种"] + [lab for _, lab, _ in active_special] + [lab for _, lab, _ in active_general]
+        header_parts = [
+            _t("card.header.rank", lang=lang),
+            _t("card.header.symbol", lang=lang),
+        ] + [lab for _, lab, _ in active_special] + [lab for _, lab, _ in active_general]
 
         rows: List[List[str]] = []
         for idx, item in enumerate(items[:limit], 1):

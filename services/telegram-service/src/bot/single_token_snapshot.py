@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Literal, Sequence, Tuple
 
 from cards.data_provider import format_symbol, get_ranking_provider
+from cards.i18n import gettext as _t, resolve_lang
 
 # ==================== 配置 ====================
 
@@ -303,6 +304,7 @@ class SingleTokenSnapshot:
         page: int = 0,
         max_lines: int = 40,
         max_chars: int = 4000,
+        lang: str | None = None,
     ) -> tuple[str, int]:
         """渲染指定面板的表格文本（含表头 + 代码块对齐内容）。
 
@@ -311,17 +313,18 @@ class SingleTokenSnapshot:
         self._data_cache.clear()
         self._index_cache.clear()
         self._target_sym = format_symbol(symbol)
+        lang = resolve_lang(lang=lang)
         if not self._target_sym:
-            return "未提供有效币种", 1
+            return _t("snapshot.error.no_symbol", lang=lang), 1
 
         periods = FUTURES_PERIODS if panel == "futures" else ALL_PERIODS
         enabled = enabled_periods or {p: True for p in periods}
         columns = [p for p in periods if enabled.get(p, False)]
         if not columns:
-            return "请至少开启一个周期列", 1
+            return _t("snapshot.error.no_period", lang=lang), 1
 
         enabled_cards = enabled_cards or {}
-        header = ["字段\\周期"] + columns
+        header = [_t("snapshot.header.field", lang=lang)] + columns
         rows: List[List[str]] = []
         table_field_map = TABLE_FIELDS.get(panel, {})
         hidden_fields = _get_hidden_fields()
@@ -349,14 +352,14 @@ class SingleTokenSnapshot:
 
         aligned = align_rows([header] + rows, left_cols=1)
         title = {
-            "basic": f"💵 {self._target_sym} 基础数据",
-            "futures": f"📑 {self._target_sym} 合约数据",
-            "advanced": f"🧠 {self._target_sym} 高级数据",
-        }.get(panel, f"{self._target_sym} 数据快照")
-        header_line = "字段\\周期/" + "/".join(columns)
+            "basic": _t("snapshot.title.basic", lang=lang, symbol=self._target_sym),
+            "futures": _t("snapshot.title.futures", lang=lang, symbol=self._target_sym),
+            "advanced": _t("snapshot.title.advanced", lang=lang, symbol=self._target_sym),
+        }.get(panel, _t("snapshot.title.default", lang=lang, symbol=self._target_sym))
+        header_line = _t("snapshot.header.compact", lang=lang, columns="/".join(columns))
         body_lines = aligned[1:]
         if not body_lines:
-            body_lines = ["暂无数据"]
+            body_lines = [_t("data.no_data", lang=lang)]
 
         # 分页：优先按字符数防止超 4096 长度，再兜底按行数
         if max_lines <= 0:
@@ -383,11 +386,11 @@ class SingleTokenSnapshot:
 
         total_pages = max(len(pages_list), 1)
         page = max(0, min(page, total_pages - 1))
-        page_body = "\n".join(pages_list[page]) if pages_list else "暂无数据"
+        page_body = "\n".join(pages_list[page]) if pages_list else _t("data.no_data", lang=lang)
 
         footer_parts = [
-            "💡 按钮可开关卡片/周期/面板；合约不含1m；高级默认少列防超长",
-            f"📑 页 {page+1}/{total_pages}",
+            _t("snapshot.footer.hint", lang=lang),
+            _t("snapshot.footer.page", lang=lang, current=page + 1, total=total_pages),
         ]
         footer = "\n".join(footer_parts)
         return f"{title}\n{header_line}\n```\n{page_body}\n```\n{footer}", total_pages

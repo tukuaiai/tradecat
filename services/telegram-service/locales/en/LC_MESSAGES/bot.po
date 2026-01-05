@@ -415,3 +415,85 @@ msgstr "🔄 Loading data"
 
 msgid "data.coins_count"
 msgstr "📊 Available coins ({count})"
+
+# ============ Single token snapshot ============
+msgid "snapshot.error.no_symbol"
+msgstr "Symbol is required"
+
+msgid "snapshot.error.no_period"
+msgstr "Please enable at least one timeframe"
+
+msgid "snapshot.header.field"
+msgstr "Field/TF"
+
+msgid "snapshot.header.compact"
+msgstr "Field/TF/{columns}"
+
+msgid "snapshot.title.basic"
+msgstr "💵 {symbol} Basics"
+
+msgid "snapshot.title.futures"
+msgstr "📑 {symbol} Futures"
+
+msgid "snapshot.title.advanced"
+msgstr "🧠 {symbol} Advanced"
+
+msgid "snapshot.title.default"
+msgstr "{symbol} Snapshot"
+
+msgid "snapshot.footer.hint"
+msgstr "💡 Toggle cards/periods/panels; futures hide 1m; advanced keeps fewer columns"
+
+msgid "snapshot.footer.page"
+msgstr "📑 Page {current}/{total}"
+
+# ============ Ranking common ============
+msgid "card.header.rank"
+msgstr "Rank"
+
+msgid "card.header.symbol"
+msgstr "Symbol"
+
+msgid "card.header.rank_symbol"
+msgstr "Rank/Symbol"
+
+msgid "btn.sort.desc"
+msgstr "Desc"
+
+msgid "btn.sort.asc"
+msgstr "Asc"
+
+msgid "btn.limit.10"
+msgstr "Top 10"
+
+msgid "btn.limit.20"
+msgstr "Top 20"
+
+msgid "btn.limit.30"
+msgstr "Top 30"
+
+# ============ Futures divergence ============
+msgid "card.divergence.title"
+msgstr "⚖️ Divergence Ranking"
+
+msgid "card.divergence.sort"
+msgstr "📊 Sort {period} {field}({symbol})"
+
+msgid "card.divergence.source"
+msgstr "💡 Source: Futures sentiment aggregation (divergence)"
+
+msgid "card.divergence.fallback"
+msgstr "⚖️ Divergence data loading, please retry..."
+
+# ============ Trendline ============
+msgid "card.trendline.title"
+msgstr "📈 Trendline"
+
+msgid "card.trendline.sort"
+msgstr "📊 Sort {period} {field}({symbol})"
+
+msgid "card.trendline.source"
+msgstr "💡 Keep only direction and distance (Pine equivalent)"
+
+msgid "card.trendline.fallback"
+msgstr "🔄 Trendline data is loading"
