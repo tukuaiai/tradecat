@@ -7,14 +7,18 @@ from ..base import Indicator, IndicatorMeta, register
 
 
 def _f(v) -> Optional[float]:
-    if v is None: return None
-    try: return float(v)
-    except (ValueError, TypeError): return None
+    if v is None:
+        return None
+    try:
+        return float(v)
+    except (ValueError, TypeError):
+        return None
 
 
 def _linreg_slope(values: List[float]) -> Optional[float]:
     """线性回归斜率（绝对值）"""
-    if not values or len(values) < 2: return None
+    if not values or len(values) < 2:
+        return None
     n = len(values)
     x_sum = (n - 1) * n / 2
     x2_sum = (n - 1) * n * (2 * n - 1) / 6
@@ -26,37 +30,44 @@ def _linreg_slope(values: List[float]) -> Optional[float]:
 
 def _linreg_slope_pct(values: List[float]) -> Optional[float]:
     """线性回归斜率（百分比，相对于最新值）"""
-    if not values or len(values) < 2: return None
+    if not values or len(values) < 2:
+        return None
     slope = _linreg_slope(values)
-    if slope is None: return None
+    if slope is None:
+        return None
     latest = values[-1]
-    if not latest or latest == 0: return None
+    if not latest or latest == 0:
+        return None
     # 斜率占最新值的百分比
     return (slope / latest) * 100
 
 
 def _std_over_mean(values: List[float]) -> Optional[float]:
-    if not values or len(values) < 2: return None
+    if not values or len(values) < 2:
+        return None
     mean_v = statistics.fmean(values)
     return statistics.pstdev(values) / mean_v if mean_v else None
 
 
 def _z_score(latest: float, series: List[float]) -> Optional[float]:
-    if series is None or len(series) < 2: return None
+    if series is None or len(series) < 2:
+        return None
     mean_v = statistics.fmean(series)
     std_v = statistics.pstdev(series)
     return (latest - mean_v) / std_v if std_v else 0.0
 
 
 def _percentile_rank(values: List[float], latest: float) -> Optional[float]:
-    if not values: return None
+    if not values:
+        return None
     count = sum(1 for v in values if v is not None and v <= latest)
     total = sum(1 for v in values if v is not None)
     return count / total if total else None
 
 
 def _尾部连续根数(sign_list: List[int]) -> Optional[int]:
-    if not sign_list: return None
+    if not sign_list:
+        return None
     count, last_sign = 0, None
     for s in reversed(sign_list):
         if s == 0:
@@ -200,8 +211,10 @@ class FuturesAggregate(Indicator):
         # 翻转信号
         flip_signal = 0
         if prev_tlsr and tlsr:
-            if prev_tlsr < 1 < tlsr: flip_signal = 1
-            elif prev_tlsr > 1 > tlsr: flip_signal = -1
+            if prev_tlsr < 1 < tlsr:
+                flip_signal = 1
+            elif prev_tlsr > 1 > tlsr:
+                flip_signal = -1
 
         # 主动跳变幅度
         taker_jump = abs(tlsvr - prev_tlsvr) if tlsvr and prev_tlsvr else None

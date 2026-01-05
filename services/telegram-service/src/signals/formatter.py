@@ -28,7 +28,7 @@ def fmt_price(val: Any) -> str:
             return f"${v:.2f}"
         else:
             return f"${v:.4f}"
-    except:
+    except Exception:
         return str(val)
 
 
@@ -41,7 +41,7 @@ def fmt_pct(val: Any, with_sign: bool = True) -> str:
         if with_sign and v > 0:
             return f"+{v:.2f}%"
         return f"{v:.2f}%"
-    except:
+    except Exception:
         return str(val)
 
 
@@ -58,7 +58,7 @@ def fmt_vol(val: Any) -> str:
         elif v >= 1e3:
             return f"${v/1e3:.0f}K"
         return f"${v:.0f}"
-    except:
+    except Exception:
         return str(val)
 
 
@@ -71,7 +71,7 @@ def fmt_num(val: Any, decimals: int = 2) -> str:
         if decimals == 0:
             return f"{v:,.0f}"
         return f"{v:.{decimals}f}"
-    except:
+    except Exception:
         return str(val)
 
 
@@ -87,7 +87,7 @@ def fmt_change(prev: Any, curr: Any) -> str:
         if pct > 0:
             return f"(+{pct:.1f}%)"
         return f"({pct:.1f}%)"
-    except:
+    except Exception:
         return ""
 
 
