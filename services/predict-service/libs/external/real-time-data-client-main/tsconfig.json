@@ -1,0 +1,33 @@
+{
+    "include": ["src/**/*"],
+    "exclude": [
+        "src/**/*.test.ts", 
+        "tests/*",
+        "node_modules",
+        "./node_modules",
+        "./node_modules/*",
+    ],
+    "compilerOptions": {
+        "baseUrl": "./",
+        "module": "commonjs",
+        "target": "es6",
+        "outDir": "./dist",
+        "sourceMap": true,
+        "declaration": true,
+        "moduleResolution": "node",
+        "esModuleInterop": true,
+        "experimentalDecorators": true,
+        "allowSyntheticDefaultImports": true,
+        "importHelpers": true,
+        "strict": true,
+        "noFallthroughCasesInSwitch": true,
+        "noUnusedLocals": true,
+        "noImplicitReturns": true,
+        "noUnusedParameters": true,
+        "resolveJsonModule": true,
+        "strictNullChecks": true,
+        "typeRoots": ["node_modules/@types"],
+        "lib": ["es2018", "dom"],
+        "skipLibCheck": true
+    },
+}

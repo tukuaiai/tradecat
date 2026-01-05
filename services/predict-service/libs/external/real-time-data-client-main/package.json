@@ -1,0 +1,53 @@
+{
+    "name": "@polymarket/real-time-data-client",
+    "version": "1.4.2",
+    "description": "A TypeScript client to receive real time data messages",
+    "contributors": [
+        {
+            "name": "Rodrigo Calvo",
+            "url": "https://github.com/poly-rodr"
+        },
+        {
+            "name": "Matt Walker",
+            "url": "https://github.com/mttwlkr"
+        }
+    ],
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "files": [
+        "/dist"
+    ],
+    "keywords": [
+        "Polymarket"
+    ],
+    "license": "MIT",
+    "scripts": {
+        "build": "make build",
+        "lint": "make lint",
+        "deploy": "yarn build && npm publish",
+        "format": "prettier --write ."
+    },
+    "dependencies": {
+        "https-proxy-agent": "^7.0.6",
+        "isomorphic-ws": "^5.0.0",
+        "tslib": "^2.8.1",
+        "ws": "^8.18.1"
+    },
+    "devDependencies": {
+        "@eslint/eslintrc": "^3.3.0",
+        "@eslint/js": "^9.21.0",
+        "@types/node": "^22.13.9",
+        "@types/ws": "^8.18.0",
+        "dotenv": "^16.4.7",
+        "eslint": "^9.21.0",
+        "esm": "^3.2.25",
+        "globals": "^16.0.0",
+        "jsdom": "^26.0.0",
+        "jsdom-global": "^3.0.2",
+        "path": "^0.12.7",
+        "prettier": "^3.5.3",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.8.2",
+        "typescript-eslint": "^8.26.0"
+    }
+}

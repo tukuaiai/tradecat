@@ -1,0 +1,15 @@
+# folders
+build/
+dist/
+lib/
+node_modules/
+.nyc_output/
+coverage/
+
+# files
+.env
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store

@@ -627,103 +627,119 @@ def render_vpvr_zone_grid(params: Dict, output: str) -> Tuple[object, str]:
 
 def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
     """
-    手绘风格的 VPVR 条带散点图。
+    VPVR 价值区分布图。
 
-    - 纵轴：价格归一化后的相对位置（依据 value_area_low/high）
-    - 横向：窄条带，随机抖动散点，标签在右侧
+    每个币种按当前价格在自身价值区的相对位置(0-100%)分布。
+    
+    必填 data 字段：symbol, price, value_area_low, value_area_high
     """
 
     data = params.get("data")
     if not data or not isinstance(data, list):
         raise ValueError("缺少 data 列表")
 
-    bands = max(2, int(params.get("bands", 6)))
-    dots_per_symbol = max(1, int(params.get("dots_per_symbol", 8)))
+    bands = max(2, int(params.get("bands", 5)))
 
     import pandas as pd
 
     df = pd.DataFrame(data)
-    required_cols = {"symbol", "value_area_low", "value_area_high"}
+    required_cols = {"symbol", "price", "value_area_low", "value_area_high"}
     if not required_cols.issubset(df.columns):
-        raise ValueError("data 需包含 symbol, value_area_low, value_area_high")
-    df = df.dropna(subset=["value_area_low", "value_area_high"])
-    df["mid"] = (df["value_area_low"].astype(float) + df["value_area_high"].astype(float)) / 2
+        raise ValueError("data 需包含 symbol, price, value_area_low, value_area_high")
+    
+    df = df.dropna(subset=["price", "value_area_low", "value_area_high"])
     df["span"] = (df["value_area_high"] - df["value_area_low"]).astype(float)
     df = df[df["span"] > 0]
     if df.empty:
         raise ValueError("无有效 VPVR 数据")
 
-    # 全量统一归一化（单组展示）
-    pmin, pmax = df["value_area_low"].min(), df["value_area_high"].max()
-    span = pmax - pmin if pmax > pmin else 1.0
-    df["y_low"] = (df["value_area_low"] - pmin) / span
-    df["y_high"] = (df["value_area_high"] - pmin) / span
-    df["poc_norm"] = (df["mid"] - pmin) / span
+    # 每个币种在自身价值区的相对位置 (0-1)
+    df["y"] = ((df["price"] - df["value_area_low"]) / df["span"]).clip(0, 1)
 
     sns.set_theme(style="white")
-    fig, ax = plt.subplots(1, 1, figsize=(4, 6))
-    band_colors = ["#e0f2fe", "#d1fae5", "#fef9c3", "#fae8ff"]
-
+    fig, ax = plt.subplots(1, 1, figsize=(14, 11), dpi=200)
+    
+    cmap = plt.cm.viridis
+    band_colors = [cmap(i / (bands - 1)) for i in range(bands)]
     rng = np.random.default_rng(42)
 
     # 背景条带
     for i in range(bands):
         y0 = i / bands
-        color = band_colors[i % len(band_colors)]
-        ax.add_patch(
-            plt.Rectangle(
-                (0.0, y0),
-                1.0,
-                1 / bands,
-                facecolor=color,
-                alpha=0.55,
-                edgecolor="none",
-            )
-        )
+        ax.add_patch(plt.Rectangle((0.0, y0), 1.0, 1/bands, facecolor=band_colors[i], alpha=0.8, edgecolor="none"))
 
+    # 基础尺寸
+    base_size = 320
+    base_font = 4.2
+
+    # 防重叠放置
+    placed = []
+    min_dist = 0.022
     for _, row in df.iterrows():
-        ys = rng.uniform(row["y_low"], row["y_high"], size=dots_per_symbol)
-        xs = rng.uniform(0.05, 0.95, size=dots_per_symbol)
-        ax.scatter(xs, ys, color="#0ea5e9", s=18, alpha=0.9)
+        y_center = row["y"]
+        best_x = 0.5
+        best_score = -1
+        for _ in range(150):
+            x_test = rng.uniform(0.04, 0.96)
+            if not placed:
+                best_x = x_test
+                break
+            min_d = min((x_test - px)**2 + (y_center - py)**2 for px, py in placed)
+            if min_d > best_score:
+                best_score = min_d
+                best_x = x_test
+            if min_d > min_dist**2:
+                break
+        placed.append((best_x, y_center))
+        
         label = str(row["symbol"]).replace("USDT", "")
-        x_mean, y_mean = float(xs.mean()), float(ys.mean())
-        label_y = min(y_mean + 0.08, 0.97)
-        label_x = min(max(x_mean, 0.05), 0.95)
-        ax.annotate(
-            label,
-            xy=(x_mean, y_mean),
-            xytext=(label_x, label_y),
-            textcoords="data",
-            ha="center",
-            va="center",
-            fontsize=8,
-            color="#0f172a",
-            bbox=dict(boxstyle="round,pad=0.15", facecolor="#ffffff", edgecolor="none", alpha=0.85),
-            arrowprops=dict(arrowstyle="->", color="#0f172a", lw=0.7, shrinkA=4, shrinkB=4),
-        )
+        # 动态调整圆圈和字体大小
+        label_len = len(label)
+        if label_len <= 3:
+            size_mult, font_mult = 0.85, 1.3
+        elif label_len <= 4:
+            size_mult, font_mult = 1.0, 1.1
+        elif label_len <= 5:
+            size_mult, font_mult = 1.1, 1.0
+        elif label_len <= 6:
+            size_mult, font_mult = 1.25, 0.9
+        else:
+            label = label[:6] + ".."
+            size_mult, font_mult = 1.4, 0.8
+        
+        ax.scatter([best_x], [y_center], s=base_size * size_mult, c="#ffffff", alpha=0.95, zorder=2, edgecolors="#444444", linewidths=1.2)
+        ax.text(best_x, y_center, label, ha="center", va="center", fontsize=base_font * font_mult, color="#1a1a1a", fontweight="bold", zorder=3)
 
-    for spine in ax.spines.values():
-        spine.set_visible(False)
+    for spine in ["top", "right", "bottom"]:
+        ax.spines[spine].set_visible(False)
+    ax.spines["left"].set_visible(True)
+    ax.spines["left"].set_color("#666666")
+    ax.spines["left"].set_linewidth(1.5)
+
     ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_xlim(0, 1)
-    ax.set_ylim(-0.02, 1.02)
+    yticks = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
+    ylabels = ["0%", "20%", "40%", "60%", "80%", "100%"]
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(ylabels, fontsize=9, color="#333333")
+    ax.set_ylabel("Position in Value Area", fontsize=10, color="#333333", labelpad=10)
 
-    fig.suptitle(params.get("title", "VPVR 条带"), fontsize=12, color="#0f172a", y=1.02)
-    fig.tight_layout()
+    # 右侧区域标签
+    ax.text(1.02, 0.1, "Oversold", fontsize=9, color="#440154", va="center", ha="left", transform=ax.transAxes)
+    ax.text(1.02, 0.5, "POC Zone", fontsize=9, color="#21918c", va="center", ha="left", transform=ax.transAxes)
+    ax.text(1.02, 0.9, "Overbought", fontsize=9, color="#fde725", va="center", ha="left", transform=ax.transAxes, fontweight="bold")
+
+    ax.set_xlim(-0.01, 1.01)
+    ax.set_ylim(-0.03, 1.03)
+
+    fig.suptitle(params.get("title", "VPVR Zone Distribution"), fontsize=13, color="#1e293b", fontweight="bold", y=0.98)
+    fig.tight_layout(rect=[0, 0.01, 0.95, 0.95])
 
     if output == "json":
         return (
             {
-                "title": params.get("title", "VPVR 条带"),
+                "title": params.get("title", "VPVR Zone Distribution"),
                 "bands": bands,
-                "points": [
-                    {
-                        "symbol": symbol,
-                        "ys": [float(y) for y in rng.uniform(norm(vl), norm(vh), size=dots_per_symbol)],
-                    }
-                    for symbol, vl, vh, _ in records
-                ],
+                "points": [{"symbol": row["symbol"], "position": float(row["y"])} for _, row in df.iterrows()],
             },
             "application/json",
         )

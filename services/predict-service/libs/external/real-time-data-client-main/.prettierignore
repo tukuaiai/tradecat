@@ -1,0 +1,25 @@
+# folders
+build/
+dist/
+lib/
+node_modules/
+.nyc_output/
+coverage/
+
+# files
+.eslintrc.js
+.editorconfig
+.eslintignore
+.github/workflows/workflow.yaml
+.prettierignore
+.prettierrc.json
+Makefile
+tsconfig.json
+.env
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+tsconfig.eslint.json
+tsconfig.json
