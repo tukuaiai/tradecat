@@ -106,3 +106,5 @@ services/trading-service/.venv
 
 
 book/
+# Ignore temp file "5"
+5
