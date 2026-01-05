@@ -530,3 +530,26 @@ msgstr "💡 Keep only direction and distance (Pine equivalent)"
 
 msgid "card.trendline.fallback"
 msgstr "🔄 Trendline data is loading"
+
+# ============ Export ============
+msgid "export.caption"
+msgstr "📊 {symbol} Full Data Report"
+
+msgid "export.title"
+msgstr "{symbol} Full Data Report"
+
+# ============ UI Hints ============
+msgid "ui.please_wait"
+msgstr "⏳ Please wait"
+
+msgid "ui.processing"
+msgstr "Processing..."
+
+msgid "ui.futures_no_1m"
+msgstr "Futures view doesn't support 1m"
+
+msgid "ui.card_offline"
+msgstr "⚖️ Card offline"
+
+msgid "ui.system_reloading"
+msgstr "System reloading, please try again later"

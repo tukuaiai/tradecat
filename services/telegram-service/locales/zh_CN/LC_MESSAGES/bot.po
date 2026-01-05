@@ -530,3 +530,26 @@ msgstr "💡 指标仅保留方向与距离（Pine 等价）"
 
 msgid "card.trendline.fallback"
 msgstr "🔄 趋势线数据准备中"
+
+# ============ 导出 ============
+msgid "export.caption"
+msgstr "📊 {symbol} 完整数据报告"
+
+msgid "export.title"
+msgstr "{symbol} 完整数据报告"
+
+# ============ UI 提示 ============
+msgid "ui.please_wait"
+msgstr "⏳ 请稍等"
+
+msgid "ui.processing"
+msgstr "处理中..."
+
+msgid "ui.futures_no_1m"
+msgstr "合约视图不支持1m"
+
+msgid "ui.card_offline"
+msgstr "⚖️ 卡片已下线"
+
+msgid "ui.system_reloading"
+msgstr "系统正在重新加载，请稍后重试"
