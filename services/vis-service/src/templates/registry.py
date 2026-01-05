@@ -632,15 +632,16 @@ def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
     每个币种按当前价格在自身价值区的相对位置(0-100%)分布。
     
     必填 data 字段：symbol, price, value_area_low, value_area_high
+    可选 data 字段：
+      - market_cap: 市值，决定圆圈大小
+      - volume: 成交量，决定圆圈颜色深浅
+      - price_change: 涨跌幅，决定颜色(红跌绿涨)
     """
-
     data = params.get("data")
     if not data or not isinstance(data, list):
         raise ValueError("缺少 data 列表")
 
-    bands = max(2, int(params.get("bands", 5)))
-
-    import pandas as pd
+    bands = max(2, int(params.get("bands", 6)))
 
     df = pd.DataFrame(data)
     required_cols = {"symbol", "price", "value_area_low", "value_area_high"}
@@ -654,92 +655,165 @@ def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
         raise ValueError("无有效 VPVR 数据")
 
     # 每个币种在自身价值区的相对位置 (0-1)
-    df["y"] = ((df["price"] - df["value_area_low"]) / df["span"]).clip(0, 1)
+    raw_y = (df["price"] - df["value_area_low"]) / df["span"]
+    df["y"] = raw_y.clip(0.01, 0.99)
+    df["y_raw"] = raw_y.clip(0, 1)
 
-    sns.set_theme(style="white")
-    fig, ax = plt.subplots(1, 1, figsize=(14, 11), dpi=200)
+    n = len(df)
+    fig_height = min(14, max(10, n * 0.028))
     
-    cmap = plt.cm.viridis
-    band_colors = [cmap(i / (bands - 1)) for i in range(bands)]
-    rng = np.random.default_rng(42)
-
-    # 背景条带
+    sns.set_theme(style="white")
+    fig, ax = plt.subplots(1, 1, figsize=(16, fig_height), dpi=150)
+    
+    # 更丰富的背景色带
+    band_colors = ["#4a148c", "#1a237e", "#006064", "#1b5e20", "#f9a825", "#ff6f00"]
+    if bands != 6:
+        cmap = plt.cm.viridis
+        band_colors = [cmap(i / max(1, bands - 1)) for i in range(bands)]
+    
     for i in range(bands):
         y0 = i / bands
-        ax.add_patch(plt.Rectangle((0.0, y0), 1.0, 1/bands, facecolor=band_colors[i], alpha=0.8, edgecolor="none"))
+        ax.add_patch(plt.Rectangle((0.0, y0), 1.0, 1/bands, facecolor=band_colors[i], alpha=0.85, edgecolor="none"))
 
-    # 基础尺寸
-    base_size = 320
-    base_font = 4.2
+    rng = np.random.default_rng(42)
 
-    # 防重叠放置
-    placed = []
-    min_dist = 0.022
+    # 市值归一化 -> 圆圈大小
+    if "market_cap" in df.columns:
+        mc = df["market_cap"].fillna(df["market_cap"].median())
+        mc_log = np.log10(mc.clip(lower=1))
+        mc_norm = (mc_log - mc_log.min()) / (mc_log.max() - mc_log.min() + 1e-9)
+        df["size_factor"] = 0.4 + mc_norm * 0.8  # 0.4 ~ 1.2
+    else:
+        df["size_factor"] = 1.0
+
+    # 成交量归一化 -> 颜色亮度
+    if "volume" in df.columns:
+        vol = df["volume"].fillna(df["volume"].median())
+        vol_log = np.log10(vol.clip(lower=1))
+        vol_norm = (vol_log - vol_log.min()) / (vol_log.max() - vol_log.min() + 1e-9)
+        df["vol_factor"] = vol_norm  # 0 ~ 1
+    else:
+        df["vol_factor"] = 0.5
+
+    # 智能初始布局
+    df = df.sort_values("y").reset_index(drop=True)
+    y_bins = pd.cut(df["y"], bins=25, labels=False)
+    df["y_bin"] = y_bins.fillna(0).astype(int)
+    
+    x_positions = []
+    for bin_id in range(25):
+        bin_mask = df["y_bin"] == bin_id
+        bin_count = bin_mask.sum()
+        if bin_count > 0:
+            # 层内均匀分布
+            bin_indices = df[bin_mask].index.tolist()
+            for i, idx in enumerate(bin_indices):
+                x = (i + 0.5) / bin_count * 0.88 + 0.06
+                x += rng.uniform(-0.015, 0.015)  # 小抖动
+                x_positions.append((idx, x))
+    
+    for idx, x in x_positions:
+        df.loc[idx, "x"] = x
+    df["x"] = df["x"].clip(0.03, 0.97)
+
+    # 绘制圆圈
+    base_size = 280
+    base_font = 3.6
+    texts = []
+    
+    # 成交量排序映射颜色：深红 -> 橙 -> 黄 -> 浅黄
+    vol_cmap = plt.cm.YlOrRd_r  # 黄-橙-红 反转 = 红->橙->黄
+    
     for _, row in df.iterrows():
-        y_center = row["y"]
-        best_x = 0.5
-        best_score = -1
-        for _ in range(150):
-            x_test = rng.uniform(0.04, 0.96)
-            if not placed:
-                best_x = x_test
-                break
-            min_d = min((x_test - px)**2 + (y_center - py)**2 for px, py in placed)
-            if min_d > best_score:
-                best_score = min_d
-                best_x = x_test
-            if min_d > min_dist**2:
-                break
-        placed.append((best_x, y_center))
-        
         label = str(row["symbol"]).replace("USDT", "")
-        # 动态调整圆圈和字体大小
-        label_len = len(label)
-        if label_len <= 3:
-            size_mult, font_mult = 0.85, 1.3
-        elif label_len <= 4:
-            size_mult, font_mult = 1.0, 1.1
-        elif label_len <= 5:
-            size_mult, font_mult = 1.1, 1.0
-        elif label_len <= 6:
-            size_mult, font_mult = 1.25, 0.9
-        else:
+        if len(label) > 6:
             label = label[:6] + ".."
-            size_mult, font_mult = 1.4, 0.8
         
-        ax.scatter([best_x], [y_center], s=base_size * size_mult, c="#ffffff", alpha=0.95, zorder=2, edgecolors="#444444", linewidths=1.2)
-        ax.text(best_x, y_center, label, ha="center", va="center", fontsize=base_font * font_mult, color="#1a1a1a", fontweight="bold", zorder=3)
+        # 市值决定大小
+        size_factor = row.get("size_factor", 1.0)
+        font_size = base_font * (0.7 + size_factor * 0.4)
+        
+        # 成交量决定填充颜色（深红到浅黄渐变）
+        vol_factor = row.get("vol_factor", 0.5)
+        rgba = vol_cmap(1 - vol_factor)
+        point_color = f"#{int(rgba[0]*255):02x}{int(rgba[1]*255):02x}{int(rgba[2]*255):02x}"
+        
+        # 涨跌决定边框颜色
+        chg = row.get("price_change")
+        if chg is not None and chg > 0.005:
+            edge_color = "#1a9850"  # 绿
+        elif chg is not None and chg < -0.005:
+            edge_color = "#d73027"  # 红
+        else:
+            edge_color = "#ffffff"  # 白
+        
+        txt = ax.text(
+            row["x"], row["y"], label,
+            ha="center", va="center",
+            fontsize=font_size,
+            color="#1a1a1a",
+            fontweight="bold",
+            zorder=4,
+            bbox=dict(boxstyle="circle,pad=0.25", facecolor=point_color, edgecolor=edge_color, linewidth=2.5, alpha=0.9),
+        )
+        texts.append(txt)
 
+    # adjustText 微调
+    adjust_text(
+        texts,
+        x=df["x"].tolist(),
+        y=df["y"].tolist(),
+        ax=ax,
+        expand=(1.15, 1.25),
+        force_text=(0.5, 0.7),
+        force_static=(0.2, 0.3),
+        force_pull=(0.003, 0.003),
+        arrowprops=dict(arrowstyle="-", color="#666666", lw=0.3, alpha=0.4),
+        time_lim=3,
+    )
+
+    # 样式
     for spine in ["top", "right", "bottom"]:
         ax.spines[spine].set_visible(False)
-    ax.spines["left"].set_visible(True)
-    ax.spines["left"].set_color("#666666")
-    ax.spines["left"].set_linewidth(1.5)
+    ax.spines["left"].set_color("#444444")
+    ax.spines["left"].set_linewidth(1.2)
 
     ax.set_xticks([])
-    yticks = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
-    ylabels = ["0%", "20%", "40%", "60%", "80%", "100%"]
-    ax.set_yticks(yticks)
-    ax.set_yticklabels(ylabels, fontsize=9, color="#333333")
-    ax.set_ylabel("Position in Value Area", fontsize=10, color="#333333", labelpad=10)
+    ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
+    ax.set_yticklabels(["0%", "20%", "40%", "60%", "80%", "100%"], fontsize=9, color="#333333")
+    ax.set_ylabel("Position in Value Area", fontsize=10, color="#333333", labelpad=8)
 
-    # 右侧区域标签
-    ax.text(1.02, 0.1, "Oversold", fontsize=9, color="#440154", va="center", ha="left", transform=ax.transAxes)
-    ax.text(1.02, 0.5, "POC Zone", fontsize=9, color="#21918c", va="center", ha="left", transform=ax.transAxes)
-    ax.text(1.02, 0.9, "Overbought", fontsize=9, color="#fde725", va="center", ha="left", transform=ax.transAxes, fontweight="bold")
+    # 右下角图例
+    legend_y_start = 0.32
+    legend_x = 0.88
+    legend_items = [
+        ("Overbought", band_colors[-1], 50, "#333"),
+        ("POC Zone", band_colors[len(band_colors)//2], 50, "#333"),
+        ("Oversold", band_colors[0], 50, "#333"),
+        ("High Vol", "#b71c1c", 60, "#333"),
+        ("Low Vol", "#ffffcc", 40, "#333"),
+        ("Up", "#ffcc80", 50, "#1a9850"),
+        ("Down", "#ffcc80", 50, "#d73027"),
+    ]
+    for i, (lbl, color, size, edge) in enumerate(legend_items):
+        y_pos = legend_y_start - i * 0.04
+        ax.scatter([legend_x], [y_pos], s=size, c=[color], edgecolors=edge, linewidths=1.5, transform=ax.transAxes, zorder=9)
+        ax.text(legend_x + 0.025, y_pos, lbl, fontsize=7, va="center", ha="left", transform=ax.transAxes, color="#333333", zorder=9)
 
     ax.set_xlim(-0.01, 1.01)
-    ax.set_ylim(-0.03, 1.03)
+    ax.set_ylim(-0.02, 1.02)
 
-    fig.suptitle(params.get("title", "VPVR Zone Distribution"), fontsize=13, color="#1e293b", fontweight="bold", y=0.98)
-    fig.tight_layout(rect=[0, 0.01, 0.95, 0.95])
+    fig.suptitle(params.get("title", "VPVR Zone Distribution"), fontsize=12, color="#1e293b", fontweight="bold", y=0.98)
+    fig.tight_layout(rect=[0, 0.02, 0.92, 0.96])
 
     if output == "json":
         return (
             {
                 "title": params.get("title", "VPVR Zone Distribution"),
                 "bands": bands,
-                "points": [{"symbol": row["symbol"], "position": float(row["y"])} for _, row in df.iterrows()],
+                "points": [{"symbol": row["symbol"], "position": float(row["y_raw"]), "x": float(row["x"]), 
+                           "size_factor": float(row.get("size_factor", 1)), "vol_factor": float(row.get("vol_factor", 0.5))} 
+                          for _, row in df.iterrows()],
             },
             "application/json",
         )
@@ -906,24 +980,22 @@ def register_defaults() -> TemplateRegistry:
         TemplateMeta(
             template_id="vpvr-zone-strip",
             name="VPVR 条带散点",
-            description="按价值区在纵轴定位，右侧散点+标签，仿手绘条带图",
+            description="按价值区位置分布，使用 adjustText 自动防重叠，支持涨跌/量比着色",
             outputs=["png", "json"],
             params=[
-                "data(list[{symbol, value_area_low, value_area_high, poc?}])",
-                "bands?(int, default 6)",
-                "dots_per_symbol?(int, default 8)",
+                "data(list[{symbol, price, value_area_low, value_area_high, price_change?, volume_change?}])",
+                "bands?(int, default 5)",
                 "title?",
             ],
             sample={
                 "template_id": "vpvr-zone-strip",
                 "output": "png",
                 "params": {
-                    "bands": 6,
-                    "dots_per_symbol": 8,
+                    "bands": 5,
                     "data": [
-                        {"symbol": "ETH", "value_area_low": 1500, "value_area_high": 1700, "poc": 1620},
-                        {"symbol": "BTC", "value_area_low": 33000, "value_area_high": 36000, "poc": 34500},
-                        {"symbol": "SOL", "value_area_low": 120, "value_area_high": 140, "poc": 132},
+                        {"symbol": "ETHUSDT", "price": 1620, "value_area_low": 1500, "value_area_high": 1700, "price_change": 0.03},
+                        {"symbol": "BTCUSDT", "price": 34500, "value_area_low": 33000, "value_area_high": 36000, "price_change": -0.05},
+                        {"symbol": "SOLUSDT", "price": 135, "value_area_low": 120, "value_area_high": 140, "volume_change": 2.0},
                     ],
                 },
             },
