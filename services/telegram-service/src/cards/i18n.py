@@ -63,6 +63,7 @@ def btn(update, key: str, callback: str, *, active: bool = False, prefix: str = 
     return InlineKeyboardButton(text, callback_data=callback)
 
 BUTTON_KEY_MAP = {
+    "排序": "card.common.sort",
     "降序": "btn.sort.desc",
     "升序": "btn.sort.asc",
     "10条": "btn.limit.10",
