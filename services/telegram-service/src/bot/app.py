@@ -4959,17 +4959,16 @@ async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if getattr(update, "callback_query", None):
         await update.callback_query.answer(msg)
         if user_handler:
-            await update.callback_query.edit_message_text(
-                user_handler.get_main_menu_text(update),
-                reply_markup=user_handler.get_main_menu_keyboard(update)
+            # 发送新消息刷新底部键盘
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=msg,
+                reply_markup=user_handler.get_reply_keyboard(update)
             )
     elif getattr(update, "message", None):
-        await update.message.reply_text(msg)
         if user_handler:
-            await update.message.reply_text(
-                user_handler.get_main_menu_text(update),
-                reply_markup=user_handler.get_main_menu_keyboard(update)
-            )
+            # 发送带底部键盘的消息
+            await update.message.reply_text(msg, reply_markup=user_handler.get_reply_keyboard(update))
 
 async def vol_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """交易量数据查询指令 /vol"""

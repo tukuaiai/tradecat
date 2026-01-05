@@ -17,3 +17,6 @@
 [ ] 数据库完全迁移到新的 TimescaleDB（RAW/QUALITY schema）  
     - 迁移脚本与 README 说明统一到新端口/新 schema；确保数据导出/恢复/压缩脚本可用。  
     - 验收：使用 restore_*.sh 完成一次全量恢复并通过 ./scripts/verify.sh。
+
+
+[ ] 新建专业的可视化数据分析微服务，内置有常用可视化类型/模板
