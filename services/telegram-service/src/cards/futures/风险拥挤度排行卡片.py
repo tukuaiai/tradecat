@@ -26,7 +26,7 @@ class FuturesRiskCrowdingCard(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="futures_risk_crowding",
-            button_text="🚨 风险拥挤",
+            button_text="card.crowding.btn",
             category="free",
             description="风险分与市场占比排行榜，基于期货情绪聚合表",
             default_state={

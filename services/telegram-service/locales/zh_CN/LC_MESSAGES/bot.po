@@ -938,3 +938,126 @@ msgstr "• `BTC!` - 交互式查询"
 
 msgid "query.usage_export"
 msgstr "• `BTC!!` - 导出完整TXT文件"
+
+# Card buttons - Basic
+msgid "card.kdj.btn"
+msgstr "🎯 KDJ"
+
+msgid "card.macd.btn"
+msgstr "🧲 MACD柱"
+
+msgid "card.obv.btn"
+msgstr "📡 OBV"
+
+msgid "card.rsi.btn"
+msgstr "🔔 RSI谐波"
+
+msgid "card.bollinger.btn"
+msgstr "🎗️ 布林带"
+
+msgid "card.volume.btn"
+msgstr "📊 成交量"
+
+msgid "card.volume_ratio.btn"
+msgstr "📦 成交量比率"
+
+msgid "card.support.btn"
+msgstr "🧱 支撑阻力"
+
+msgid "card.flow.btn"
+msgstr "🚰 资金流向"
+
+# Card buttons - Advanced
+msgid "card.ema.btn"
+msgstr "🧮 EMA"
+
+msgid "card.pattern.btn"
+msgstr "🕯️ 形态"
+
+msgid "card.vpvr.btn"
+msgstr "🏛️ VPVR"
+
+msgid "card.vwap.btn"
+msgstr "📏 VWAP"
+
+msgid "card.trendline.btn"
+msgstr "📈 趋势线"
+
+msgid "card.atr.btn"
+msgstr "🧭 波动率"
+
+msgid "card.cvd.btn"
+msgstr "🌊 CVD"
+
+msgid "card.supertrend.btn"
+msgstr "📐 超级趋势"
+
+msgid "card.mfi.btn"
+msgstr "💰 MFI"
+
+msgid "card.liquidity.btn"
+msgstr "💧 流动性"
+
+# Card buttons - Futures
+msgid "card.oi.btn"
+msgstr "🐋 持仓量"
+
+msgid "card.oi_agg.btn"
+msgstr "🐋 持仓聚合"
+
+msgid "card.oi_trend.btn"
+msgstr "📐 OI趋势"
+
+msgid "card.oi_cont.btn"
+msgstr "📈 OI连续"
+
+msgid "card.oi_extreme.btn"
+msgstr "🚩 OI极值"
+
+msgid "card.oi_speed.btn"
+msgstr "⚡ 持仓增减速"
+
+msgid "card.taker_ratio.btn"
+msgstr "🧾 主动买卖比"
+
+msgid "card.taker_dir.btn"
+msgstr "🚦 主动方向"
+
+msgid "card.taker_jump.btn"
+msgstr "⚡ 主动跳变"
+
+msgid "card.taker_cont.btn"
+msgstr "↕️ 主动连续"
+
+msgid "card.whale.btn"
+msgstr "🐳 大户情绪"
+
+msgid "card.sentiment.btn"
+msgstr "🌐 全体情绪"
+
+msgid "card.divergence.btn"
+msgstr "⚖️ 情绪分歧"
+
+msgid "card.momentum.btn"
+msgstr "🚀 情绪动量"
+
+msgid "card.funding.btn"
+msgstr "💱 资金费率"
+
+msgid "card.depth.btn"
+msgstr "🧊 市场深度"
+
+msgid "card.volatility.btn"
+msgstr "🌊 波动度"
+
+msgid "card.reversal.btn"
+msgstr "🛰️ 翻转雷达"
+
+msgid "card.crowding.btn"
+msgstr "🚨 风险拥挤"
+
+msgid "card.liquidation.btn"
+msgstr "💥 爆仓"
+
+msgid "card.futures_sentiment.btn"
+msgstr "📊 期货情绪"

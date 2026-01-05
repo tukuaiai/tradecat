@@ -23,7 +23,7 @@ class OBV排行卡片(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="obv_ranking",
-            button_text="📡 OBV",
+            button_text="card.obv.btn",
             category="free",
             description="OBV 能量潮斜率/方向榜",
             default_state={

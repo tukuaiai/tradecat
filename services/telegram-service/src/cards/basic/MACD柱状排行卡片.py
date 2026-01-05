@@ -23,7 +23,7 @@ class MACD柱状排行卡片(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="macd_ranking",
-            button_text="🧲 MACD柱",
+            button_text="card.macd.btn",
             category="free",
             description="MACD 柱状强度榜",
             default_state={

@@ -36,7 +36,7 @@ class KDJ排行卡片(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="kdj_ranking",
-            button_text="🎯 KDJ",
+            button_text="card.kdj.btn",
             category="free",
             description="card.kdj.desc",
             default_state={

@@ -26,7 +26,7 @@ class FuturesTakerJumpCard(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="futures_taker_jump",
-            button_text="⚡ 主动跳变",
+            button_text="card.taker_jump.btn",
             category="free",
             description="主动成交跳变幅度榜，基于期货情绪聚合表",
             default_state={

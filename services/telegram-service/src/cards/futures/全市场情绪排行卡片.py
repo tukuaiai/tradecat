@@ -26,7 +26,7 @@ class FuturesCrowdSentimentCard(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="futures_crowd_sentiment",
-            button_text="🌐 全体情绪",
+            button_text="card.sentiment.btn",
             category="free",
             description="全市场多空情绪与偏离排行榜，基于期货情绪聚合表",
             default_state={

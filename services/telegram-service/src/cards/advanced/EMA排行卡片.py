@@ -21,7 +21,7 @@ class EMA排行卡片(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="ema_ranking",
-            button_text="🧮 EMA",
+            button_text="card.ema.btn",
             category="free",
             description="EMA 区间收敛/发散强度榜",
             default_state={

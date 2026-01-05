@@ -23,7 +23,7 @@ class RSI谐波排行卡片(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="rsi_harmonic_ranking",
-            button_text="🔔 RSI谐波",
+            button_text="card.rsi.btn",
             category="free",
             description="RSI 全谐波信号榜",
             default_state={

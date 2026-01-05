@@ -26,7 +26,7 @@ class FuturesDivergenceCard(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="futures_divergence",
-            button_text="⚖️ 情绪分歧",
+            button_text="card.divergence.btn",
             category="free",
             description="大户与全体情绪差值排行榜，基于期货情绪聚合表",
             default_state={

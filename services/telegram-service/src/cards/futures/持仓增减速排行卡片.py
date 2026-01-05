@@ -27,7 +27,7 @@ class FuturesOIChangeRankingCard(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="futures_oi_change_ranking",
-            button_text="⚡ 持仓增减速",
+            button_text="card.oi_speed.btn",
             category="free",
             description="持仓变动速度排行榜，基于期货情绪聚合表",
             default_state={

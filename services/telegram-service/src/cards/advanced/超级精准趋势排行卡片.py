@@ -26,7 +26,7 @@ class 超级精准趋势排行卡片(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="super_trend_ranking",
-            button_text="📐 超级趋势",
+            button_text="card.supertrend.btn",
             category="free",
             description="零延迟趋势信号：方向/持续/强度",
             default_state={

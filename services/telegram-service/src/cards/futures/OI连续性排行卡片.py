@@ -26,7 +26,7 @@ class FuturesOIStreakCard(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="futures_oi_streak",
-            button_text="📈 OI连续",
+            button_text="card.oi_cont.btn",
             category="free",
             description="OI 连涨/连跌根数排行榜，基于期货情绪聚合表",
             default_state={

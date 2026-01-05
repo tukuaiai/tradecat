@@ -26,7 +26,7 @@ class FuturesSentimentMomentumCard(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="futures_sentiment_momentum",
-            button_text="🚀 情绪动量",
+            button_text="card.momentum.btn",
             category="free",
             description="大户/主动情绪动量排行榜，基于期货情绪聚合表",
             default_state={

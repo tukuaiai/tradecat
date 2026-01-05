@@ -938,3 +938,126 @@ msgstr "• `BTC!` - Interactive query"
 
 msgid "query.usage_export"
 msgstr "• `BTC!!` - Export full TXT file"
+
+# Card buttons - Basic
+msgid "card.kdj.btn"
+msgstr "🎯 KDJ"
+
+msgid "card.macd.btn"
+msgstr "🧲 MACD"
+
+msgid "card.obv.btn"
+msgstr "📡 OBV"
+
+msgid "card.rsi.btn"
+msgstr "🔔 RSI"
+
+msgid "card.bollinger.btn"
+msgstr "🎗️ Bollinger"
+
+msgid "card.volume.btn"
+msgstr "📊 Volume"
+
+msgid "card.volume_ratio.btn"
+msgstr "📦 Vol Ratio"
+
+msgid "card.support.btn"
+msgstr "🧱 S/R"
+
+msgid "card.flow.btn"
+msgstr "🚰 Flow"
+
+# Card buttons - Advanced
+msgid "card.ema.btn"
+msgstr "🧮 EMA"
+
+msgid "card.pattern.btn"
+msgstr "🕯️ Pattern"
+
+msgid "card.vpvr.btn"
+msgstr "🏛️ VPVR"
+
+msgid "card.vwap.btn"
+msgstr "📏 VWAP"
+
+msgid "card.trendline.btn"
+msgstr "📈 Trend"
+
+msgid "card.atr.btn"
+msgstr "🧭 ATR"
+
+msgid "card.cvd.btn"
+msgstr "🌊 CVD"
+
+msgid "card.supertrend.btn"
+msgstr "📐 SuperTrend"
+
+msgid "card.mfi.btn"
+msgstr "💰 MFI"
+
+msgid "card.liquidity.btn"
+msgstr "💧 Liquidity"
+
+# Card buttons - Futures
+msgid "card.oi.btn"
+msgstr "🐋 OI"
+
+msgid "card.oi_agg.btn"
+msgstr "🐋 OI Agg"
+
+msgid "card.oi_trend.btn"
+msgstr "📐 OI Trend"
+
+msgid "card.oi_cont.btn"
+msgstr "📈 OI Cont"
+
+msgid "card.oi_extreme.btn"
+msgstr "🚩 OI Alert"
+
+msgid "card.oi_speed.btn"
+msgstr "⚡ OI Speed"
+
+msgid "card.taker_ratio.btn"
+msgstr "🧾 Taker Ratio"
+
+msgid "card.taker_dir.btn"
+msgstr "🚦 Taker Dir"
+
+msgid "card.taker_jump.btn"
+msgstr "⚡ Taker Jump"
+
+msgid "card.taker_cont.btn"
+msgstr "↕️ Taker Cont"
+
+msgid "card.whale.btn"
+msgstr "🐳 Whale"
+
+msgid "card.sentiment.btn"
+msgstr "🌐 Sentiment"
+
+msgid "card.divergence.btn"
+msgstr "⚖️ Divergence"
+
+msgid "card.momentum.btn"
+msgstr "🚀 Momentum"
+
+msgid "card.funding.btn"
+msgstr "💱 Funding"
+
+msgid "card.depth.btn"
+msgstr "🧊 Depth"
+
+msgid "card.volatility.btn"
+msgstr "🌊 Volatility"
+
+msgid "card.reversal.btn"
+msgstr "🛰️ Reversal"
+
+msgid "card.crowding.btn"
+msgstr "🚨 Crowding"
+
+msgid "card.liquidation.btn"
+msgstr "💥 Liquidation"
+
+msgid "card.futures_sentiment.btn"
+msgstr "📊 Futures"

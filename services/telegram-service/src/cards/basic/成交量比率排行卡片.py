@@ -24,7 +24,7 @@ class 成交量比率排行卡片(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="volume_ratio_ranking",
-            button_text="📦 成交量比率",
+            button_text="card.volume_ratio.btn",
             category="free",
             description="成交量比率(当前/均量)排行榜",
             default_state={

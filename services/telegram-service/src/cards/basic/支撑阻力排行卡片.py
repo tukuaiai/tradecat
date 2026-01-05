@@ -22,7 +22,7 @@ class 支撑阻力排行卡片(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="sr_ranking",
-            button_text="🧱 支撑阻力",
+            button_text="card.support.btn",
             category="free",
             description="支撑阻力突破/反弹信号榜",
             default_state={

@@ -22,7 +22,7 @@ class CVD排行卡片(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="cvd_ranking",
-            button_text="🌊 CVD",
+            button_text="card.cvd.btn",
             category="free",
             description="按净流强度排序的 CVD 榜单",
             default_state={

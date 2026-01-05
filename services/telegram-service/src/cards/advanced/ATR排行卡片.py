@@ -23,7 +23,7 @@ class ATR排行卡片(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="atr_ranking",
-            button_text="🧭 波动率",
+            button_text="card.atr.btn",
             category="free",
             description="波幅强度榜（ATR%）",
             default_state={

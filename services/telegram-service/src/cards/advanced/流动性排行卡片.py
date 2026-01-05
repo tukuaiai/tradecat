@@ -24,7 +24,7 @@ class 流动性排行卡片(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="liquidity_ranking",
-            button_text="💧 流动性",
+            button_text="card.liquidity.btn",
             category="free",
             description="流动性危机指数榜 (Amihud/Kyle 综合)",
             default_state={

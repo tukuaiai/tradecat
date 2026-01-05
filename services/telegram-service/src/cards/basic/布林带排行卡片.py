@@ -23,7 +23,7 @@ class 布林带排行卡片(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="bb_ranking",
-            button_text="🎗️ 布林带",
+            button_text="card.bollinger.btn",
             category="free",
             description="布林带带宽/百分比 榜单",
             default_state={

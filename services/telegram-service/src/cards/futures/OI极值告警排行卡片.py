@@ -26,7 +26,7 @@ class FuturesOIZAlertCard(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="futures_oi_z_alert",
-            button_text="🚩 OI极值",
+            button_text="card.oi_extreme.btn",
             category="free",
             description="持仓Z分数极值告警榜，基于期货情绪聚合表",
             default_state={

@@ -28,7 +28,7 @@ class MoneyFlowCard(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="money_flow",
-            button_text="🚰 资金流向",
+            button_text="card.flow.btn",
             category="free",
             description="资金净流量榜（Smart Money Flow）",
             default_state={

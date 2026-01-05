@@ -24,7 +24,7 @@ class VolumeRankingCard(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="volume_ranking",
-            button_text="📊 成交量",
+            button_text="card.volume.btn",
             category="free",
             description="按成交量排序的榜单",
             default_state={

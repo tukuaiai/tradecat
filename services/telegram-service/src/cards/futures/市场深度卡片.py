@@ -22,7 +22,7 @@ class MarketDepthCard(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="market_depth",
-            button_text="🧊 市场深度",
+            button_text="card.depth.btn",
             category="free",
             description="市场深度与买卖盘分析",
             default_state={

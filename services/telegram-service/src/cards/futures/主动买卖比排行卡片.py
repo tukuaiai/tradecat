@@ -25,7 +25,7 @@ class 主动买卖比排行卡片(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="buy_sell_ratio_ranking",
-            button_text="🧾 主动买卖比",
+            button_text="card.taker_ratio.btn",
             category="free",
             description="按主动买成交额占比排序，洞察买盘强弱",
             default_state={

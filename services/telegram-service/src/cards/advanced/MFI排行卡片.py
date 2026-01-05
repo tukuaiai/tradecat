@@ -23,7 +23,7 @@ class MFI排行卡片(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="mfi_ranking",
-            button_text="💰 MFI",
+            button_text="card.mfi.btn",
             category="free",
             description="MFI 资金流量强度榜",
             default_state={

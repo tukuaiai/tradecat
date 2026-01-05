@@ -22,7 +22,7 @@ class PositionRankingCard(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="position_ranking",
-            button_text="🐋 持仓量",
+            button_text="card.oi.btn",
             category="free",
             description="持仓量排行榜，追踪主力动向",
             default_state={

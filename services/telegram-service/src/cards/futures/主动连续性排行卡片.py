@@ -26,7 +26,7 @@ class FuturesTakerStreakCard(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="futures_taker_streak",
-            button_text="↕️ 主动连续",
+            button_text="card.taker_cont.btn",
             category="free",
             description="主动成交连多/连空根数排行榜，基于期货情绪聚合表",
             default_state={

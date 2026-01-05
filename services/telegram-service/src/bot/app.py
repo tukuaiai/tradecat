@@ -1132,8 +1132,12 @@ class UserRequestHandler:
             ]
         ])
 
-    def _build_card_button(self, card) -> InlineKeyboardButton:
-        return InlineKeyboardButton(card.button_text, callback_data=card.entry_callback)
+    def _build_card_button(self, card, lang: str = None) -> InlineKeyboardButton:
+        # 如果 button_text 是 i18n key（以 card. 开头），则翻译
+        text = card.button_text
+        if text.startswith("card.") or text.startswith("btn."):
+            text = I18N.gettext(text, lang=lang or I18N.default_locale)
+        return InlineKeyboardButton(text, callback_data=card.entry_callback)
 
     def _chunk_buttons(self, buttons: List[InlineKeyboardButton], chunk_size: int = 3) -> List[List[InlineKeyboardButton]]:
         rows: List[List[InlineKeyboardButton]] = []
@@ -1164,7 +1168,7 @@ class UserRequestHandler:
         if registry:
             cards = [c for c in registry.iter_cards() if self._card_group(c) == current_group]
             cards.sort(key=lambda c: (c.priority, c.button_text))
-            buttons = [self._build_card_button(card) for card in cards]
+            buttons = [self._build_card_button(card, lang=lang) for card in cards]
 
         rows = self._chunk_buttons(buttons, chunk_size=3) if buttons else []
 

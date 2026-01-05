@@ -26,7 +26,7 @@ class FuturesFlipRadarCard(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="futures_flip_radar",
-            button_text="🛰️ 翻转雷达",
+            button_text="card.reversal.btn",
             category="free",
             description="情绪翻转信号榜，基于期货情绪聚合表",
             default_state={

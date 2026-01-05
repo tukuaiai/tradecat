@@ -27,7 +27,7 @@ class FuturesTopSentimentCard(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="futures_top_sentiment",
-            button_text="🐳 大户情绪",
+            button_text="card.whale.btn",
             category="free",
             description="大户多空情绪与动量排行榜，基于期货情绪聚合表",
             default_state={

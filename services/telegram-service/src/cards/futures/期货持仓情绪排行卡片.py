@@ -28,7 +28,7 @@ class FuturesOIRankingCard(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="futures_oi_ranking",
-            button_text="🐋 持仓聚合",
+            button_text="card.oi_agg.btn",
             category="free",
             description="期货合约持仓量/变动排行榜，基于期货情绪聚合表",
             default_state={

@@ -19,7 +19,7 @@ class VPVR排行卡片(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="vpvr_ranking",
-            button_text="🏛️ VPVR",
+            button_text="card.vpvr.btn",
             category="free",
             description="成交量分布偏离价值区榜单（宽度用百分比）",
             default_state={

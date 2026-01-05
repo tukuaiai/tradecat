@@ -25,7 +25,7 @@ class VWAP排行卡片(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="vwap_ranking",
-            button_text="📏 VWAP",
+            button_text="card.vwap.btn",
             category="free",
             description="按VWAP偏离强度排序的榜单",
             default_state={

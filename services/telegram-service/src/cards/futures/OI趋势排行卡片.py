@@ -26,7 +26,7 @@ class FuturesOITrendCard(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="futures_oi_trend",
-            button_text="📐 OI趋势",
+            button_text="card.oi_trend.btn",
             category="free",
             description="持仓斜率与Z分数趋势榜，基于期货情绪聚合表",
             default_state={

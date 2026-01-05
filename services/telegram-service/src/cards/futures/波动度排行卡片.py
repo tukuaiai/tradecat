@@ -26,7 +26,7 @@ class FuturesVolatilityCard(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="futures_volatility",
-            button_text="🌊 波动度",
+            button_text="card.volatility.btn",
             category="free",
             description="OI/情绪稳定度与波动率排行榜，基于期货情绪聚合表",
             default_state={

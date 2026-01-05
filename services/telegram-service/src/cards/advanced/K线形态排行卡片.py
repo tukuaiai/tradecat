@@ -23,7 +23,7 @@ class K线形态排行卡片(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="candle_pattern_ranking",
-            button_text="🕯️ 形态",
+            button_text="card.pattern.btn",
             category="free",
             description="K线形态强度榜（价格形态+蜡烛形态，全中文）",
             default_state={

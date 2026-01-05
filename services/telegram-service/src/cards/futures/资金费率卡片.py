@@ -21,7 +21,7 @@ class FundingRateCard(RankingCard):
     def __init__(self) -> None:
         super().__init__(
             card_id="funding_rate",
-            button_text="💱 资金费率",
+            button_text="card.funding.btn",
             category="free",
             description="资金费率/权重排行榜",
             default_state={
