@@ -136,65 +136,68 @@ class KDJ排行卡片(RankingCard):
 
     async def _reply(self, query, h, ensure):
         await query.answer()
-        text, kb = await self._build_payload(h, ensure)
+        lang = resolve_lang(query)
+        text, kb = await self._build_payload(h, ensure, lang, query)
         await query.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
     async def _edit(self, query, h, ensure):
         await query.answer()
-        text, kb = await self._build_payload(h, ensure)
+        lang = resolve_lang(query)
+        text, kb = await self._build_payload(h, ensure, lang, query)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
 
     async def _edit_settings(self, query, h, ensure):
         await query.answer()
-        text, kb = await self._build_settings_payload(h, ensure)
+        lang = resolve_lang(query)
+        text, kb = await self._build_settings_payload(h, ensure, lang, query)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
 
-    async def _build_payload(self, h, ensure) -> Tuple[str, object]:
+    async def _build_payload(self, h, ensure, lang: str, update=None) -> Tuple[str, object]:
         period = h.user_states.get("kdj_period", "15m")
         sort_order = h.user_states.get("kdj_sort", "desc")
         limit = h.user_states.get("kdj_limit", 10)
         sort_field = h.user_states.get("kdj_sort_field", "quote_volume")
         fields_state = self._ensure_field_state(h)
         rows, header = self._load_rows(period, sort_order, limit, sort_field, fields_state)
-        aligned = h.dynamic_align_format(rows) if rows else "暂无数据"
+        aligned = h.dynamic_align_format(rows) if rows else _t("data.no_data", update, lang=lang)
         display_sort_field = sort_field.replace("_", "\\_")
         time_info = h.get_current_time_display()
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         text = (
-            f"🎯 KDJ数据\n"
-            f"⏰ 更新 {time_info['full']}\n"
-            f"📊 排序 {period} {display_sort_field}({sort_symbol})\n"
+            f"{_t('card.kdj.title', update, lang=lang)}\n"
+            f"{_t('time.update', update, lang=lang, time=time_info['full'])}\n"
+            f"{_t('card.common.sort', update, lang=lang, period=period, field=display_sort_field, symbol=sort_symbol)}\n"
             f"{header}\n"
-            f"```\n{aligned}\n```\n"
-            f"💡 强度综合 J/K/D 与超买超卖，>0 偏多，<0 偏空\n"
-            f"⏰ 最后更新 {time_info['full']}"
+            f\"\"\"\n{aligned}\n\"\"\"\n"
+            f"{_t('card.kdj.hint', update, lang=lang)}\n"
+            f"{_t('time.last_update', update, lang=lang, time=time_info['full'])}"
         )
         if callable(ensure):
-            text = ensure(text, self.FALLBACK)
+            text = ensure(text, _t(self.FALLBACK, update, lang=lang))
         kb = self._build_keyboard(h)
         return text, kb
 
-    async def _build_settings_payload(self, h, ensure) -> Tuple[str, object]:
+    async def _build_settings_payload(self, h, ensure, lang: str, update=None) -> Tuple[str, object]:
         period = h.user_states.get("kdj_period", "15m")
         sort_order = h.user_states.get("kdj_sort", "desc")
         limit = h.user_states.get("kdj_limit", 10)
         sort_field = h.user_states.get("kdj_sort_field", "quote_volume")
         fields_state = self._ensure_field_state(h)
         rows, header = self._load_rows(period, sort_order, limit, sort_field, fields_state)
-        aligned = h.dynamic_align_format(rows) if rows else "暂无数据"
+        aligned = h.dynamic_align_format(rows) if rows else _t("data.no_data", update, lang=lang)
         display_sort_field = sort_field.replace("_", "\\_")
         time_info = h.get_current_time_display()
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         text = (
-            f"⚙️ KDJ字段设置\n"
-            f"⏰ 更新 {time_info['full']}\n"
-            f"📊 排序 {period} {display_sort_field}({sort_symbol})\n"
+            f"{_t('card.kdj.settings.title', update, lang=lang)}\n"
+            f"{_t('time.update', update, lang=lang, time=time_info['full'])}\n"
+            f"{_t('card.common.sort', update, lang=lang, period=period, field=display_sort_field, symbol=sort_symbol)}\n"
             f"{header}\n"
-            f"```\n{aligned}\n```\n"
-            f"💡 点击字段开关，数据实时刷新"
+            f\"\"\"\n{aligned}\n\"\"\"\n"
+            f"{_t('card.kdj.settings.hint', update, lang=lang)}"
         )
         if callable(ensure):
-            text = ensure(text, self.FALLBACK)
+            text = ensure(text, _t(self.FALLBACK, update, lang=lang))
         kb = self._build_settings_keyboard(h)
         return text, kb
 

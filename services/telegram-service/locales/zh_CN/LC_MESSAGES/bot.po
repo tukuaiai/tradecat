@@ -482,6 +482,29 @@ msgstr "开启推送"
 msgid "signal.push.off"
 msgstr "关闭推送"
 
+# ============ 通用排序提示 ============
+msgid "card.common.sort"
+msgstr "📊 排序 {period} {field}({symbol})"
+
+# ============ KDJ 排行 ============
+msgid "card.kdj.title"
+msgstr "🎯 KDJ 排行"
+
+msgid "card.kdj.desc"
+msgstr "KDJ 随机指标强度榜"
+
+msgid "card.kdj.hint"
+msgstr "💡 强度综合 J/K/D 与超买超卖，>0 偏多，<0 偏空"
+
+msgid "card.kdj.settings.title"
+msgstr "⚙️ KDJ 字段设置"
+
+msgid "card.kdj.settings.hint"
+msgstr "💡 关闭不关心的字段，避免数据过长"
+
+msgid "card.kdj.fallback"
+msgstr "🔄 KDJ 数据准备中"
+
 # ============ 期货情绪分歧榜 ============
 msgid "card.divergence.title"
 msgstr "⚖️ 情绪分歧榜"

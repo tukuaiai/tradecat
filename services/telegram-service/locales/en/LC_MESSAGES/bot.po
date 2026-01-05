@@ -482,6 +482,29 @@ msgstr "Enable alerts"
 msgid "signal.push.off"
 msgstr "Disable alerts"
 
+# ============ Common sort hint ============
+msgid "card.common.sort"
+msgstr "📊 Sort {period} {field}({symbol})"
+
+# ============ KDJ ranking ============
+msgid "card.kdj.title"
+msgstr "🎯 KDJ Ranking"
+
+msgid "card.kdj.desc"
+msgstr "KDJ strength leaderboard"
+
+msgid "card.kdj.hint"
+msgstr "💡 Combines J/K/D and overbought/oversold; >0 bullish, <0 bearish"
+
+msgid "card.kdj.settings.title"
+msgstr "⚙️ KDJ Fields"
+
+msgid "card.kdj.settings.hint"
+msgstr "💡 Turn off fields you don't need to keep the list concise"
+
+msgid "card.kdj.fallback"
+msgstr "🔄 KDJ data loading"
+
 # ============ Futures divergence ============
 msgid "card.divergence.title"
 msgstr "⚖️ Divergence Ranking"
