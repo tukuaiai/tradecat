@@ -11,14 +11,14 @@ from typing import Dict, List, Tuple
 
 from cards.base import RankingCard
 from cards.data_provider import get_ranking_provider, format_symbol
-from cards.i18n import btn_auto as _btn_auto
+from cards.i18n import btn_auto as _btn_auto, gettext as _t, resolve_lang
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.排行榜服务 import build_standard_keyboard, GENERAL_FIELDS
 
 
 class KDJ排行卡片(RankingCard):
-    FALLBACK = "🔄 KDJ 数据准备中"
+    FALLBACK = "card.kdj.fallback"
     provider = get_ranking_provider()
     DEFAULT_FIELDS_STATE = {
         # 通用字段默认关闭
@@ -39,7 +39,7 @@ class KDJ排行卡片(RankingCard):
             card_id="kdj_ranking",
             button_text="🎯 KDJ",
             category="free",
-            description="KDJ 随机指标强度榜",
+            description="card.kdj.desc",
             default_state={
                 "kdj_period": "15m",
                 "kdj_sort": "desc",
