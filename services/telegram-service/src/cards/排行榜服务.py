@@ -536,8 +536,8 @@ def build_standard_keyboard(
         btn("降序", f"{prefix}sort_desc", active=current_sort_order == "desc"),
         btn("升序", f"{prefix}sort_asc", active=current_sort_order == "asc"),
     ]
-    for l in limits:
-        sort_limit_row.append(btn(f"{l}条", f"{prefix}limit_{l}", active=l == current_limit))
+    for lim in limits:
+        sort_limit_row.append(btn(f"{lim}条", f"{prefix}limit_{lim}", active=lim == current_limit))
     if show_sort_limit:
         keyboard.append(sort_limit_row)
 

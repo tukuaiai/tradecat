@@ -166,8 +166,8 @@ def _query_futures_priority(top_n: int = 30) -> set:
 
                     # 多空比极端 (<0.5 或 >4.0)
                     if ls:
-                        l = float(ls)
-                        if l < 0.5 or l > 4.0:
+                        ls_val = float(ls)
+                        if ls_val < 0.5 or ls_val > 4.0:
                             ls_extreme.add(sym)
 
                 top_oi_value = {s for s, _ in sorted(oi_value_rank, key=lambda x: x[1], reverse=True)[:top_n]}

@@ -32,7 +32,7 @@ class BaseData(Indicator):
         bar = df.iloc[-1]
         o = safe_float(bar.get("open"))
         h = safe_float(bar.get("high"))
-        l = safe_float(bar.get("low"))
+        low = safe_float(bar.get("low"))
         c = safe_float(bar.get("close"))
         vol = safe_float(bar.get("volume"))
         quote = safe_float(bar.get("quote_volume"), vol * c)
@@ -44,12 +44,12 @@ class BaseData(Indicator):
         return self._make_result(df, symbol, interval, {
             "开盘价": o,
             "最高价": h,
-            "最低价": l,
+            "最低价": low,
             "收盘价": c,
             "当前价格": c,
             "成交量": vol,
             "成交额": quote,
-            "振幅": (h - l) / l if l else 0,
+            "振幅": (h - low) / low if low else 0,
             "变化率": (c - o) / o if o else 0,
             "交易次数": trade_count,
             "成交笔数": trade_count,

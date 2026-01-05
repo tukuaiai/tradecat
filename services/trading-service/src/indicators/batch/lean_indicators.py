@@ -240,8 +240,8 @@ def calc_ichimoku(high: np.ndarray, low: np.ndarray, close: np.ndarray,
     if n < kijun:
         return {}
 
-    def donchian_mid(h, l, period):
-        return (h[-period:].max() + l[-period:].min()) / 2
+    def donchian_mid(h, low, period):
+        return (h[-period:].max() + low[-period:].min()) / 2
 
     tenkan_val = donchian_mid(high, low, tenkan)
     kijun_val = donchian_mid(high, low, kijun)

@@ -74,11 +74,11 @@ def _detect_talib(df: pd.DataFrame) -> dict:
     cdl_funcs = _get_talib_cdl_funcs()
     if not cdl_funcs:
         return {}
-    o, h, l, c = df["open"].values, df["high"].values, df["low"].values, df["close"].values
+    o, h, low, c = df["open"].values, df["high"].values, df["low"].values, df["close"].values
     results = {}
     for fname, fn in cdl_funcs:
         try:
-            val = float(fn(o, h, l, c)[-1])
+            val = float(fn(o, h, low, c)[-1])
             if val != 0:
                 results[fname] = val / 100.0
         except Exception:

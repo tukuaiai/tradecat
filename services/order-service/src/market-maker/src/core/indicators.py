@@ -212,7 +212,7 @@ class TradingIntensityIndicator:
         for level, amt in zip(price_levels, amounts):
             agg[level] = agg.get(level, 0.0) + amt
         levels = np.array(sorted(agg.keys(), reverse=True), dtype=np.float64)
-        lambdas = np.array([agg[l] for l in levels], dtype=np.float64)
+        lambdas = np.array([agg[lv] for lv in levels], dtype=np.float64)
 
         if len(levels) == 0 or np.all(lambdas == 0):
             return 1.0, 1.5

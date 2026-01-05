@@ -283,8 +283,8 @@ def _get_futures_priority(top_n: int = 15) -> tuple[set, dict]:
 
                     # 10. 多空比极端 (<0.5 或 >4.0)
                     if ls:
-                        l = float(ls)
-                        if l < 0.5 or l > 4.0:
+                        ls_val = float(ls)
+                        if ls_val < 0.5 or ls_val > 4.0:
                             ls_extreme.add(sym)
 
                 # Top N
