@@ -235,7 +235,16 @@ class RankingDataProvider:
     def __init__(self, db_path: Optional[Path] = None) -> None:
         _project_root = Path(__file__).resolve().parent.parent.parent.parent.parent
         _default_db = _project_root / "libs" / "database" / "services" / "telegram-service" / "market_data.db"
-        self.db_path = db_path or _default_db
+
+        # 支持相对路径：统一基于项目根目录解析为绝对路径
+        def _resolve_path(p: Optional[Path]) -> Path:
+            if p is None:
+                return _default_db
+            if not p.is_absolute():
+                return (_project_root / p).resolve()
+            return p
+
+        self.db_path = _resolve_path(db_path)
         self._pool = _get_pool(self.db_path)
 
     def _get_conn(self) -> Optional[sqlite3.Connection]:

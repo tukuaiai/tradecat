@@ -1,6 +1,10 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: tradecat-telegram\n"
+"PO-Revision-Date: 2026-01-06 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Language: en\n"
@@ -151,6 +155,24 @@ msgstr "Descending"
 
 msgid "btn.show_more"
 msgstr "👇 Tap buttons below for more data"
+
+msgid "btn.refresh_menu"
+msgstr "🔄 Refresh menu"
+
+msgid "btn.retry"
+msgstr "🔁 Retry"
+
+msgid "btn.market_overview"
+msgstr "📈 Market overview"
+
+msgid "btn.position_ranking"
+msgstr "📊 Position ranking"
+
+msgid "btn.volume_ranking"
+msgstr "🔊 Volume ranking"
+
+msgid "btn.liquidation_ranking"
+msgstr "💥 Liquidation ranking"
 
 # ============ Panel Buttons ============
 msgid "panel.basic"
@@ -895,3 +917,24 @@ msgstr "Current"
 
 msgid "cache.backup_file"
 msgstr "Backup"
+
+msgid "query.title"
+msgstr "🔍 *Symbol Query*"
+
+msgid "query.prompt"
+msgstr "Send symbol name to query:"
+
+msgid "query.format"
+msgstr "Format: `SYMBOL!` (with exclamation mark)"
+
+msgid "query.count"
+msgstr "📊 Available symbols ({count})"
+
+msgid "query.usage"
+msgstr "💡 Usage:"
+
+msgid "query.usage_interactive"
+msgstr "• `BTC!` - Interactive query"
+
+msgid "query.usage_export"
+msgstr "• `BTC!!` - Export full TXT file"

@@ -7,11 +7,13 @@
 import os
 from functools import lru_cache
 from typing import Optional
+from pathlib import Path
 
 from pydantic import BaseSettings, Field
 
 
-DEFAULT_SQLITE = "libs/database/services/telegram-service/market_data.db"
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
+DEFAULT_SQLITE = PROJECT_ROOT / "libs" / "database" / "services" / "telegram-service" / "market_data.db"
 
 
 class Settings(BaseSettings):
@@ -44,8 +46,18 @@ class Settings(BaseSettings):
         env_file = None  # 由启动脚本加载根 config/.env 后生效
 
 
+def _resolve_sqlite(path_str: str) -> str:
+    """支持相对路径，统一基于项目根目录解析为绝对路径。"""
+    p = Path(path_str)
+    if not p.is_absolute():
+        p = (PROJECT_ROOT / p).resolve()
+    return str(p)
+
+
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """缓存后的配置获取函数，避免重复解析环境变量。"""
 
-    return Settings()
+    settings = Settings()
+    settings.indicator_sqlite_path = _resolve_sqlite(settings.indicator_sqlite_path)
+    return settings

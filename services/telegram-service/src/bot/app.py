@@ -4080,11 +4080,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 coins_text = "\n".join(coins)
             else:
                 coins_text = "BTC\nETH\nSOL"
+                coins = ["BTC", "ETH", "SOL"]
             text = (
-                "🔍 *币种查询*\n\n"
-                "请发送币种名称触发查询：\n"
+                f"{_t(update, 'query.title')}\n\n"
+                f"{_t(update, 'query.prompt')}\n"
                 f"```\n{coins_text}\n```\n"
-                "格式：`币种名!`（加感叹号）"
+                f"{_t(update, 'query.format')}"
             )
             keyboard = InlineKeyboardMarkup([
                 [
@@ -5314,12 +5315,12 @@ async def query_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         coins = [s.replace("USDT", "") for s in symbols] if symbols else ["BTC", "ETH", "SOL"]
         coins_text = "\n".join(coins)
         text = (
-            "🔍 *币种查询*\n\n"
+            f"{_t(update, 'query.title')}\n\n"
             f"```\n{coins_text}\n```\n"
-            f"📊 可查询币种 ({len(coins)} 个)\n"
-            "💡 使用方法:\n"
-            "• `BTC!` - 交互式查询\n"
-            "• `BTC!!` - 导出完整TXT文件"
+            f"{_t(update, 'query.count', count=len(coins))}\n"
+            f"{_t(update, 'query.usage')}\n"
+            f"{_t(update, 'query.usage_interactive')}\n"
+            f"{_t(update, 'query.usage_export')}"
         )
         keyboard = InlineKeyboardMarkup([[_btn(update, "btn.back_home", "main_menu")]])
         await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')

@@ -13,6 +13,7 @@ CODE_OF_CONDUCT.md
 OPTIMIZATION_TODO.md
 MARKETING.md
 book/
+.ruff_cache/
 
 # ====================
 # Python

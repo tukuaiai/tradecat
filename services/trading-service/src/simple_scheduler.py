@@ -27,7 +27,20 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 TRADING_SERVICE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROJECT_ROOT = os.path.dirname(os.path.dirname(TRADING_SERVICE_DIR))  # tradecat/
 DB_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/market_data")
-SQLITE_PATH = os.environ.get("INDICATOR_SQLITE_PATH", os.path.join(PROJECT_ROOT, "libs/database/services/telegram-service/market_data.db"))
+
+def _resolve_sqlite_path(env_path: str | None, default_path: str) -> str:
+    """支持相对路径，统一基于项目根目录解析为绝对路径。"""
+    if env_path and env_path.strip():
+        path = env_path.strip()
+        if not os.path.isabs(path):
+            path = os.path.abspath(os.path.join(PROJECT_ROOT, path))
+        return path
+    return default_path
+
+SQLITE_PATH = _resolve_sqlite_path(
+    os.environ.get("INDICATOR_SQLITE_PATH"),
+    os.path.join(PROJECT_ROOT, "libs/database/services/telegram-service/market_data.db"),
+)
 
 # 币种管理配置
 HIGH_PRIORITY_TOP_N = int(os.environ.get("HIGH_PRIORITY_TOP_N", "50"))

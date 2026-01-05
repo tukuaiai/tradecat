@@ -1,6 +1,10 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: tradecat-telegram\n"
+"PO-Revision-Date: 2026-01-06 00:00+0800\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Language: zh_CN\n"
@@ -151,6 +155,24 @@ msgstr "降序"
 
 msgid "btn.show_more"
 msgstr "👇显示点击下方按钮选择更多数据"
+
+msgid "btn.refresh_menu"
+msgstr "🔄 刷新菜单"
+
+msgid "btn.retry"
+msgstr "🔁 重试"
+
+msgid "btn.market_overview"
+msgstr "📈 市场概览"
+
+msgid "btn.position_ranking"
+msgstr "📊 持仓排行"
+
+msgid "btn.volume_ranking"
+msgstr "🔊 量能排行"
+
+msgid "btn.liquidation_ranking"
+msgstr "💥 爆仓排行"
 
 # ============ 面板按钮 ============
 msgid "panel.basic"
@@ -895,3 +917,24 @@ msgstr "当前使用"
 
 msgid "cache.backup_file"
 msgstr "备份文件"
+
+msgid "query.title"
+msgstr "🔍 *币种查询*"
+
+msgid "query.prompt"
+msgstr "请发送币种名称触发查询："
+
+msgid "query.format"
+msgstr "格式：`币种名!`（加感叹号）"
+
+msgid "query.count"
+msgstr "📊 可查询币种 ({count} 个)"
+
+msgid "query.usage"
+msgstr "💡 使用方法:"
+
+msgid "query.usage_interactive"
+msgstr "• `BTC!` - 交互式查询"
+
+msgid "query.usage_export"
+msgstr "• `BTC!!` - 导出完整TXT文件"

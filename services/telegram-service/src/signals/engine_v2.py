@@ -19,10 +19,20 @@ logger = logging.getLogger(__name__)
 # 数据库路径
 _SIGNALS_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(_SIGNALS_DIR))))
-DB_PATH = os.environ.get(
-    "INDICATOR_SQLITE_PATH",
-    os.path.join(_PROJECT_ROOT, "libs/database/services/telegram-service/market_data.db")
-)
+_DEFAULT_DB = os.path.join(_PROJECT_ROOT, "libs/database/services/telegram-service/market_data.db")
+
+
+def _resolve_db_path(env_path: Optional[str], default_path: str) -> str:
+    """支持相对路径：基于项目根目录归一化为绝对路径。"""
+    if env_path and env_path.strip():
+        path = env_path.strip()
+        if not os.path.isabs(path):
+            path = os.path.abspath(os.path.join(_PROJECT_ROOT, path))
+        return path
+    return default_path
+
+
+DB_PATH = _resolve_db_path(os.environ.get("INDICATOR_SQLITE_PATH"), _DEFAULT_DB)
 COOLDOWN_DB_PATH = os.path.join(_PROJECT_ROOT, "libs/database/services/telegram-service/signal_cooldown.db")
 
 # 默认周期
