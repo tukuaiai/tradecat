@@ -147,16 +147,16 @@ class FundingRateCard(RankingCard):
         time_info = user_handler.get_current_time_display()
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         text = (
-            f"💱 资金费率数据\n"
-            f"⏰ 更新 {time_info['full']}\n"
-            f"📊 排序 {period} {sort_type.replace('_','\\\\_')}({sort_symbol})\n"
+            f"{_t('card.funding.title')}\n"
+            f"{_t('card.common.update_time').format(time=time_info['full'])}\n"
+            f"{_t('card.common.sort_info').format(period=period, field=sort_type.replace('_','\\_'), symbol=sort_symbol)}\n"
             f"{header}\n"
             f"```\n{aligned}\n```\n"
-            f"💡 可切换资金费率/加权费率及通用列\n"
-            f"⏰ 最后更新 {time_info['full']}"
+            f"{_t('card.funding.hint')}\n"
+            f"{_t('card.common.last_update').format(time=time_info['full'])}"
         )
         if callable(ensure_valid_text):
-            text = ensure_valid_text(text, self.FALLBACK)
+            text = ensure_valid_text(text, _t(self.FALLBACK))
         keyboard = self._build_keyboard(user_handler, fields_state)
         return text, keyboard
 

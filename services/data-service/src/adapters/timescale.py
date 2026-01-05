@@ -228,9 +228,11 @@ class TimescaleAdapter:
         table = f"{self.schema}.candles_{normalize_interval(interval)}"
         conds, params = ["exchange = %s", "symbol = %s"], [exchange, symbol]
         if start:
-            conds.append("bucket_ts >= %s"); params.append(start)
+            conds.append("bucket_ts >= %s")
+            params.append(start)
         if end:
-            conds.append("bucket_ts <= %s"); params.append(end)
+            conds.append("bucket_ts <= %s")
+            params.append(end)
         params.append(limit)
         with self.connection() as conn:
             with conn.cursor(row_factory=dict_row) as cur:

@@ -139,17 +139,17 @@ class FuturesTakerJumpCard(RankingCard):
 
         text = (
             "⚡ 主动跳变榜\n"
-            f"⏰ 更新 {time_info['full']}\n"
-            f"📊 排序 {period} {display_sort_field}({sort_symbol})\n"
+            f"{_t('card.common.update_time').format(time=time_info['full'])}\n"
+            f"{_t('card.common.sort_info').format(period=period, field=display_sort_field, symbol=sort_symbol)}\n"
             f"{header}\n"
             "```\n"
             f"{aligned}\n"
             "```\n"
             "💡 数据源：期货情绪聚合表（主动跳变幅度）\n"
-            f"⏰ 最后更新 {time_info['full']}"
+            f"{_t('card.common.last_update').format(time=time_info['full'])}"
         )
         if callable(ensure):
-            text = ensure(text, _t(self.FALLBACK, update, lang=lang))
+            text = ensure(text, _t(self.FALLBACK))
         kb = self._build_keyboard(h)
         return text, kb
 

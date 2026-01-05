@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import re
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -158,13 +158,13 @@ class MarketDepthCard(RankingCard):
         time_info = user_handler.get_current_time_display()
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         text = (
-            f"🧊 市场深度数据\n"
-            f"⏰ 更新 {time_info['full']}\n"
-            f"📊 排序 {period} {sort_type.replace('_','\\_')}({sort_symbol})\n"
+            f"{_t('card.depth.title')}\n"
+            f"{_t('card.common.update_time').format(time=time_info['full'])}\n"
+            f"{_t('card.common.sort_info').format(period=period, field=sort_type.replace('_','\\_'), symbol=sort_symbol)}\n"
             f"{header}\n"
             f"```\n{aligned}\n```\n"
-            f"💡 深度比=买卖盘量对比，搭配价差/买墙/卖墙查看流动性质量\n"
-            f"⏰ 最后更新 {time_info['full']}"
+            f"{_t('card.depth.hint')}\n"
+            f"{_t('card.common.last_update').format(time=time_info['full'])}"
         )
 
         if callable(ensure_valid_text):

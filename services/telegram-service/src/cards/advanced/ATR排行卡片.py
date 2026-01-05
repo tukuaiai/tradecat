@@ -139,15 +139,15 @@ class ATR排行卡片(RankingCard):
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         display_sort_field = sort_field.replace("_", "\\_")
         text = (
-            f"{_t('card.atr.title', update, lang=lang)}\n"
+            f"{_t('card.atr.title')}\n"
             f"{_t('time.update', update, lang=lang, time=time_info['full'])}\n"
-            f"📊 {period} {display_sort_field}({sort_symbol})\n"
+            f"{_t('card.common.sort_info').format(period=period, field=display_sort_field, symbol=sort_symbol)}\n"
             f"{header}\n"
             f"```\n{aligned}\n```\n"
-            f"{_t('card.atr.hint', update, lang=lang)}"
+            f"{_t('card.atr.hint')}"
         )
         if callable(ensure):
-            text = ensure(text, _t(self.FALLBACK, update, lang=lang))
+            text = ensure(text, _t(self.FALLBACK))
         kb = self._build_keyboard(h)
         return text, kb
 

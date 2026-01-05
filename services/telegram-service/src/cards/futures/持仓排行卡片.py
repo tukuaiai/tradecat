@@ -154,13 +154,13 @@ class PositionRankingCard(RankingCard):
         time_info = user_handler.get_current_time_display()
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         text = (
-            f"🐋 持仓量数据\n"
-            f"⏰ 更新 {time_info['full']}\n"
-            f"📊 排序 {period} {sort_field.replace('_','\\_')}({sort_symbol})\n"
+            f"{_t('card.oi.title')}\n"
+            f"{_t('card.common.update_time').format(time=time_info['full'])}\n"
+            f"{_t('card.common.sort_info').format(period=period, field=sort_field.replace('_','\\_'), symbol=sort_symbol)}\n"
             f"{header}\n"
             f"```\n{aligned}\n```\n"
-            f"💡 持仓占比按多空拆分，可切换字段/排序\n"
-            f"⏰ 最后更新 {time_info['full']}"
+            f"{_t('card.oi.hint')}\n"
+            f"{_t('card.common.last_update').format(time=time_info['full'])}"
         )
         if callable(ensure_valid_text):
             text = ensure_valid_text(text, self.FALLBACK)

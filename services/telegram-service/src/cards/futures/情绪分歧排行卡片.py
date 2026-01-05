@@ -137,18 +137,18 @@ class FuturesDivergenceCard(RankingCard):
         time_info = h.get_current_time_display()
 
         text = (
-            f"{_t('card.divergence.title', update, lang=lang)}\n"
+            f"{_t('card.divergence.title')}\n"
             f"{_t('time.update', update, lang=lang, time=time_info['full'])}\n"
             f"{_t('card.divergence.sort', update, lang=lang, period=period, field=display_sort_field, symbol=sort_symbol)}\n"
             f"{header}\n"
             "```\n"
             f"{aligned}\n"
             "```\n"
-            f"{_t('card.divergence.source', update, lang=lang)}\n"
+            f"{_t('card.divergence.source')}\n"
             f"{_t('time.last_update', update, lang=lang, time=time_info['full'])}"
         )
         if callable(ensure):
-            text = ensure(text, _t(self.FALLBACK, update, lang=lang))
+            text = ensure(text, _t(self.FALLBACK))
         kb = self._build_keyboard(h, lang, update)
         return text, kb
 

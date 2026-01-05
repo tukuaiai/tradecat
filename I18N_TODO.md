@@ -1,7 +1,7 @@
 # i18n 全局适配检查清单
 
 > 生成时间: 2026-01-05
-> 当前进度: ~95%
+> 当前进度: ~98%
 
 ---
 
@@ -10,12 +10,14 @@
 | 模块 | 中文行数 | 按钮数 | 状态 |
 |------|----------|--------|------|
 | `bot/app.py` | 1455 | 101 | ✅ 完成 |
-| `cards/basic/*.py` | ~200 | 按钮 | ✅ i18n 结构完成 |
-| `cards/advanced/*.py` | ~150 | 按钮 | ✅ i18n 结构完成 |
-| `cards/futures/*.py` | ~200 | 按钮 | ✅ i18n 结构完成 |
-| `cards/data_provider.py` | ~50 | - | 🟡 待评估 |
+| `cards/basic/*.py` | ~200 | 按钮 | ✅ 标题/提示/结构完成 |
+| `cards/advanced/*.py` | ~150 | 按钮 | ✅ 标题/提示/结构完成 |
+| `cards/futures/*.py` | ~200 | 按钮 | ✅ 标题/提示/结构完成 |
+| `cards/data_provider.py` | ~50 | - | 🟡 字段名待评估 |
 | `signals/*.py` | ~50 | - | ✅ 基础完成 |
 | `bot/single_token_snapshot.py` | ~100 | - | ✅ 完成 |
+
+**词条统计**: 248 条 (zh_CN/en 各 248 条)
 
 ---
 
@@ -23,8 +25,8 @@
 
 ### 1. 基础设施
 - [x] `libs/common/i18n.py` - i18n 服务类
-- [x] `locales/zh_CN/LC_MESSAGES/bot.po` - 中文词条 (244+)
-- [x] `locales/en/LC_MESSAGES/bot.po` - 英文词条 (244+)
+- [x] `locales/zh_CN/LC_MESSAGES/bot.po` - 中文词条 (248)
+- [x] `locales/en/LC_MESSAGES/bot.po` - 英文词条 (248)
 - [x] 编译 `.mo` 文件
 - [x] 翻译缺失告警（日志一次性记录），缺词回退原值
 

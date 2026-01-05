@@ -181,15 +181,15 @@ class VolumeRankingCard(RankingCard):
 
         text = (
             "📈 交易量数据\n"
-            f"⏰ 更新 {time_info['full']}\n"
-            f"📊 排序 {period} {safe_sort_field}({sort_symbol})\n"
+            f"{_t('card.common.update_time').format(time=time_info['full'])}\n"
+            f"{_t('card.common.sort_info').format(period=period, field=safe_sort_field, symbol=sort_symbol)}\n"
             f"{'/'.join(header_parts)}\n"
             f"```\n{aligned}\n```\n"
             "💡 交易量反映市场活跃度和流动性\n"
-            f"⏰ 最后更新 {time_info['full']}"
+            f"{_t('card.common.last_update').format(time=time_info['full'])}"
         )
         if callable(ensure):
-            text = ensure(text, _t(self.FALLBACK, update, lang=lang))
+            text = ensure(text, _t(self.FALLBACK))
         kb = self._build_keyboard(h)
         return text, kb
 

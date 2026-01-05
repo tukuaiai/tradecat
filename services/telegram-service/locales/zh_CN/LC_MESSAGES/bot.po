@@ -805,3 +805,17 @@ msgstr "📏 VWAP 数据加载中..."
 
 msgid "card.liquidation.fallback"
 msgstr "📊 爆仓数据加载中..."
+
+# ATR 卡片
+msgid "card.atr.title"
+msgstr "📊 ATR数据"
+
+msgid "card.atr.hint"
+msgstr "💡 ATR衡量波动幅度，数值越高波动越大"
+
+# 成交量比率 卡片
+msgid "card.volume_ratio.title"
+msgstr "📊 成交量比率数据"
+
+msgid "card.volume_ratio.hint"
+msgstr "💡 量比=当前成交量/均量，>2 放量，<0.5 缩量"

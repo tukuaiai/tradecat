@@ -137,13 +137,13 @@ class 主动买卖比排行卡片(RankingCard):
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         display_sort_field = sort_field.replace("_", "\\_")
         text = (
-            f"🧾 主动买卖比数据\n"
-            f"⏰ 更新 {time_info['full']}\n"
-            f"📊 排序 {period} {display_sort_field}({sort_symbol})\n"
+            f"{_t('card.taker_ratio.title')}\n"
+            f"{_t('card.common.update_time').format(time=time_info['full'])}\n"
+            f"{_t('card.common.sort_info').format(period=period, field=display_sort_field, symbol=sort_symbol)}\n"
             f"{header}\n"
             f"```\n{aligned}\n```\n"
-            f"💡 买卖比 = 主动买成交额 ÷ 总成交额，越高代表买盘越强\n"
-            f"⏰ 最后更新 {time_info['full']}"
+            f"{_t('card.taker_ratio.hint')}\n"
+            f"{_t('card.common.last_update').format(time=time_info['full'])}"
         )
 
         if callable(ensure_valid_text):

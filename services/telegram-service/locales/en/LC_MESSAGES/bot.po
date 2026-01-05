@@ -805,3 +805,17 @@ msgstr "📏 Loading VWAP data..."
 
 msgid "card.liquidation.fallback"
 msgstr "📊 Loading liquidation data..."
+
+# ATR card
+msgid "card.atr.title"
+msgstr "📊 ATR Data"
+
+msgid "card.atr.hint"
+msgstr "💡 ATR measures volatility, higher value = higher volatility"
+
+# Volume Ratio card
+msgid "card.volume_ratio.title"
+msgstr "📊 Volume Ratio Data"
+
+msgid "card.volume_ratio.hint"
+msgstr "💡 Ratio = current volume / avg volume, >2 high, <0.5 low"

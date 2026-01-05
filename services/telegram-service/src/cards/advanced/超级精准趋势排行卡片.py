@@ -145,16 +145,16 @@ class 超级精准趋势排行卡片(RankingCard):
         time_info = h.get_current_time_display()
 
         text = (
-            f"📐 超级趋势\n"
-            f"⏰ 更新 {time_info['full']}\n"
-            f"📊 排序 {period} {display_sort_field}({sort_symbol})\n"
+            f"{_t('card.supertrend.title')}\n"
+            f"{_t('card.common.update_time').format(time=time_info['full'])}\n"
+            f"{_t('card.common.sort_info').format(period=period, field=display_sort_field, symbol=sort_symbol)}\n"
             f"{header}\n"
             f"```\n{aligned}\n```\n"
-            f"💡 强度 = (价格-趋势带)/带宽；方向 1=多 -1=空\n"
-            f"⏰ 最后更新 {time_info['full']}"
+            f"{_t('card.supertrend.hint')}\n"
+            f"{_t('card.common.last_update').format(time=time_info['full'])}"
         )
         if callable(ensure):
-            text = ensure(text, _t(self.FALLBACK, update, lang=lang))
+            text = ensure(text, _t(self.FALLBACK))
         kb = self._build_keyboard(h)
         return text, kb
 

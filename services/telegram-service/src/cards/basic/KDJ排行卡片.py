@@ -164,16 +164,16 @@ class KDJ排行卡片(RankingCard):
         time_info = h.get_current_time_display()
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         text = (
-            f"{_t('card.kdj.title', update, lang=lang)}\n"
+            f"{_t('card.kdj.title')}\n"
             f"{_t('time.update', update, lang=lang, time=time_info['full'])}\n"
             f"{_t('card.common.sort', update, lang=lang, period=period, field=display_sort_field, symbol=sort_symbol)}\n"
             f"{header}\n"
             f"```\n{aligned}\n```\n"
-            f"{_t('card.kdj.hint', update, lang=lang)}\n"
+            f"{_t('card.kdj.hint')}\n"
             f"{_t('time.last_update', update, lang=lang, time=time_info['full'])}"
         )
         if callable(ensure):
-            text = ensure(text, _t(self.FALLBACK, update, lang=lang))
+            text = ensure(text, _t(self.FALLBACK))
         kb = self._build_keyboard(h)
         return text, kb
 
@@ -189,15 +189,15 @@ class KDJ排行卡片(RankingCard):
         time_info = h.get_current_time_display()
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         text = (
-            f"{_t('card.kdj.settings.title', update, lang=lang)}\n"
+            f"{_t('card.kdj.settings.title')}\n"
             f"{_t('time.update', update, lang=lang, time=time_info['full'])}\n"
             f"{_t('card.common.sort', update, lang=lang, period=period, field=display_sort_field, symbol=sort_symbol)}\n"
             f"{header}\n"
             f"```\n{aligned}\n```\n"
-            f"{_t('card.kdj.settings.hint', update, lang=lang)}"
+            f"{_t('card.kdj.settings.hint')}"
         )
         if callable(ensure):
-            text = ensure(text, _t(self.FALLBACK, update, lang=lang))
+            text = ensure(text, _t(self.FALLBACK))
         kb = self._build_settings_keyboard(h)
         return text, kb
 

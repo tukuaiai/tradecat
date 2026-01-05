@@ -180,13 +180,13 @@ class MoneyFlowCard(RankingCard):
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         display_sort_field = flow_type.replace("_", "\\_")
         text = (
-            f"💧 资金流向数据\n"
-            f"⏰ 更新 {time_info['full']}\n"
-            f"📊 排序 {period} {display_sort_field}({sort_symbol})\n"
+            f"{_t('card.flow.title')}\n"
+            f"{_t('card.common.update_time').format(time=time_info['full'])}\n"
+            f"{_t('card.common.sort_info').format(period=period, field=display_sort_field, symbol=sort_symbol)}\n"
             f"{header}\n"
             f"```\n{aligned}\n```\n"
-            f"💡 净流=流入-流出；可切换净流/成交额/流入/流出/价格等维度\n"
-            f"⏰ 最后更新 {time_info['full']}"
+            f"{_t('card.flow.hint')}\n"
+            f"{_t('card.common.last_update').format(time=time_info['full'])}"
         )
 
         if callable(ensure_valid_text):

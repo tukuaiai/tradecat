@@ -136,13 +136,13 @@ class VWAP排行卡片(RankingCard):
         sort_field = handler.user_states.get("vwap_sort_field", "deviation")
         display_sort_field = sort_field.replace("_", "\\_")
         text = (
-            f"📏 VWAP数据\n"
-            f"⏰ 更新 {time_info['full']}\n"
-            f"📊 排序 {period} {display_sort_field}({sort_symbol})\n"
+            f"{_t('card.vwap.title')}\n"
+            f"{_t('card.common.update_time').format(time=time_info['full'])}\n"
+            f"{_t('card.common.sort_info').format(period=period, field=display_sort_field, symbol=sort_symbol)}\n"
             f"{header}\n"
             f"```\n{aligned}\n```\n"
-            f"💡 偏离>0 表示价格高于VWAP，偏离<0 表示低于VWAP\n"
-            f"⏰ 最后更新 {time_info['full']}"
+            f"{_t('card.vwap.hint')}\n"
+            f"{_t('card.common.last_update').format(time=time_info['full'])}"
         )
         if callable(ensure_valid_text):
             text = ensure_valid_text(text, self.FALLBACK)

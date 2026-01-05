@@ -401,6 +401,7 @@ class Engine:
     def run_single(self, symbol: str, interval: str, indicator_name: str):
         """单次增量计算 - 走缓存"""
         from ..db.cache import get_cache
+        from ..db.reader import writer
 
         ind_cls = get_all_indicators().get(indicator_name)
         if not ind_cls:

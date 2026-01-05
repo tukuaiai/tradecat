@@ -146,16 +146,16 @@ class 趋势线排行卡片(RankingCard):
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         display_sort_field = sort_field.replace("_", "\\_")
         text = (
-            f"{_t('card.trendline.title', update, lang=lang)}\n"
+            f"{_t('card.trendline.title')}\n"
             f"{_t('time.update', update, lang=lang, time=time_info['full'])}\n"
             f"{_t('card.trendline.sort', update, lang=lang, period=period, field=display_sort_field, symbol=sort_symbol)}\n"
             f"{header}\n"
             f"```\n{aligned}\n```\n"
-            f"{_t('card.trendline.source', update, lang=lang)}\n"
+            f"{_t('card.trendline.source')}\n"
             f"{_t('time.last_update', update, lang=lang, time=time_info['full'])}"
         )
         if callable(ensure):
-            text = ensure(text, _t(self.FALLBACK, update, lang=lang))
+            text = ensure(text, _t(self.FALLBACK))
         kb = self._build_keyboard(h, lang, update)
         return text, kb
 

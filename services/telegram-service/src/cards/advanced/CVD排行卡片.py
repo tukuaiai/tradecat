@@ -128,21 +128,21 @@ class CVD排行卡片(RankingCard):
         sort_field = h.user_states.get("cvd_sort_field", "net")
         fields_state = self._ensure_field_state(h)
         rows, header = self._load_rows(period, sort_order, limit, sort_field, fields_state)
-        aligned = h.dynamic_align_format(rows) if rows else _t("data.no_data", update, lang=lang)
+        aligned = h.dynamic_align_format(rows) if rows else _t("data.no_data")
         time_info = h.get_current_time_display()
         sort_symbol = "🔽" if sort_order == "desc" else "🔼"
         display_sort_field = sort_field.replace("_", "\\_")
         text = (
-            f"{_t('card.cvd.title', update, lang=lang)}\n"
-            f"{_t('card.common.update_time', update, lang=lang).format(time=time_info['full'])}\n"
-            f"{_t('card.common.sort_info', update, lang=lang).format(period=period, field=display_sort_field, symbol=sort_symbol)}\n"
+            f"{_t('card.cvd.title')}\n"
+            f"{_t('card.common.update_time').format(time=time_info['full'])}\n"
+            f"{_t('card.common.sort_info').format(period=period, field=display_sort_field, symbol=sort_symbol)}\n"
             f"{header}\n"
             f"```\n{aligned}\n```\n"
-            f"{_t('card.cvd.hint', update, lang=lang)}\n"
-            f"{_t('card.common.last_update', update, lang=lang).format(time=time_info['full'])}"
+            f"{_t('card.cvd.hint')}\n"
+            f"{_t('card.common.last_update').format(time=time_info['full'])}"
         )
         if callable(ensure):
-            text = ensure(text, _t(self.FALLBACK, update, lang=lang))
+            text = ensure(text, _t(self.FALLBACK))
         kb = self._build_keyboard(h)
         return text, kb
 
