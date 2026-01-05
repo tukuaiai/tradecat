@@ -341,6 +341,12 @@ msgstr "仅保留多头占优，按净流降序"
 msgid "flow.desc.futures_short"
 msgstr "仅保留空头占优，按净流升序"
 
+msgid "flow.desc.spot_long"
+msgstr "仅保留现货净流入，按净流降序"
+
+msgid "flow.desc.spot_short"
+msgstr "仅保留现货净流出，按净流升序"
+
 msgid "flow.desc.volume"
 msgstr "按该周期成交额排序"
 

@@ -83,9 +83,18 @@ else
     warn "未安装 gettext/msgfmt，跳过 i18n 检查"
 fi
 
-# 5. 文档链接检查
+# 5. i18n 词条对齐检查
 echo ""
-echo "5. 文档链接检查..."
+echo "5. i18n 词条对齐检查..."
+if python3 scripts/check_i18n_keys.py; then
+    success "i18n 代码键与词条对齐"
+else
+    fail "i18n 代码键缺失，请补充 bot.po"
+fi
+
+# 6. 文档链接检查
+echo ""
+echo "6. 文档链接检查..."
 if [ -f "docs/index.md" ]; then
     BROKEN_LINKS=0
     while IFS= read -r line; do
@@ -110,9 +119,9 @@ else
     fail "docs/index.md 不存在"
 fi
 
-# 6. ADR 编号检查
+# 7. ADR 编号检查
 echo ""
-echo "6. ADR 编号检查..."
+echo "7. ADR 编号检查..."
 if [ -d "docs/decisions/adr" ]; then
     ADR_COUNT=$(ls docs/decisions/adr/*.md 2>/dev/null | wc -l)
     success "ADR 文件数: $ADR_COUNT"
@@ -120,9 +129,9 @@ else
     warn "docs/decisions/adr 目录不存在"
 fi
 
-# 7. Prompt 模板检查
+# 8. Prompt 模板检查
 echo ""
-echo "7. Prompt 模板检查..."
+echo "8. Prompt 模板检查..."
 if [ -d "docs/prompts" ]; then
     PROMPT_COUNT=$(ls docs/prompts/*.md 2>/dev/null | wc -l)
     success "Prompt 文件数: $PROMPT_COUNT"
@@ -130,9 +139,9 @@ else
     warn "docs/prompts 目录不存在"
 fi
 
-# 8. 单元测试 (如有)
+# 9. 单元测试 (如有)
 echo ""
-echo "8. 单元测试..."
+echo "9. 单元测试..."
 if command -v pytest &> /dev/null; then
     if [ -d "tests" ] && [ "$(ls -A tests 2>/dev/null)" ]; then
         if pytest tests/ -q --tb=no 2>/dev/null; then

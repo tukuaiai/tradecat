@@ -341,6 +341,12 @@ msgstr "Keep long-dominant coins, sorted by net inflow (desc)"
 msgid "flow.desc.futures_short"
 msgstr "Keep short-dominant coins, sorted by net outflow (asc)"
 
+msgid "flow.desc.spot_long"
+msgstr "Keep spot net inflow, sorted by net inflow (desc)"
+
+msgid "flow.desc.spot_short"
+msgstr "Keep spot net outflow, sorted by net outflow (asc)"
+
 msgid "flow.desc.volume"
 msgstr "Sorted by traded quote volume for the period"
 
