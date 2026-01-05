@@ -126,3 +126,196 @@ msgstr "已取消 AI 分析"
 
 msgid "ai.no_symbol"
 msgstr "❌ 未选择币种，请重新发送 `币种名@`"
+
+# ============ 通用按钮 ============
+msgid "btn.back_home"
+msgstr "🏠 返回主菜单"
+
+msgid "btn.back"
+msgstr "🔙 返回"
+
+msgid "btn.refresh"
+msgstr "🔄 刷新"
+
+msgid "btn.next_page"
+msgstr "下一页 ➡️"
+
+msgid "btn.prev_page"
+msgstr "⬅️ 上一页"
+
+msgid "btn.asc"
+msgstr "升序"
+
+msgid "btn.desc"
+msgstr "降序"
+
+msgid "btn.show_more"
+msgstr "👇显示点击下方按钮选择更多数据"
+
+# ============ 面板按钮 ============
+msgid "panel.basic"
+msgstr "💵基础"
+
+msgid "panel.futures"
+msgstr "📑合约"
+
+msgid "panel.advanced"
+msgstr "🧠高级"
+
+msgid "panel.pattern"
+msgstr "🕯️形态"
+
+# ============ 市场类型 ============
+msgid "market.spot"
+msgstr "现货"
+
+msgid "market.futures"
+msgstr "合约"
+
+# ============ 排序/筛选 ============
+msgid "sort.by_volume"
+msgstr "成交额"
+
+msgid "sort.by_price"
+msgstr "价格"
+
+msgid "sort.by_change"
+msgstr "涨跌幅"
+
+msgid "sort.items"
+msgstr "{n}条"
+
+# ============ 资金流向 ============
+msgid "flow.absolute"
+msgstr "绝对值"
+
+msgid "flow.inflow"
+msgstr "流入"
+
+msgid "flow.outflow"
+msgstr "流出"
+
+msgid "flow.volume"
+msgstr "市值"
+
+# ============ 比率类型 ============
+msgid "ratio.position_market"
+msgstr "持仓/市值"
+
+msgid "ratio.volume_market"
+msgstr "交易量/市值"
+
+msgid "ratio.volume_oi"
+msgstr "交易量/持仓"
+
+# ============ 错误消息 ============
+msgid "error.not_ready"
+msgstr "❌ 系统未就绪，请稍后重试"
+
+msgid "error.query_failed"
+msgstr "❌ 查询失败: {error}"
+
+msgid "error.refresh_failed"
+msgstr "❌ 刷新失败，请稍后重试"
+
+msgid "error.export_failed"
+msgstr "❌ 导出失败: {error}"
+
+msgid "error.status_failed"
+msgstr "❌ 获取状态失败，请稍后重试"
+
+msgid "error.signal_failed"
+msgstr "❌ 信号界面失败: {error}"
+
+# ============ 功能提示 ============
+msgid "query.disabled"
+msgstr "⚠️ 单币查询功能暂时关闭"
+
+msgid "query.hint"
+msgstr "请先发送例如 btc! 触发单币查询"
+
+msgid "feature.coming_soon"
+msgstr "🚧 功能开发中，敬请期待！"
+
+msgid "signal.coming_soon"
+msgstr "🚧 信号订阅功能开发中，敬请期待！"
+
+# ============ 排行榜标题 ============
+msgid "ranking.volume"
+msgstr "📈 成交量排行 - 成交额热度榜 📈"
+
+msgid "ranking.position"
+msgstr "🐋 持仓量排行 - 大鲸追踪，资金嗅探 🐋"
+
+msgid "ranking.funding"
+msgstr "💱 资金费率排行"
+
+msgid "ranking.liquidation"
+msgstr "💥 爆仓排行"
+
+msgid "ranking.flow"
+msgstr "💧 资金流向排行"
+
+msgid "ranking.depth"
+msgstr "🧊 市场深度排行"
+
+msgid "ranking.sentiment"
+msgstr "🎭 市场情绪"
+
+msgid "ranking.overview"
+msgstr "📡 行情总览"
+
+# ============ 比率排行榜 ============
+msgid "ranking.ratio.position_market"
+msgstr "📊 持仓/市值比排行榜 📊"
+
+msgid "ranking.ratio.volume_market"
+msgstr "📊 交易量/市值比排行榜 📊"
+
+msgid "ranking.ratio.volume_oi"
+msgstr "📊 交易量/持仓量比排行榜 📊"
+
+# ============ 资金流向标题 ============
+msgid "flow.title.futures_long"
+msgstr "🟢 合约多头资金流入({period})"
+
+msgid "flow.title.futures_short"
+msgstr "🔴 合约空头资金流出({period})"
+
+msgid "flow.title.futures_volume"
+msgstr "📦 合约交易量排行({period})"
+
+msgid "flow.title.futures"
+msgstr "💧 资金流向排行 - 合约({period})"
+
+msgid "flow.title.spot_long"
+msgstr "🟢 现货多头资金流入({period})"
+
+msgid "flow.title.spot_short"
+msgstr "🔴 现货空头资金流出({period})"
+
+msgid "flow.title.spot_volume"
+msgstr "📦 现货交易量排行({period})"
+
+msgid "flow.title.spot"
+msgstr "💧 现货资金流向排行({period})"
+
+# ============ 时间显示 ============
+msgid "time.update"
+msgstr "⏰ 更新 {time}"
+
+msgid "time.last_update"
+msgstr "⏰ 最后更新 {time}"
+
+msgid "time.cache"
+msgstr "📄 缓存时间: {time}"
+
+# ============ 数据提示 ============
+msgid "data.no_data"
+msgstr "暂无数据"
+
+msgid "data.loading"
+msgstr "🔄 数据准备中"
+
+msgid "data.coins_count"
+msgstr "📊 可查询币种 ({count} 个)"

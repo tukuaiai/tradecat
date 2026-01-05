@@ -126,3 +126,196 @@ msgstr "AI analysis cancelled"
 
 msgid "ai.no_symbol"
 msgstr "❌ No symbol selected, please send `symbol@` again"
+
+# ============ Common Buttons ============
+msgid "btn.back_home"
+msgstr "🏠 Back to menu"
+
+msgid "btn.back"
+msgstr "🔙 Back"
+
+msgid "btn.refresh"
+msgstr "🔄 Refresh"
+
+msgid "btn.next_page"
+msgstr "Next ➡️"
+
+msgid "btn.prev_page"
+msgstr "⬅️ Previous"
+
+msgid "btn.asc"
+msgstr "Ascending"
+
+msgid "btn.desc"
+msgstr "Descending"
+
+msgid "btn.show_more"
+msgstr "👇 Tap buttons below for more data"
+
+# ============ Panel Buttons ============
+msgid "panel.basic"
+msgstr "💵Basic"
+
+msgid "panel.futures"
+msgstr "📑Futures"
+
+msgid "panel.advanced"
+msgstr "🧠Advanced"
+
+msgid "panel.pattern"
+msgstr "🕯️Pattern"
+
+# ============ Market Type ============
+msgid "market.spot"
+msgstr "Spot"
+
+msgid "market.futures"
+msgstr "Futures"
+
+# ============ Sort/Filter ============
+msgid "sort.by_volume"
+msgstr "Volume"
+
+msgid "sort.by_price"
+msgstr "Price"
+
+msgid "sort.by_change"
+msgstr "Change"
+
+msgid "sort.items"
+msgstr "{n} items"
+
+# ============ Money Flow ============
+msgid "flow.absolute"
+msgstr "Absolute"
+
+msgid "flow.inflow"
+msgstr "Inflow"
+
+msgid "flow.outflow"
+msgstr "Outflow"
+
+msgid "flow.volume"
+msgstr "Volume"
+
+# ============ Ratio Type ============
+msgid "ratio.position_market"
+msgstr "OI/MCap"
+
+msgid "ratio.volume_market"
+msgstr "Vol/MCap"
+
+msgid "ratio.volume_oi"
+msgstr "Vol/OI"
+
+# ============ Error Messages ============
+msgid "error.not_ready"
+msgstr "❌ System not ready, please retry later"
+
+msgid "error.query_failed"
+msgstr "❌ Query failed: {error}"
+
+msgid "error.refresh_failed"
+msgstr "❌ Refresh failed, please retry later"
+
+msgid "error.export_failed"
+msgstr "❌ Export failed: {error}"
+
+msgid "error.status_failed"
+msgstr "❌ Failed to get status, please retry later"
+
+msgid "error.signal_failed"
+msgstr "❌ Signal panel failed: {error}"
+
+# ============ Feature Hints ============
+msgid "query.disabled"
+msgstr "⚠️ Coin query is temporarily disabled"
+
+msgid "query.hint"
+msgstr "Please send e.g. btc! to trigger coin query"
+
+msgid "feature.coming_soon"
+msgstr "🚧 Feature coming soon!"
+
+msgid "signal.coming_soon"
+msgstr "🚧 Signal subscription coming soon!"
+
+# ============ Ranking Titles ============
+msgid "ranking.volume"
+msgstr "📈 Volume Ranking 📈"
+
+msgid "ranking.position"
+msgstr "🐋 Open Interest Ranking 🐋"
+
+msgid "ranking.funding"
+msgstr "💱 Funding Rate Ranking"
+
+msgid "ranking.liquidation"
+msgstr "💥 Liquidation Ranking"
+
+msgid "ranking.flow"
+msgstr "💧 Money Flow Ranking"
+
+msgid "ranking.depth"
+msgstr "🧊 Market Depth Ranking"
+
+msgid "ranking.sentiment"
+msgstr "🎭 Market Sentiment"
+
+msgid "ranking.overview"
+msgstr "📡 Market Overview"
+
+# ============ Ratio Rankings ============
+msgid "ranking.ratio.position_market"
+msgstr "📊 OI/Market Cap Ratio 📊"
+
+msgid "ranking.ratio.volume_market"
+msgstr "📊 Volume/Market Cap Ratio 📊"
+
+msgid "ranking.ratio.volume_oi"
+msgstr "📊 Volume/OI Ratio 📊"
+
+# ============ Flow Titles ============
+msgid "flow.title.futures_long"
+msgstr "🟢 Futures Long Inflow ({period})"
+
+msgid "flow.title.futures_short"
+msgstr "🔴 Futures Short Outflow ({period})"
+
+msgid "flow.title.futures_volume"
+msgstr "📦 Futures Volume ({period})"
+
+msgid "flow.title.futures"
+msgstr "💧 Money Flow - Futures ({period})"
+
+msgid "flow.title.spot_long"
+msgstr "🟢 Spot Long Inflow ({period})"
+
+msgid "flow.title.spot_short"
+msgstr "🔴 Spot Short Outflow ({period})"
+
+msgid "flow.title.spot_volume"
+msgstr "📦 Spot Volume ({period})"
+
+msgid "flow.title.spot"
+msgstr "💧 Money Flow - Spot ({period})"
+
+# ============ Time Display ============
+msgid "time.update"
+msgstr "⏰ Updated {time}"
+
+msgid "time.last_update"
+msgstr "⏰ Last updated {time}"
+
+msgid "time.cache"
+msgstr "📄 Cache time: {time}"
+
+# ============ Data Hints ============
+msgid "data.no_data"
+msgstr "No data"
+
+msgid "data.loading"
+msgstr "🔄 Loading data"
+
+msgid "data.coins_count"
+msgstr "📊 Available coins ({count})"

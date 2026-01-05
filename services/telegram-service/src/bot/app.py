@@ -202,6 +202,23 @@ def _t(update, message_id: str, **kwargs) -> str:
     lang = _resolve_lang(update)
     return I18N.gettext(message_id, lang=lang, **kwargs)
 
+
+def _btn(update, key: str, callback: str, active: bool = False, prefix: str = "✅") -> InlineKeyboardButton:
+    """国际化按钮工厂"""
+    text = _t(update, key)
+    if active:
+        text = prefix + text
+    return InlineKeyboardButton(text, callback_data=callback)
+
+
+def _btn_lang(lang: str, key: str, callback: str, active: bool = False, prefix: str = "✅") -> InlineKeyboardButton:
+    """按语言代码创建按钮（无update时使用）"""
+    text = I18N.gettext(key, lang=lang)
+    if active:
+        text = prefix + text
+    return InlineKeyboardButton(text, callback_data=callback)
+
+
 # 统一 sys.path 优先级：本服务 src 放最前，并移除不存在的占位路径
 sys.path = [p for p in sys.path if p != str(SRC_ROOT)]
 sys.path.insert(0, str(SRC_ROOT))
@@ -468,25 +485,28 @@ def build_single_snapshot_keyboard(enabled_periods: dict, panel: str, enabled_ca
             continue
         row_period.append(InlineKeyboardButton(label, callback_data=data))
 
-    def panel_btn(name: str, code: str):
+    # 面板按钮使用i18n
+    lang = _resolve_lang(update) if update else I18N.default_locale
+    def panel_btn(key: str, code: str):
         active = (panel == code)
-        label = f"✅{name}" if active else name
+        text = I18N.gettext(key, lang=lang)
+        label = f"✅{text}" if active else text
         return InlineKeyboardButton(label, callback_data=f"single_panel_{code}")
 
     row_panel = [
-        panel_btn("💵基础", "basic"),
-        panel_btn("📑合约", "futures"),
-        panel_btn("🧠高级", "advanced"),
-        InlineKeyboardButton("🕯️形态", callback_data="single_panel_pattern"),
+        panel_btn("panel.basic", "basic"),
+        panel_btn("panel.futures", "futures"),
+        panel_btn("panel.advanced", "advanced"),
+        InlineKeyboardButton(I18N.gettext("panel.pattern", lang=lang), callback_data="single_panel_pattern"),
     ]
     # 主控行：返回主菜单 / 刷新 / 下一页 / 上一页（无则省略按钮）
     row_ctrl: list[InlineKeyboardButton] = []
-    row_ctrl.append(InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu"))
-    row_ctrl.append(InlineKeyboardButton("🔄 刷新", callback_data="single_refresh"))
+    row_ctrl.append(InlineKeyboardButton(I18N.gettext("btn.back_home", lang=lang), callback_data="main_menu"))
+    row_ctrl.append(InlineKeyboardButton(I18N.gettext("btn.refresh", lang=lang), callback_data="single_refresh"))
     if pages > 1 and page < pages - 1:
-        row_ctrl.append(InlineKeyboardButton("下一页 ➡️", callback_data="single_page_next"))
+        row_ctrl.append(InlineKeyboardButton(I18N.gettext("btn.next_page", lang=lang), callback_data="single_page_next"))
     if pages > 1 and page > 0:
-        row_ctrl.append(InlineKeyboardButton("⬅️ 上一页", callback_data="single_page_prev"))
+        row_ctrl.append(InlineKeyboardButton(I18N.gettext("btn.prev_page", lang=lang), callback_data="single_page_prev"))
 
     kb_rows: list[list[InlineKeyboardButton]] = []
     if row_cards:
@@ -495,26 +515,28 @@ def build_single_snapshot_keyboard(enabled_periods: dict, panel: str, enabled_ca
     return InlineKeyboardMarkup(kb_rows)
 
 
-def build_pattern_keyboard() -> InlineKeyboardMarkup:
+def build_pattern_keyboard(update=None) -> InlineKeyboardMarkup:
     """K线形态面板的按钮"""
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    lang = _resolve_lang(update) if update else I18N.default_locale
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("💵基础", callback_data="single_panel_basic"),
-            InlineKeyboardButton("📑合约", callback_data="single_panel_futures"),
-            InlineKeyboardButton("🧠高级", callback_data="single_panel_advanced"),
-            InlineKeyboardButton("✅🕯️形态", callback_data="single_panel_pattern"),
+            InlineKeyboardButton(I18N.gettext("panel.basic", lang=lang), callback_data="single_panel_basic"),
+            InlineKeyboardButton(I18N.gettext("panel.futures", lang=lang), callback_data="single_panel_futures"),
+            InlineKeyboardButton(I18N.gettext("panel.advanced", lang=lang), callback_data="single_panel_advanced"),
+            InlineKeyboardButton("✅" + I18N.gettext("panel.pattern", lang=lang), callback_data="single_panel_pattern"),
         ],
         [
-            InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu"),
-            InlineKeyboardButton("🔄 刷新", callback_data="single_refresh"),
+            InlineKeyboardButton(I18N.gettext("btn.back_home", lang=lang), callback_data="main_menu"),
+            InlineKeyboardButton(I18N.gettext("btn.refresh", lang=lang), callback_data="single_refresh"),
         ]
     ])
 
 
-def build_pattern_keyboard_with_periods(enabled_periods: dict) -> InlineKeyboardMarkup:
+def build_pattern_keyboard_with_periods(enabled_periods: dict, update=None) -> InlineKeyboardMarkup:
     """K线形态面板的按钮（带周期开关）"""
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    lang = _resolve_lang(update) if update else I18N.default_locale
     periods = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"]
     row_period = []
     for p in periods:
@@ -525,14 +547,14 @@ def build_pattern_keyboard_with_periods(enabled_periods: dict) -> InlineKeyboard
     return InlineKeyboardMarkup([
         row_period,
         [
-            InlineKeyboardButton("💵基础", callback_data="single_panel_basic"),
-            InlineKeyboardButton("📑合约", callback_data="single_panel_futures"),
-            InlineKeyboardButton("🧠高级", callback_data="single_panel_advanced"),
-            InlineKeyboardButton("✅🕯️形态", callback_data="single_panel_pattern"),
+            InlineKeyboardButton(I18N.gettext("panel.basic", lang=lang), callback_data="single_panel_basic"),
+            InlineKeyboardButton(I18N.gettext("panel.futures", lang=lang), callback_data="single_panel_futures"),
+            InlineKeyboardButton(I18N.gettext("panel.advanced", lang=lang), callback_data="single_panel_advanced"),
+            InlineKeyboardButton("✅" + I18N.gettext("panel.pattern", lang=lang), callback_data="single_panel_pattern"),
         ],
         [
-            InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu"),
-            InlineKeyboardButton("🔄 刷新", callback_data="single_refresh"),
+            InlineKeyboardButton(I18N.gettext("btn.back_home", lang=lang), callback_data="main_menu"),
+            InlineKeyboardButton(I18N.gettext("btn.refresh", lang=lang), callback_data="single_refresh"),
         ]
     ])
 
@@ -546,17 +568,18 @@ def render_single_snapshot(symbol: str, panel: str, enabled_periods: dict, enabl
     return text, keyboard, pages, page
 
 # 🤖 AI分析模块已下线（历史依赖 pandas/numpy/pandas-ta）。
-AI_FEATURE_NOTICE = (
-    "🤖 AI分析暂未开放\n"
-    "📊 所有菜单数据均由数据库实时消费，不再执行额外计算。"
-)
+# AI_FEATURE_NOTICE 使用 i18n
+def _get_ai_notice(update=None):
+    lang = _resolve_lang(update) if update else I18N.default_locale
+    return I18N.gettext("feature.coming_soon", lang=lang)
 
-def build_ai_placeholder_keyboard() -> InlineKeyboardMarkup:
+def build_ai_placeholder_keyboard(update=None) -> InlineKeyboardMarkup:
     """统一的AI功能下线提示按钮"""
+    lang = _resolve_lang(update) if update else I18N.default_locale
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu"),
-            InlineKeyboardButton("🔄 刷新", callback_data="main_menu"),
+            InlineKeyboardButton(I18N.gettext("btn.back_home", lang=lang), callback_data="main_menu"),
+            InlineKeyboardButton(I18N.gettext("btn.refresh", lang=lang), callback_data="main_menu"),
         ]
     ])
 
@@ -1063,13 +1086,15 @@ class UserRequestHandler:
         current_period='24h',
         current_sort_order='desc',
         current_limit=10,
-        current_market_type='futures'
+        current_market_type='futures',
+        update=None
     ):
         """基础行情键盘（占位版）"""
+        lang = _resolve_lang(update) if update else I18N.default_locale
         return InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu"),
-                InlineKeyboardButton("🔄 刷新", callback_data="basic_market"),
+                InlineKeyboardButton(I18N.gettext("btn.back_home", lang=lang), callback_data="main_menu"),
+                InlineKeyboardButton(I18N.gettext("btn.refresh", lang=lang), callback_data="basic_market"),
             ]
         ])
 
@@ -1095,10 +1120,11 @@ class UserRequestHandler:
         return "basic"  # 默认归入基础
 
 
-    def get_ranking_menu_keyboard(self) -> InlineKeyboardMarkup:
+    def get_ranking_menu_keyboard(self, update=None) -> InlineKeyboardMarkup:
         """排行榜二级菜单：列出所有已注册的排行榜卡片"""
         registry = self.card_registry or ensure_ranking_registry()
         current_group = self.user_states.get("ranking_group", "basic")
+        lang = _resolve_lang(update) if update else I18N.default_locale
 
         buttons: List[InlineKeyboardButton] = []
         if registry:
@@ -1110,24 +1136,25 @@ class UserRequestHandler:
 
         # 提示行
         rows.append([
-            InlineKeyboardButton("👇显示点击下方按钮选择更多数据", callback_data="ranking_menu_nop")
+            InlineKeyboardButton(I18N.gettext("btn.show_more", lang=lang), callback_data="ranking_menu_nop")
         ])
 
         # 分组切换行
-        def _group_btn(label: str, value: str) -> InlineKeyboardButton:
+        def _group_btn(key: str, value: str) -> InlineKeyboardButton:
             active = current_group == value
+            text = I18N.gettext(key, lang=lang)
             prefix = "✅" if active else ""
-            return InlineKeyboardButton(f"{prefix}{label}", callback_data=f"ranking_menu_group_{value}")
+            return InlineKeyboardButton(f"{prefix}{text}", callback_data=f"ranking_menu_group_{value}")
 
         rows.append([
-            _group_btn("基础数据", "basic"),
-            _group_btn("合约数据", "futures"),
-            _group_btn("高级数据", "advanced"),
+            _group_btn("panel.basic", "basic"),
+            _group_btn("panel.futures", "futures"),
+            _group_btn("panel.advanced", "advanced"),
         ])
 
         rows.append([
-            InlineKeyboardButton("🏠 主菜单", callback_data="main_menu"),
-            InlineKeyboardButton("🔄 刷新", callback_data="ranking_menu"),
+            InlineKeyboardButton(I18N.gettext("menu.home", lang=lang), callback_data="main_menu"),
+            InlineKeyboardButton(I18N.gettext("btn.refresh", lang=lang), callback_data="ranking_menu"),
         ])
         return InlineKeyboardMarkup(rows)
     
@@ -3754,7 +3781,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         try:
             if os.getenv("DISABLE_SINGLE_TOKEN_QUERY", "1") == "1":
-                await query.edit_message_text("⚠️ 单币查询功能暂时关闭")
+                await query.edit_message_text(_t(update, "query.disabled"))
                 return
             from bot.single_token_snapshot import SingleTokenSnapshot
             enabled_periods = {"1m": False, "5m": False, "15m": True, "1h": True, "4h": True, "1d": True, "1w": False}
@@ -3789,12 +3816,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ---- 形态面板周期开关 ----
     if button_data.startswith("pattern_toggle_"):
         if user_handler is None:
-            await query.edit_message_text("❌ 系统未就绪，请稍后重试", parse_mode='Markdown')
+            await query.edit_message_text(_t(update, "error.not_ready"), parse_mode='Markdown')
             return
         states = user_handler.user_states.setdefault(user_id, {})
         sym = states.get("single_symbol")
         if not sym:
-            await query.edit_message_text("请先发送例如 btc! 触发单币查询", parse_mode='Markdown')
+            await query.edit_message_text(_t(update, "query.hint"), parse_mode='Markdown')
             return
         pattern_periods = states.get("pattern_periods", {"1m": False, "5m": False, "15m": True, "1h": True, "4h": True, "1d": False, "1w": False})
         period = button_data.replace("pattern_toggle_", "")
@@ -3813,7 +3840,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ---- 单币快照按钮处理 ----
     if button_data.startswith("single_"):
         if user_handler is None:
-            await query.edit_message_text("❌ 系统未就绪，请稍后重试", parse_mode='Markdown')
+            await query.edit_message_text(_t(update, "error.not_ready"), parse_mode='Markdown')
             return
         states = user_handler.user_states.setdefault(user_id, {})
         sym = states.get("single_symbol")
@@ -3822,7 +3849,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         enabled_cards = states.get("single_cards", {})
         page = states.get("single_page", 0)
         if not sym:
-            await query.edit_message_text("请先发送例如 btc! 触发单币查询", parse_mode='Markdown')
+            await query.edit_message_text(_t(update, "query.hint"), parse_mode='Markdown')
             return
 
         reset_page = False
@@ -3911,7 +3938,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await query.message.reply_text(p, parse_mode='Markdown')
             else:
                 logger.error("单币快照编辑失败: %s", e)
-                await query.message.reply_text("❌ 刷新失败，请稍后重试", parse_mode='Markdown')
+                await query.message.reply_text(_t(update, "error.refresh_failed"), parse_mode='Markdown')
         return
 
     # ⚖️ 超买超卖卡片下线保护
@@ -4909,7 +4936,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                            "coin_page_prev", "coin_page_next", "analysis_depth", "analysis_point",
                            "refresh_main_menu"} or query.data.startswith(("toggle_", "page_", "reanalyze_", "coin_", "sort_", "interval_")):
             await query.edit_message_text(
-                "🚧 功能开发中，敬请期待！",
+                _t(update, "feature.coming_soon"),
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")
                 ]]),
@@ -4976,7 +5003,7 @@ async def vol_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     global user_handler
     if user_handler is None:
-        await update.message.reply_text("🚀 机器人正在初始化中，请稍等...")
+        await update.message.reply_text(_t(update, "start.initializing"))
         return
     
     try:
@@ -5000,7 +5027,7 @@ async def sentiment_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     global user_handler
     if user_handler is None:
-        await update.message.reply_text("🚀 机器人正在初始化中，请稍等...")
+        await update.message.reply_text(_t(update, "start.initializing"))
         return
     
     try:
@@ -5022,7 +5049,7 @@ async def market_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     global user_handler
     if user_handler is None:
-        await update.message.reply_text("🚀 机器人正在初始化中，请稍等...")
+        await update.message.reply_text(_t(update, "start.initializing"))
         return
     
     try:
@@ -5058,7 +5085,7 @@ async def flow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     global user_handler
     if user_handler is None:
-        await update.message.reply_text("🚀 机器人正在初始化中，请稍等...")
+        await update.message.reply_text(_t(update, "start.initializing"))
         return
     
     try:
@@ -5082,7 +5109,7 @@ async def depth_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     global user_handler
     if user_handler is None:
-        await update.message.reply_text("🚀 机器人正在初始化中，请稍等...")
+        await update.message.reply_text(_t(update, "start.initializing"))
         return
     
     try:
@@ -5115,7 +5142,7 @@ async def ratio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     global user_handler
     if user_handler is None:
-        await update.message.reply_text("🚀 机器人正在初始化中，请稍等...")
+        await update.message.reply_text(_t(update, "start.initializing"))
         return
     
     try:
@@ -5165,13 +5192,13 @@ async def alerts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """信号订阅指令 /alerts - 开发中"""
     if not _is_command_allowed(update):
         return
-    await update.message.reply_text("🚧 信号订阅功能开发中，敬请期待！")
+    await update.message.reply_text(_t(update, "signal.coming_soon"))
 
 async def subscribe_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """信号订阅指令 /subscribe - 开发中"""
     if not _is_command_allowed(update):
         return
-    await update.message.reply_text("🚧 信号订阅功能开发中，敬请期待！")
+    await update.message.reply_text(_t(update, "signal.coming_soon"))
 
 async def status_command_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """用户中心指令 /status"""
@@ -5184,7 +5211,7 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     global user_handler
     if user_handler is None:
-        await update.message.reply_text("🚀 机器人正在初始化中，请稍等...")
+        await update.message.reply_text(_t(update, "start.initializing"))
         return
     
     # 发送主菜单，保持永久常驻键盘
@@ -5214,10 +5241,10 @@ async def data_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     global user_handler
     if user_handler is None:
-        await update.message.reply_text("🚀 机器人正在初始化中，请稍等...")
+        await update.message.reply_text(_t(update, "start.initializing"))
         return
     # 先发送带键盘的消息刷新底部键盘
-    await update.message.reply_text("你好👋", reply_markup=user_handler.get_reply_keyboard(update))
+    await update.message.reply_text(_t(update, "start.greet"), reply_markup=user_handler.get_reply_keyboard(update))
     text = _build_ranking_menu_text("basic", update)
     keyboard = user_handler.get_ranking_menu_keyboard()
     await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
@@ -5299,7 +5326,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     global bot
     if bot is None:
-        await update.message.reply_text("🚀 机器人正在初始化中，请稍等...")
+        await update.message.reply_text(_t(update, "start.initializing"))
         return
     
     try:
@@ -5350,7 +5377,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logger.error(f"状态命令错误: {e}")
-        await update.message.reply_text("❌ 获取状态失败，请稍后重试")
+        await update.message.reply_text(_t(update, "error.status_failed"))
 
 async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """处理常驻键盘按钮消息"""
@@ -5370,7 +5397,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
     if user_handler is None:
         logger.warning("user_handler 未初始化")
         return
-        await update.message.reply_text("🚀 机器人正在初始化中，请稍等...")
+        await update.message.reply_text(_t(update, "start.initializing"))
         return
     
     # 映射常驻键盘按钮到对应功能
@@ -5470,7 +5497,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
             user_id = update.effective_user.id
             # 性能优化：临时关闭单币查询
             if os.getenv("DISABLE_SINGLE_TOKEN_QUERY", "1") == "1":
-                await update.message.reply_text("⚠️ 单币查询功能暂时关闭（性能优化中）")
+                await update.message.reply_text(_t(update, "query.disabled"))
                 return
             # 默认周期开关：仅开 15m/1h/4h/1d，其他可通过按钮再开启
             enabled_periods = {"1m": False, "5m": False, "15m": True, "1h": True, "4h": True, "1d": True, "1w": False}
@@ -5501,7 +5528,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                         raise
             except Exception as exc:
                 logger.error("单币快照渲染失败: %s", exc)
-                await update.message.reply_text("❌ 单币查询失败，请稍后重试", parse_mode='Markdown')
+                await update.message.reply_text(_t(update, "error.query_failed", error=""), parse_mode='Markdown')
             return
 
         if message_text in button_mapping:
@@ -5712,7 +5739,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     await update.message.reply_text(_t(update, "ai.failed", error=e))
                 
             elif action in {"aggregated_alerts", "coin_search"}:
-                await update.message.reply_text("🚧 功能开发中，敬请期待！")
+                await update.message.reply_text(_t(update, "feature.coming_soon"))
                 return
 
         else:
