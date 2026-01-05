@@ -9,6 +9,7 @@ from typing import Dict, Tuple
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.base import RankingCard
+from cards.i18n import btn_auto as _btn_auto
 from cards.排行榜服务 import DEFAULT_PERIODS, get_funding_service, normalize_period
 
 
@@ -166,9 +167,13 @@ class FundingRateCard(RankingCard):
         period = h.user_states.get('funding_period', '24h')
 
         def b(label: str, data: str, active: bool = False, disabled: bool = False):
+
             if disabled:
-                return InlineKeyboardButton(label, callback_data="funding_nop")
-            return InlineKeyboardButton(f"✅{label}" if active else label, callback_data=data)
+
+                return InlineKeyboardButton(label, callback_data=data or 'nop')
+
+            return _btn_auto(None, label, data, active=active)
+
 
         kb: list[list[InlineKeyboardButton]] = []
         # 行1 市场省略
@@ -204,8 +209,8 @@ class FundingRateCard(RankingCard):
         ])
         # 行8 主控
         kb.append([
-            InlineKeyboardButton("🏠主菜单", callback_data="ranking_menu"),
-            InlineKeyboardButton("🔄刷新", callback_data="funding_rate_refresh"),
+            _btn_auto(None, "🏠主菜单", "ranking_menu"),
+            _btn_auto(None, "🔄刷新", "funding_rate_refresh"),
         ])
         return InlineKeyboardMarkup(kb)
 

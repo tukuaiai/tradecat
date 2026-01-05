@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Dict, List, Sequence
 
 from cards.data_provider import get_ranking_provider, format_symbol
+from cards.i18n import btn_auto as _btn_auto
 
 from cards.数据库行情服务 import 获取数据库行情服务
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -485,7 +486,7 @@ def build_standard_keyboard(
     """
 
     def btn(label: str, data: str, active: bool = False) -> InlineKeyboardButton:
-        return InlineKeyboardButton(f"✅{label}" if active else label, callback_data=data)
+        return _btn_auto(None, label, data, active=active)
 
     prefix = callback_prefix or ""
     if prefix and not prefix.endswith("_"):
@@ -545,8 +546,8 @@ def build_standard_keyboard(
     # 第六行：返回排行榜 + 刷新
     if show_main_refresh:
         keyboard.append([
-            InlineKeyboardButton("🏠返回排行榜", callback_data=main_callback),
-            InlineKeyboardButton("🔄刷新", callback_data=refresh_callback),
+            _btn_auto(None, "btn.back_home", main_callback),
+            _btn_auto(None, "btn.refresh", refresh_callback),
         ])
 
     return InlineKeyboardMarkup(keyboard)

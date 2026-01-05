@@ -13,6 +13,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.base import RankingCard
 from cards.data_provider import get_ranking_provider, format_symbol
+from cards.i18n import btn_auto as _btn_auto
 
 
 class 超级精准趋势排行卡片(RankingCard):
@@ -207,8 +208,8 @@ class 超级精准趋势排行卡片(RankingCard):
         ])
 
         kb.append([
-            InlineKeyboardButton("🏠主菜单", callback_data="ranking_menu"),
-            InlineKeyboardButton("🔄刷新", callback_data="st_refresh"),
+            _btn_auto(None, "🏠主菜单", "ranking_menu"),
+            _btn_auto(None, "🔄刷新", "st_refresh"),
         ])
 
         return InlineKeyboardMarkup(kb)

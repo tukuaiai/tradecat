@@ -62,4 +62,40 @@ def btn(update, key: str, callback: str, *, active: bool = False, prefix: str = 
         text = f"{prefix}{text}"
     return InlineKeyboardButton(text, callback_data=callback)
 
-__all__ = ["gettext", "btn", "resolve_lang", "I18N"]
+BUTTON_KEY_MAP = {
+    "降序": "btn.sort.desc",
+    "升序": "btn.sort.asc",
+    "10条": "btn.limit.10",
+    "20条": "btn.limit.20",
+    "30条": "btn.limit.30",
+    "现货": "market.spot",
+    "期货": "market.futures",
+    "🏠主菜单": "menu.home",
+    "🏠 返回": "btn.back_home",
+    "⬅️ 返回": "btn.back",
+    "返回": "btn.back",
+    "🔄刷新": "btn.refresh",
+    "刷新": "btn.refresh",
+    "⚙️设置": "btn.settings",
+    "设置": "btn.settings",
+    "开启推送": "signal.push.on",
+    "关闭推送": "signal.push.off",
+    "开启": "signal.push.on",
+    "关闭": "signal.push.off",
+}
+
+
+def btn_auto(update, label: str, callback: str, *, active: bool = False, prefix: str = "✅") -> InlineKeyboardButton:
+    """根据常见中文标签自动映射到词条；未命中则回退原文。"""
+    key = BUTTON_KEY_MAP.get(label)
+    if key:
+        text = gettext(key, update=update)
+    else:
+        # 若传入的 label 本身是 key（带 .），尝试翻译；否则原文回退
+        text = gettext(label, update=update) if "." in label else label
+    if active and prefix:
+        text = f"{prefix}{text}"
+    return InlineKeyboardButton(text, callback_data=callback)
+
+
+__all__ = ["gettext", "btn", "btn_auto", "resolve_lang", "I18N"]

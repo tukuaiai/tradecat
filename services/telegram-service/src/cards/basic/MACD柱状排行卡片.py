@@ -12,6 +12,7 @@ from typing import Dict, List, Tuple
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.data_provider import get_ranking_provider, format_symbol
+from cards.i18n import btn_auto as _btn_auto
 from cards.base import RankingCard
 
 
@@ -155,9 +156,13 @@ class MACD柱状排行卡片(RankingCard):
         market = h.user_states.get("macd_market", "futures")
 
         def b(label: str, data: str, active: bool = False, disabled: bool = False):
+
             if disabled:
-                return InlineKeyboardButton(label, callback_data="macd_nop")
-            return InlineKeyboardButton(f"✅{label}" if active else label, callback_data=data)
+
+                return InlineKeyboardButton(label, callback_data=data or 'nop')
+
+            return _btn_auto(None, label, data, active=active)
+
 
         kb: List[List[InlineKeyboardButton]] = []
 
@@ -205,8 +210,8 @@ class MACD柱状排行卡片(RankingCard):
         ])
 
         kb.append([
-            InlineKeyboardButton("🏠主菜单", callback_data="ranking_menu"),
-            InlineKeyboardButton("🔄刷新", callback_data="macd_ranking_refresh"),
+            _btn_auto(None, "🏠主菜单", "ranking_menu"),
+            _btn_auto(None, "🔄刷新", "macd_ranking_refresh"),
         ])
 
         return InlineKeyboardMarkup(kb)

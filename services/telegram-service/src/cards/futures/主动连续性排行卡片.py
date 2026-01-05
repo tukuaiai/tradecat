@@ -12,6 +12,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.base import RankingCard
 from cards.data_provider import get_ranking_provider, format_symbol
+from cards.i18n import btn_auto as _btn_auto
 
 
 class FuturesTakerStreakCard(RankingCard):
@@ -157,9 +158,13 @@ class FuturesTakerStreakCard(RankingCard):
         market = h.user_states.get("tstreak_market", self.DEFAULT_MARKET)
 
         def b(label: str, data: str, active: bool = False, disabled: bool = False):
+
             if disabled:
-                return InlineKeyboardButton(label, callback_data="tstreak_nop")
-            return InlineKeyboardButton(f"✅{label}" if active else label, callback_data=data)
+
+                return InlineKeyboardButton(label, callback_data=data or 'nop')
+
+            return _btn_auto(None, label, data, active=active)
+
 
         kb: List[List[InlineKeyboardButton]] = []
         if self.SHOW_MARKET_SWITCH:
@@ -204,8 +209,8 @@ class FuturesTakerStreakCard(RankingCard):
         ])
 
         kb.append([
-            InlineKeyboardButton("🏠主菜单", callback_data="ranking_menu"),
-            InlineKeyboardButton("🔄刷新", callback_data="futures_taker_streak_refresh"),
+            _btn_auto(None, "🏠主菜单", "ranking_menu"),
+            _btn_auto(None, "🔄刷新", "futures_taker_streak_refresh"),
         ])
         return InlineKeyboardMarkup(kb)
 

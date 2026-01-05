@@ -12,7 +12,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.base import RankingCard
 from cards.data_provider import get_ranking_provider, format_symbol
-from cards.i18n import gettext as _t, btn as _btn, resolve_lang
+from cards.i18n import gettext as _t, btn as _btn, resolve_lang, btn_auto as _btn_auto
 
 
 class FuturesDivergenceCard(RankingCard):
@@ -161,9 +161,13 @@ class FuturesDivergenceCard(RankingCard):
         market = h.user_states.get("div_market", self.DEFAULT_MARKET)
 
         def b(label: str, data: str, active: bool = False, disabled: bool = False):
+
             if disabled:
-                return InlineKeyboardButton(label, callback_data="div_nop")
-            return InlineKeyboardButton(f"✅{label}" if active else label, callback_data=data)
+
+                return InlineKeyboardButton(label, callback_data=data or 'nop')
+
+            return _btn_auto(None, label, data, active=active)
+
 
         kb: List[List[InlineKeyboardButton]] = []
         if self.SHOW_MARKET_SWITCH:

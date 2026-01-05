@@ -10,6 +10,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.base import RankingCard
 from cards.data_provider import format_symbol
+from cards.i18n import btn_auto as _btn_auto
 from cards.排行榜服务 import DEFAULT_PERIODS, get_market_depth_service, normalize_period
 
 
@@ -180,9 +181,13 @@ class MarketDepthCard(RankingCard):
         period = h.user_states.get('market_depth_period', '15m')
 
         def b(label: str, data: str, active: bool = False, disabled: bool = False):
+
             if disabled:
-                return InlineKeyboardButton(label, callback_data="md_nop")
-            return InlineKeyboardButton(f"✅{label}" if active else label, callback_data=data)
+
+                return InlineKeyboardButton(label, callback_data=data or 'nop')
+
+            return _btn_auto(None, label, data, active=active)
+
 
         kb: list[list[InlineKeyboardButton]] = []
         # 行1 市场省略（仅期货）
@@ -225,8 +230,8 @@ class MarketDepthCard(RankingCard):
 
         # 行8 主控
         kb.append([
-            InlineKeyboardButton("🏠主菜单", callback_data="ranking_menu"),
-            InlineKeyboardButton("🔄刷新", callback_data="market_depth_refresh"),
+            _btn_auto(None, "🏠主菜单", "ranking_menu"),
+            _btn_auto(None, "🔄刷新", "market_depth_refresh"),
         ])
 
         return InlineKeyboardMarkup(kb)
