@@ -4943,21 +4943,33 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """语言切换命令 /lang"""
-    buttons = []
-    display_names = {
-        "zh_CN": _t(update, "lang.zh"),
-        "en": _t(update, "lang.en"),
-    }
-    for code in I18N.supported_locales:
-        label = display_names.get(code, code)
-        buttons.append([InlineKeyboardButton(label, callback_data=f"set_lang_{code}")])
-    # 支持命令与回调两种入口
+    """语言切换命令 /lang - 直接切换中英文"""
+    user_id = getattr(getattr(update, "effective_user", None), "id", None)
+    if user_id is None:
+        return
+    
+    # 获取当前语言，切换到另一种
+    current_lang = _resolve_lang(update)
+    new_lang = "en" if current_lang == "zh_CN" else "zh_CN"
+    _save_user_locale(user_id, new_lang)
+    
+    display_names = {"zh_CN": "简体中文", "en": "English"}
+    msg = I18N.gettext("lang.set", lang=new_lang, lang_name=display_names.get(new_lang, new_lang))
+    
     if getattr(update, "callback_query", None):
-        await update.callback_query.answer()
-        await update.callback_query.edit_message_text(_t(update, "lang.prompt"), reply_markup=InlineKeyboardMarkup(buttons))
+        await update.callback_query.answer(msg)
+        if user_handler:
+            await update.callback_query.edit_message_text(
+                user_handler.get_main_menu_text(update),
+                reply_markup=user_handler.get_main_menu_keyboard(update)
+            )
     elif getattr(update, "message", None):
-        await update.message.reply_text(_t(update, "lang.prompt"), reply_markup=InlineKeyboardMarkup(buttons))
+        await update.message.reply_text(msg)
+        if user_handler:
+            await update.message.reply_text(
+                user_handler.get_main_menu_text(update),
+                reply_markup=user_handler.get_main_menu_keyboard(update)
+            )
 
 async def vol_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """交易量数据查询指令 /vol"""
