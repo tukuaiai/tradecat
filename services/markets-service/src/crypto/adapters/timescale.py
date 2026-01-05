@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, Iterator, List, Optional, Sequence
 
@@ -19,6 +20,15 @@ from ..schema_adapter import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class WriteResult:
+    """写入结果"""
+    success: bool = False
+    rows_written: int = 0
+    batch_id: Optional[int] = None
+    error: Optional[str] = None
 
 
 class TimescaleAdapter:
@@ -63,16 +73,26 @@ class TimescaleAdapter:
         try:
             with self.connection() as conn:
                 with conn.cursor() as cur:
-                    cur.execute(
-                        f"SELECT {settings.quality_schema}.start_batch(%s, %s, %s, %s, %s, %s)",
-                        ("binance", data_type, "crypto", None, None, None)
+                    # 使用 sql.Identifier 避免 SQL 注入
+                    query = sql.SQL("SELECT {}.start_batch(%s, %s, %s, %s, %s, %s)").format(
+                        sql.Identifier(settings.quality_schema)
                     )
+                    cur.execute(query, ("binance", data_type, "crypto", None, None, None))
                     result = cur.fetchone()
                     conn.commit()
                     return result[0] if result else 0
         except Exception as e:
             logger.debug("获取 batch_id 失败: %s", e)
             return 0
+    
+    def _get_batch_id_safe(self, data_type: str) -> Optional[int]:
+        """安全获取 batch_id，失败返回 None 而非抛异常 (F-04 修复)"""
+        try:
+            batch_id = self._get_batch_id(data_type)
+            return batch_id if batch_id > 0 else None
+        except Exception as e:
+            logger.warning("获取 batch_id 失败，将使用 NULL: %s", e)
+            return None
 
     def upsert_candles(self, interval: str, rows: Sequence[dict], batch_size: int = 2000) -> int:
         """
@@ -80,15 +100,18 @@ class TimescaleAdapter:
         
         - raw 模式: 写入 raw.crypto_kline_1m，字段转换 + batch_id
         - legacy 模式: 写入 market_data.candles_1m，保持原字段
+        
+        Returns:
+            写入的行数
         """
         if not rows:
             return 0
         
         interval = normalize_interval(interval)
         
-        # 根据模式处理数据
+        # 根据模式处理数据 (F-03/F-04: 使用安全的 batch_id 获取)
         if settings.is_raw_mode:
-            batch_id = self._get_batch_id("kline")
+            batch_id = self._get_batch_id_safe("kline") or 0
             rows = KlineAdapter.to_new_schema(rows, batch_id)
             table_name = get_kline_table(interval)
             conflict_keys = get_kline_conflict_keys()
@@ -175,9 +198,9 @@ class TimescaleAdapter:
         if not rows:
             return 0
 
-        # 根据模式处理数据
+        # 根据模式处理数据 (F-03/F-04: 使用安全的 batch_id 获取)
         if settings.is_raw_mode:
-            batch_id = self._get_batch_id("metrics")
+            batch_id = self._get_batch_id_safe("metrics") or 0
             rows = MetricsAdapter.to_new_schema(rows, batch_id)
             table_name = get_metrics_table()
             conflict_keys = get_metrics_conflict_keys()
@@ -252,57 +275,99 @@ class TimescaleAdapter:
             conn.commit()
             
         return total_inserted
-    
-    def _quote_val(self, v) -> str:
-        """SQL 值转义 (在此重构中已不再需要，保留以兼容旧代码)"""
-        if v is None:
-            return "NULL"
-        if isinstance(v, str):
-            return f"'{v.replace(chr(39), chr(39)+chr(39))}'"
-        if isinstance(v, datetime):
-            return f"'{v.isoformat()}'"
-        if isinstance(v, bool):
-            return "TRUE" if v else "FALSE"
-        # Decimal, int, float 都直接转 str
-        return str(v)
 
     def get_symbols(self, exchange: str, interval: str = "1m") -> List[str]:
-        table = f"{self.schema}.candles_{normalize_interval(interval)}"
+        """获取交易对列表"""
+        interval = normalize_interval(interval)
+        table = f"{self.schema}.candles_{interval}"
+        # 验证表名 (R2-01 修复)
+        from ..config import validate_table_name
+        validate_table_name(table)
+        
         with self.connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(f"SELECT DISTINCT symbol FROM {table} WHERE exchange = %s ORDER BY symbol", (exchange,))
+                cur.execute(
+                    sql.SQL("SELECT DISTINCT symbol FROM {} WHERE exchange = %s ORDER BY symbol").format(
+                        sql.Identifier(self.schema, f"candles_{interval}")
+                    ),
+                    (exchange,)
+                )
                 return [r[0] for r in cur.fetchall()]
 
     def get_counts(self, exchange: str, interval: str, symbols: Sequence[str]) -> Dict[str, int]:
+        """获取各交易对数据量"""
         if not symbols:
             return {}
-        table = f"{self.schema}.candles_{normalize_interval(interval)}"
+        interval = normalize_interval(interval)
+        table = f"{self.schema}.candles_{interval}"
+        from ..config import validate_table_name
+        validate_table_name(table)
+        
         with self.connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(f"SELECT symbol, COUNT(*) FROM {table} WHERE exchange = %s AND symbol = ANY(%s) GROUP BY symbol", (exchange, list(symbols)))
+                cur.execute(
+                    sql.SQL("SELECT symbol, COUNT(*) FROM {} WHERE exchange = %s AND symbol = ANY(%s) GROUP BY symbol").format(
+                        sql.Identifier(self.schema, f"candles_{interval}")
+                    ),
+                    (exchange, list(symbols))
+                )
                 return {r[0]: r[1] for r in cur.fetchall()}
 
     def detect_gaps(self, exchange: str, interval: str, symbols: Sequence[str], lookback_min: int = 10080, threshold_sec: int = 120, limit: int = 50) -> List[tuple]:
-        table = f"{self.schema}.candles_{normalize_interval(interval)}"
-        sql = f"""
-            WITH o AS (SELECT symbol, bucket_ts, LEAD(bucket_ts) OVER (PARTITION BY symbol ORDER BY bucket_ts) AS next_ts
-                       FROM {table} WHERE exchange = %(ex)s AND symbol = ANY(%(sym)s) AND bucket_ts >= NOW() - INTERVAL '{lookback_min} minutes')
-            SELECT symbol, bucket_ts, next_ts FROM o WHERE next_ts IS NOT NULL AND next_ts - bucket_ts >= INTERVAL '{threshold_sec} seconds' ORDER BY bucket_ts LIMIT %(lim)s
-        """
+        """检测数据缺口"""
+        interval = normalize_interval(interval)
+        table = f"{self.schema}.candles_{interval}"
+        from ..config import validate_table_name
+        validate_table_name(table)
+        
+        # 使用参数化查询，lookback_min 和 threshold_sec 是整数，安全
+        query = sql.SQL("""
+            WITH o AS (
+                SELECT symbol, bucket_ts, LEAD(bucket_ts) OVER (PARTITION BY symbol ORDER BY bucket_ts) AS next_ts
+                FROM {table} 
+                WHERE exchange = %(ex)s AND symbol = ANY(%(sym)s) 
+                  AND bucket_ts >= NOW() - INTERVAL '{lookback} minutes'
+            )
+            SELECT symbol, bucket_ts, next_ts 
+            FROM o 
+            WHERE next_ts IS NOT NULL AND next_ts - bucket_ts >= INTERVAL '{threshold} seconds' 
+            ORDER BY bucket_ts 
+            LIMIT %(lim)s
+        """).format(
+            table=sql.Identifier(self.schema, f"candles_{interval}"),
+            lookback=sql.Literal(lookback_min),
+            threshold=sql.Literal(threshold_sec)
+        )
+        
         with self.connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(sql, {"ex": exchange, "sym": list(symbols), "lim": limit})
+                cur.execute(query, {"ex": exchange, "sym": list(symbols), "lim": limit})
                 return cur.fetchall()
 
     def query(self, exchange: str, symbol: str, interval: str, start: Optional[datetime] = None, end: Optional[datetime] = None, limit: int = 1000) -> List[dict]:
-        table = f"{self.schema}.candles_{normalize_interval(interval)}"
-        conds, params = ["exchange = %s", "symbol = %s"], [exchange, symbol]
+        """查询 K 线数据"""
+        interval = normalize_interval(interval)
+        table = f"{self.schema}.candles_{interval}"
+        from ..config import validate_table_name
+        validate_table_name(table)
+        
+        conds = [sql.SQL("exchange = %s"), sql.SQL("symbol = %s")]
+        params: list = [exchange, symbol]
+        
         if start:
-            conds.append("bucket_ts >= %s"); params.append(start)
+            conds.append(sql.SQL("bucket_ts >= %s"))
+            params.append(start)
         if end:
-            conds.append("bucket_ts <= %s"); params.append(end)
+            conds.append(sql.SQL("bucket_ts <= %s"))
+            params.append(end)
         params.append(limit)
+        
+        query = sql.SQL("SELECT * FROM {} WHERE {} ORDER BY bucket_ts DESC LIMIT %s").format(
+            sql.Identifier(self.schema, f"candles_{interval}"),
+            sql.SQL(" AND ").join(conds)
+        )
+        
         with self.connection() as conn:
             with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(f"SELECT * FROM {table} WHERE {' AND '.join(conds)} ORDER BY bucket_ts DESC LIMIT %s", params)
+                cur.execute(query, params)
                 return cur.fetchall()

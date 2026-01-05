@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import List, Sequence
 
-from .config import settings
+from .config import settings, validate_table_name
 
 
 class KlineAdapter:
@@ -57,21 +57,25 @@ class KlineAdapter:
 
 
 class MetricsAdapter:
-    """期货指标字段适配: binance_futures_metrics_5m ↔ raw.crypto_metrics_5m"""
+    """期货指标字段适配: binance_futures_metrics_5m ↔ raw.crypto_metrics_5m
     
-    # 旧字段 → 新字段
+    注意: raw.crypto_metrics_5m 使用驼峰命名 (与 Binance API 一致)
+    """
+    
+    # 旧字段 → 新字段 (raw 表使用驼峰)
     FIELD_MAP = {
         "create_time": "timestamp",
-        "sum_open_interest": "open_interest",
-        "sum_open_interest_value": "open_interest_value",
-        "sum_toptrader_long_short_ratio": "top_long_short_ratio",
-        "count_long_short_ratio": "long_short_ratio",
-        "sum_taker_long_short_vol_ratio": "taker_buy_sell_ratio",
+        "sum_open_interest": "sumOpenInterest",
+        "sum_open_interest_value": "sumOpenInterestValue",
+        "sum_toptrader_long_short_ratio": "topPositionLongShortRatio",
+        "count_toptrader_long_short_ratio": "topAccountLongShortRatio",
+        "count_long_short_ratio": "globalLongShortRatio",
+        "sum_taker_long_short_vol_ratio": "takerBuySellRatio",
     }
     REVERSE_MAP = {v: k for k, v in FIELD_MAP.items()}
     
     # 新表不支持的字段 (丢弃)
-    DROPPED_FIELDS = {"count_toptrader_long_short_ratio", "is_closed"}
+    DROPPED_FIELDS = {"is_closed"}
     
     @classmethod
     def to_new_schema(cls, rows: Sequence[dict], batch_id: int) -> List[dict]:
@@ -105,17 +109,21 @@ class MetricsAdapter:
 
 
 def get_kline_table(interval: str = "1m") -> str:
-    """获取 K线表名"""
+    """获取 K线表名 (带白名单验证)"""
     if settings.is_raw_mode:
-        return f"{settings.raw_schema}.crypto_kline_{interval}"
-    return f"{settings.db_schema}.candles_{interval}"
+        table = f"{settings.raw_schema}.crypto_kline_{interval}"
+    else:
+        table = f"{settings.db_schema}.candles_{interval}"
+    return validate_table_name(table)
 
 
 def get_metrics_table() -> str:
-    """获取期货指标表名"""
+    """获取期货指标表名 (带白名单验证)"""
     if settings.is_raw_mode:
-        return f"{settings.raw_schema}.crypto_metrics_5m"
-    return f"{settings.db_schema}.binance_futures_metrics_5m"
+        table = f"{settings.raw_schema}.crypto_metrics_5m"
+    else:
+        table = f"{settings.db_schema}.binance_futures_metrics_5m"
+    return validate_table_name(table)
 
 
 def get_kline_conflict_keys() -> tuple:

@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import Optional
 
@@ -30,6 +31,38 @@ def _int_env(name: str, default: int) -> int:
         return int(os.getenv(name, default))
     except ValueError:
         return default
+
+
+class WriteMode(str, Enum):
+    """写入模式枚举"""
+    RAW = "raw"
+    LEGACY = "legacy"
+
+
+# 允许的表名白名单 (防止 SQL 注入)
+ALLOWED_TABLES = frozenset({
+    "raw.crypto_kline_1m",
+    "raw.crypto_kline_5m",
+    "raw.crypto_kline_15m",
+    "raw.crypto_kline_1h",
+    "raw.crypto_kline_4h",
+    "raw.crypto_kline_1d",
+    "raw.crypto_metrics_5m",
+    "market_data.candles_1m",
+    "market_data.candles_5m",
+    "market_data.candles_15m",
+    "market_data.candles_1h",
+    "market_data.candles_4h",
+    "market_data.candles_1d",
+    "market_data.binance_futures_metrics_5m",
+})
+
+
+def validate_table_name(table_name: str) -> str:
+    """验证表名在白名单内，防止 SQL 注入"""
+    if table_name not in ALLOWED_TABLES:
+        raise ValueError(f"Invalid table name: {table_name}. Allowed: {sorted(ALLOWED_TABLES)}")
+    return table_name
 
 
 @dataclass
@@ -66,18 +99,51 @@ class Settings:
     ws_source: str = field(default_factory=lambda: os.getenv("BINANCE_WS_SOURCE", "binance_ws"))
     
     def __post_init__(self):
+        """初始化后验证配置"""
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        self._validate()
+    
+    def _validate(self) -> None:
+        """验证配置有效性"""
+        # 验证 write_mode
+        valid_modes = {m.value for m in WriteMode}
+        if self.write_mode not in valid_modes:
+            raise ValueError(
+                f"Invalid CRYPTO_WRITE_MODE: '{self.write_mode}'. "
+                f"Must be one of: {sorted(valid_modes)}"
+            )
+        
+        # 验证 database_url
+        if not self.database_url:
+            raise ValueError(
+                "Database URL not configured. "
+                "Set MARKETS_SERVICE_DATABASE_URL or DATABASE_URL in config/.env"
+            )
+        
+        if not self.database_url.startswith("postgresql://"):
+            raise ValueError(
+                f"Invalid DATABASE_URL format: must start with 'postgresql://', "
+                f"got: '{self.database_url[:30]}...'"
+            )
+        
+        # R2-02: 警告默认密码
+        if "postgres:postgres@" in self.database_url:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Using default database credentials (postgres:postgres). "
+                "Consider setting a secure password in production."
+            )
     
     @property
     def active_schema(self) -> str:
         """当前写入的 schema"""
-        return self.raw_schema if self.write_mode == "raw" else self.db_schema
+        return self.raw_schema if self.write_mode == WriteMode.RAW.value else self.db_schema
     
     @property
     def is_raw_mode(self) -> bool:
         """是否为 raw 模式"""
-        return self.write_mode == "raw"
+        return self.write_mode == WriteMode.RAW.value
 
 
 settings = Settings()

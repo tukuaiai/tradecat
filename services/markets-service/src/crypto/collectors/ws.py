@@ -168,7 +168,7 @@ class WSCollector:
 
     def _smart_backfill(self, lookback_days: int, unfillable: Set[tuple]) -> tuple:
         """智能补齐 - 返回 (是否有缺口, 建议回溯天数)"""
-        from collectors.backfill import GapScanner, ZipBackfiller, RestBackfiller
+        from .backfill import GapScanner, ZipBackfiller, RestBackfiller
         
         t0 = time.perf_counter()
         symbols = list(self._symbols.values())
