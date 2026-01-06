@@ -315,7 +315,7 @@ class MoneyFlowCard(RankingCard):
         active_special = [f for f in self.special_display_fields if field_state.get(f[0], True)]
         active_general = [f for f in self.general_display_fields if field_state.get(f[0], True)]
 
-        header_parts = ["排名", "币种"] + [lab for _, lab, _ in active_special] + [lab for _, lab, _ in active_general]
+        header_parts = [_t("col.rank", None, lang=lang), _t("col.symbol", None, lang=lang)] + [lab for _, lab, _ in active_special] + [lab for _, lab, _ in active_general]
 
         rows: List[List[str]] = []
         for idx, item in enumerate(items[:limit], 1):

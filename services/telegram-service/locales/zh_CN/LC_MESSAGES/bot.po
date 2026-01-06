@@ -1340,3 +1340,28 @@ msgstr "持仓变动"
 
 msgid "btn.field.oi_value"
 msgstr "持仓金额"
+
+# 表头字段
+msgid "col.rank"
+msgstr "排名"
+
+msgid "col.symbol"
+msgstr "币种"
+
+msgid "col.rank_symbol"
+msgstr "排名/币种"
+
+msgid "col.price"
+msgstr "价格"
+
+msgid "col.volume"
+msgstr "成交额"
+
+msgid "col.amplitude"
+msgstr "振幅"
+
+msgid "col.trades"
+msgstr "成交笔数"
+
+msgid "col.taker_ratio"
+msgstr "主动买卖比"

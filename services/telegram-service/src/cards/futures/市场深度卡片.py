@@ -247,7 +247,7 @@ class MarketDepthCard(RankingCard):
     ) -> Tuple[List[List[str]], str]:
         raw_rows = service.render_rows(limit, sort_type, sort_order, period)
         if not raw_rows:
-            return [], "排名/币种"
+            return [], _t("col.rank_symbol", None, lang=lang)
 
         items = []
         for r in raw_rows:
@@ -270,7 +270,7 @@ class MarketDepthCard(RankingCard):
         items.sort(key=lambda x: x.get(sort_type, 0), reverse=reverse)
         active_special = [f for f in self.special_display_fields if fields_state.get(f[0], f[2] or False)]
         active_general = [f for f in self.general_display_fields if fields_state.get(f[0], f[2] or False)]
-        header_parts = ["排名", "币种"] + [lab for _, lab, _ in active_special] + [lab for _, lab, _ in active_general]
+        header_parts = [_t("col.rank", None, lang=lang), _t("col.symbol", None, lang=lang)] + [lab for _, lab, _ in active_special] + [lab for _, lab, _ in active_general]
 
         out_rows: list[list[str]] = []
         for idx, item in enumerate(items[:limit], 1):

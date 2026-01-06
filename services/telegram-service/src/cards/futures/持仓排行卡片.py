@@ -244,7 +244,7 @@ class PositionRankingCard(RankingCard):
         data = handler.get_position_ranking(limit=limit, sort_order=sort_order, period=period, sort_field=sort_field)
         items = []
         if isinstance(data, str):
-            return [], "排名/币种"
+            return [], _t("col.rank_symbol", None, lang=lang)
         for row in data or []:
             sym = (row.get("symbol") or "").upper()
             if not sym:
@@ -265,7 +265,7 @@ class PositionRankingCard(RankingCard):
         items.sort(key=lambda x: x.get(sort_field, 0), reverse=reverse)
         active_special = [f for f in self.special_display_fields if field_state.get(f[0], f[2] or False)]
         active_general = [f for f in self.general_display_fields if field_state.get(f[0], f[2] or False)]
-        header_parts = ["排名", "币种"] + [lab for _, lab, _ in active_special] + [lab for _, lab, _ in active_general]
+        header_parts = [_t("col.rank", None, lang=lang), _t("col.symbol", None, lang=lang)] + [lab for _, lab, _ in active_special] + [lab for _, lab, _ in active_general]
 
         rows: List[List[str]] = []
         for idx, item in enumerate(items[:limit], 1):

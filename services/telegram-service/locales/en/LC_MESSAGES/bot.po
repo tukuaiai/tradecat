@@ -1340,3 +1340,28 @@ msgstr "OI Change"
 
 msgid "btn.field.oi_value"
 msgstr "OI Value"
+
+# Table header fields
+msgid "col.rank"
+msgstr "Rank"
+
+msgid "col.symbol"
+msgstr "Symbol"
+
+msgid "col.rank_symbol"
+msgstr "Rank/Symbol"
+
+msgid "col.price"
+msgstr "Price"
+
+msgid "col.volume"
+msgstr "Volume"
+
+msgid "col.amplitude"
+msgstr "Amp"
+
+msgid "col.trades"
+msgstr "Trades"
+
+msgid "col.taker_ratio"
+msgstr "Taker"
