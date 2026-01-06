@@ -147,6 +147,7 @@ networkingMode=mirrored
 
 # 2) 填写全局配置（含 BOT_TOKEN / DB / 代理 等）
 cp config/.env.example config/.env && chmod 600 config/.env
+# 将 DATABASE_URL 端口改为 5433 以与仓库脚本一致（脚本默认 5433，模板默认 5434）
 vim config/.env
 
 # 3) 启动核心服务（data + trading + telegram）
@@ -159,7 +160,8 @@ vim config/.env
 
 ### ⚙️ 配置（必须）
 
-- 路径：`config/.env`（已由 init.sh 复制），权限建议 600。  
+- 路径：`config/.env`（已由 init.sh 复制），权限需 600，服务启动脚本会强制校验。  
+- TimescaleDB 端口需与脚本一致：仓库脚本默认 5433，模板为 5434，复制后请将 `DATABASE_URL` 改为 5433；若坚持 5434，需同步修改 `scripts/export_timescaledb.sh`、`scripts/timescaledb_compression.sh` 等所有脚本及下方示例端口。
 - 核心字段：  
   - `DATABASE_URL`（TimescaleDB，见下方端口说明）  
   - `BOT_TOKEN`（Telegram Bot Token）  
@@ -192,7 +194,22 @@ zstd -d futures_metrics_5m.bin.zst -c | psql -h localhost -p 5433 -U postgres -d
   -c "COPY market_data.binance_futures_metrics_5m FROM STDIN WITH (FORMAT binary)"
 ```
 
-> 端口说明：运维脚本 `scripts/export_timescaledb.sh` / `scripts/timescaledb_compression.sh` 默认使用 5433；`config/.env.example` 默认 5434。请统一为同一端口（推荐改 `.env` 为 5433，或同步修改脚本 DB_PORT）。<!-- TODO: 若选用 5434，请同步更新所有脚本与示例端口 -->
+> 端口说明：模板默认 5434，但仓库脚本默认 5433。复制后请在 `config/.env` 中把 `DATABASE_URL` 端口改为 5433，或若选择 5434，则务必同步修改 `scripts/export_timescaledb.sh`、`scripts/timescaledb_compression.sh` 与所有示例命令端口。
+
+## 🔍 补充检查（2026-01-06）
+
+- 端口分歧仍需一次性决策：核心脚本 `scripts/export_timescaledb.sh`、`scripts/timescaledb_compression.sh` 默认 5433；模板 `config/.env.example` 及 `services/markets-service/scripts/init_market_db.sh`/`import_bookdepth.py`/`sync_from_old_db.sh`/`ddl/01_enums_schemas.sql`/`migrate_5434.sql` 默认 5434（新库）。请选定端口后同步修改上述所有文件与 README 示例命令。<!-- TODO: 选择统一端口（5433 或 5434）并执行全局替换 -->
+- CI 仅执行 ruff + py_compile 抽样（`.github/workflows/ci.yml`），不会跑 tests；提交前本地仍需 `./scripts/verify.sh`。
+- `scripts/install.sh` 生成各服务 `.env` 但运行时只读 `config/.env`；避免多份配置漂移。
+
+### 🗄️ 双库端口说明（旧库 5433 / 新库 5434）
+
+- 旧库（5433，单 schema `market_data`）：与早期数据采集链兼容，仍被 `scripts/export_timescaledb.sh` / `scripts/timescaledb_compression.sh` 及多数示例命令使用。
+- 新库（5434，多 schema `raw` / `agg` / `quality`）：`config/.env.example`、markets-service 的初始化与迁移脚本（`init_market_db.sh`、`sync_from_old_db.sh`、`migrate_5434.sql` 等）默认指向此库。
+- 使用原则：  
+  - 继续沿用旧库：保持 `DATABASE_URL` 5433，并将 markets-service 脚本端口改为 5433。  
+  - 切换到新库：保持 5434，同时修改顶层运维脚本与 README 示例端口为 5434，确保存储/压缩/导出脚本一致。  
+- 混用风险：脚本与服务若指向不同端口会造成数据分叉；变更前先备份 `./scripts/export_timescaledb.sh`（当前默认 5433）。<!-- TODO: 若正式迁移到 5434，请提供统一替换列表与执行顺序 -->
 
 ### ✅ 验证安装
 
@@ -250,7 +267,7 @@ cd .. && rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
 #### 4. 配置环境变量
 
 ```bash
-# 编辑各服务配置（init.sh 已自动从 .env.example 复制）
+# 编辑 `config/.env`（init.sh 已自动从 .env.example 复制；请同步端口为 5433 以与脚本一致）
 vim config/.env
 ```
 

@@ -32,6 +32,8 @@
 | `libs/database/services/telegram-service/market_data.db` | SQLite 指标数据 | 只读 |
 | `backups/timescaledb/` | 数据库备份 | 禁止修改 |
 
+> 提醒：服务启动脚本会检查 `config/.env` 权限（需 600/400），不符合直接退出。`scripts/install.sh` 仍会为各服务复制 `.env`，但运行时只读取 `config/.env`，避免双份配置漂移。
+
 ---
 
 ## 2. Golden Path（推荐执行路径）
@@ -47,6 +49,7 @@ cd /path/to/tradecat
 
 # 2) 填写全局配置（含 BOT_TOKEN / DB / 代理 等）
 cp config/.env.example config/.env && chmod 600 config/.env
+# 将 DATABASE_URL 端口改为 5433 以与仓库脚本一致（脚本默认 5433，模板默认 5434）
 vim config/.env
 
 # 3) 启动核心服务（data + trading + telegram）
@@ -121,13 +124,13 @@ ruff check services/
 | `make start` | 启动所有服务 |
 | `make stop` | 停止所有服务 |
 | `make status` | 查看服务状态 |
-| `make verify` | 代码验证 |
+| `make verify` | 代码验证（等价 `./scripts/verify.sh`：ruff→py_compile 核心文件与 ai-service 全量→i18n msgfmt 校验与键对齐→可选 pytest） |
 | `make clean` | 清理缓存 |
 
 ### 3.4 数据库操作
 
 ```bash
-# 连接 TimescaleDB
+# 连接 TimescaleDB（默认脚本端口 5433，若 config/.env 改为 5434 需同步调整）
 PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d market_data
 
 # 查看 K线数据量
@@ -421,6 +424,37 @@ source services/<service>/.venv/bin/activate
 # 重新安装依赖
 pip install -r requirements.txt
 ```
+
+### 7.6 端口与配置漂移
+
+**问题**：TimescaleDB 端口不一致或多份 .env 导致读取错误
+
+**说明**：
+- `config/.env.example` 默认端口 5434，但仓库脚本（`scripts/export_timescaledb.sh`、`scripts/timescaledb_compression.sh` 等）默认 5433。
+- 服务启动脚本仅读取 `config/.env`，且会校验权限 600；`scripts/install.sh` 生成的各服务 `.env` 不再被读取，可能造成配置漂移。
+
+**解决**：
+```bash
+# 1) 统一端口为脚本默认 5433
+sed -i 's@localhost:5434@localhost:5433@' config/.env
+
+# 2) 确保权限符合要求
+chmod 600 config/.env
+```
+
+### 7.7 新旧库并存（markets-service 相关）
+
+**现象**：`services/markets-service/scripts/init_market_db.sh`、`import_bookdepth.py`、`sync_from_old_db.sh` 及 `scripts/ddl/01_enums_schemas.sql`、`migrate_5434.sql` 默认指向 5434（新库），并包含“5433 -> 5434”迁移脚本；而顶层运维脚本默认 5433。
+
+**约束**：
+- 执行 markets-service 脚本前确认目标端口；若全局改回 5433，需同步这些脚本与 SQL 文件。
+- 避免在未决端口下写入生产库；若不确定，先导出备份：`./scripts/export_timescaledb.sh`。
+
+### 7.8 双库操作指南（旧库 5433 / 新库 5434）
+
+- 旧库（5433，schema=market_data）：被 `scripts/export_timescaledb.sh`、`scripts/timescaledb_compression.sh` 及大部分示例命令使用。沿用旧链路时，请把 `config/.env` 设为 5433，并将 markets-service 相关脚本端口改为 5433。
+- 新库（5434，schema=raw/agg/quality）：`config/.env.example` 与 markets-service 初始化/迁移脚本默认指向。若使用新库，需同步修改顶层运维脚本和 README/AGENTS 示例端口为 5434，确保采集/压缩/导出一致。
+- 禁止混指：服务与脚本端口不一致会导致数据分叉或压缩失败；调整前先备份 `./scripts/export_timescaledb.sh`（当前默认 5433）。<!-- TODO: 若决定迁移到 5434，给出统一替换清单与执行顺序 -->
 
 ---
 
