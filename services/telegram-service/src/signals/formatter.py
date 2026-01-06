@@ -6,6 +6,8 @@ from typing import Dict, Optional, Any
 from datetime import datetime
 import time
 
+from cards.i18n import gettext as _t
+
 
 def strength_bar(value: float, max_val: float = 100) -> str:
     """生成强度条"""
@@ -113,7 +115,8 @@ class SignalFormatter:
         strength: int,
         curr_data: Dict[str, Dict[str, Any]],
         prev_data: Optional[Dict[str, Dict[str, Any]]] = None,
-        rule_message: str = ""
+        rule_message: str = "",
+        lang: str = "zh_CN"
     ) -> str:
         """
         格式化完整信号消息
@@ -126,6 +129,7 @@ class SignalFormatter:
             strength: 强度 0-100
             curr_data: 当前数据 {table: {field: value}}
             prev_data: 前值数据 {table: {field: value}}
+            lang: 语言代码
             rule_message: 规则消息
         """
         icon = {"BUY": "🟢", "SELL": "🔴", "ALERT": "⚠️"}.get(direction, "📊")
@@ -164,7 +168,7 @@ class SignalFormatter:
         # 💰 行情
         price = basic.get("当前价格") or basic.get("收盘价")
         price_prev = basic_prev.get("当前价格") or basic_prev.get("收盘价")
-        lines.append("💰 行情")
+        lines.append(_t("signal.section.market", None, lang=lang))
         lines.append(f"├ 价格: {fmt_price(price_prev)} ⏩ {fmt_price(price)} {fmt_change(price_prev, price)}")
         lines.append(f"├ 振幅: {fmt_pct(basic.get('振幅'), False)}")
 
@@ -179,7 +183,7 @@ class SignalFormatter:
 
         # 📊 合约
         if futures:
-            lines.append("📊 合约")
+            lines.append(_t("signal.section.futures", None, lang=lang))
             lines.append(f"├ 持仓: {fmt_vol(futures.get('持仓金额'))} ({fmt_pct(futures.get('持仓变动%'))})")
 
             big_ratio = futures.get("大户多空比")
@@ -201,7 +205,7 @@ class SignalFormatter:
             lines.append("")
 
         # 📉 动量
-        lines.append("📉 动量")
+        lines.append(_t("signal.section.momentum", None, lang=lang))
         adx = curr_data.get("ADX.py", {})
         adx_val = adx.get("ADX")
         di_label = "+DI>-DI" if (adx.get("正向DI") or 0) > (adx.get("负向DI") or 0) else "-DI>+DI"
@@ -227,7 +231,7 @@ class SignalFormatter:
         lines.append("")
 
         # 📊 量价
-        lines.append("📊 量价")
+        lines.append(_t("signal.section.volume", None, lang=lang))
         obv_val = obv.get("OBV值")
         obv_prev_val = obv_prev.get("OBV值")
         lines.append(f"├ OBV: {fmt_num(obv_prev_val)} ⏩ {fmt_num(obv_val)} {fmt_change(obv_prev_val, obv_val)}")
@@ -244,14 +248,14 @@ class SignalFormatter:
         lines.append("")
 
         # 📍 关键位
-        lines.append("📍 关键位")
+        lines.append(_t("signal.section.levels", None, lang=lang))
         lines.append(f"├ 支撑: {fmt_price(sr.get('支撑位'))} (距{fmt_pct(sr.get('距支撑百分比'), False)})")
         lines.append(f"├ 阻力: {fmt_price(sr.get('阻力位'))} (距{fmt_pct(sr.get('距阻力百分比'), False)})")
         lines.append(f"└ 布林%b: {fmt_num(boll.get('百分比b'))}")
         lines.append("")
 
         # 📈 趋势
-        lines.append("📈 趋势")
+        lines.append(_t("signal.section.trend", None, lang=lang))
         st_dir = st.get("方向")
         st_prev_dir = st_prev.get("方向")
         lines.append(f"├ SuperTrend: {st_prev_dir} ⏩ {st_dir}" if st_prev_dir != st_dir else f"├ SuperTrend: {st_dir}")

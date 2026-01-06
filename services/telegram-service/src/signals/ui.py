@@ -8,7 +8,7 @@ import logging
 from typing import Dict
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from cards.i18n import btn as _btn, resolve_lang
+from cards.i18n import btn as _btn, resolve_lang, gettext as _t
 
 from .rules import RULES_BY_TABLE
 
@@ -129,9 +129,9 @@ def get_short_name(table: str) -> str:
     return TABLE_NAMES.get(table, table.replace(".py", "").replace("扫描器", ""))
 
 
-def get_menu_text(uid: int) -> str:
+def get_menu_text(uid: int, lang: str = "zh_CN") -> str:
     sub = get_sub(uid)
-    status = "✅ 开启" if sub["enabled"] else "❌ 关闭"
+    status = _t("signal.status_on", None, lang=lang) if sub["enabled"] else _t("signal.status_off", None, lang=lang)
     enabled = len(sub["tables"])
     total = len(ALL_TABLES)
 
@@ -141,14 +141,17 @@ def get_menu_text(uid: int) -> str:
         if table in sub["tables"]:
             name = get_short_name(table)
             count = len(RULES_BY_TABLE[table])
-            enabled_list.append(f"{name} ({count}条)")
+            enabled_list.append(f"{name} ({_t('signal.rules_count', None, lang=lang).format(count=count)})")
 
     if enabled_list:
         content = "\n".join(enabled_list)
     else:
-        content = "暂无开启的信号"
+        content = _t("signal.no_enabled", None, lang=lang)
 
-    return f"🔔 信号\n<pre>{content}</pre>\n推送: {status} 已选: {enabled}/{total}"
+    title = _t("signal.menu_title", None, lang=lang)
+    push = _t("signal.menu_push", None, lang=lang)
+    selected = _t("signal.menu_selected", None, lang=lang)
+    return f"{title}\n<pre>{content}</pre>\n{push}: {status} {selected}: {enabled}/{total}"
 
 
 def get_menu_kb(uid: int) -> InlineKeyboardMarkup:
@@ -232,13 +235,13 @@ def is_table_enabled(uid: int, table: str) -> bool:
     return sub["enabled"] and table in sub["tables"]
 
 
-def get_signal_push_kb(symbol: str) -> InlineKeyboardMarkup:
+def get_signal_push_kb(symbol: str, lang: str = "zh_CN") -> InlineKeyboardMarkup:
     """信号推送消息的内联键盘，带币种分析和AI分析跳转"""
     # 去掉USDT后缀用于显示
     coin = symbol.replace("USDT", "")
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton(f"🔍 {coin}分析", callback_data=f"single_query_{symbol}"),
-            InlineKeyboardButton("🤖 AI分析", callback_data=f"ai_coin_{symbol}"),
+            InlineKeyboardButton(_t("signal.btn_analysis", None, lang=lang).format(coin=coin), callback_data=f"single_query_{symbol}"),
+            InlineKeyboardButton(_t("signal.btn_ai", None, lang=lang), callback_data=f"ai_coin_{symbol}"),
         ]
     ])

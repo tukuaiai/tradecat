@@ -1119,4 +1119,32 @@ def register_defaults() -> TemplateRegistry:
         ),
         render_vpvr_zone_strip,
     )
+    registry.register(
+        TemplateMeta(
+            template_id="vpvr-ridge",
+            name="VPVR 山脊图",
+            description="展示成交量分布随时间演变，Y轴为时间段，X轴为价格",
+            outputs=["png", "json"],
+            params=[
+                "data(list[{period, prices: list, volumes: list}])",
+                "bins?(int, default 50)",
+                "overlap?(float, default 0.5)",
+                "colormap?(str, default viridis)",
+                "title?",
+            ],
+            sample={
+                "template_id": "vpvr-ridge",
+                "output": "png",
+                "params": {
+                    "title": "BTC VPVR Ridge",
+                    "data": [
+                        {"period": "Day 1", "prices": [100, 101, 102, 101, 100], "volumes": [10, 20, 30, 20, 10]},
+                        {"period": "Day 2", "prices": [101, 102, 103, 102, 101], "volumes": [15, 25, 35, 25, 15]},
+                        {"period": "Day 3", "prices": [102, 103, 104, 103, 102], "volumes": [20, 30, 40, 30, 20]},
+                    ],
+                },
+            },
+        ),
+        render_vpvr_ridge,
+    )
     return registry

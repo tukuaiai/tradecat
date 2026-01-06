@@ -1061,3 +1061,173 @@ msgstr "💥 爆仓"
 
 msgid "card.futures_sentiment.btn"
 msgstr "📊 期货情绪"
+
+# signals/ui.py
+msgid "signal.status_on"
+msgstr "✅ 开启"
+
+msgid "signal.status_off"
+msgstr "❌ 关闭"
+
+msgid "signal.no_enabled"
+msgstr "暂无开启的信号"
+
+msgid "signal.menu_title"
+msgstr "🔔 信号"
+
+msgid "signal.menu_push"
+msgstr "推送"
+
+msgid "signal.menu_selected"
+msgstr "已选"
+
+msgid "signal.rules_count"
+msgstr "{count}条"
+
+msgid "signal.btn_analysis"
+msgstr "🔍 {coin}分析"
+
+msgid "signal.btn_ai"
+msgstr "🤖 AI分析"
+
+# signals/formatter.py - 信号推送内容
+msgid "signal.section.market"
+msgstr "💰 行情"
+
+msgid "signal.section.futures"
+msgstr "📊 合约"
+
+msgid "signal.section.momentum"
+msgstr "📉 动量"
+
+msgid "signal.section.volume"
+msgstr "📊 量价"
+
+msgid "signal.section.levels"
+msgstr "📍 关键位"
+
+msgid "signal.section.trend"
+msgstr "📈 趋势"
+
+msgid "signal.section.pattern"
+msgstr "🕯️ 形态"
+
+msgid "signal.label.price"
+msgstr "价格"
+
+msgid "signal.label.amplitude"
+msgstr "振幅"
+
+msgid "signal.label.buy_sell_ratio"
+msgstr "买卖比"
+
+msgid "signal.label.volume"
+msgstr "成交额"
+
+msgid "signal.label.net_inflow"
+msgstr "净流入"
+
+msgid "signal.label.trades"
+msgstr "交易次数"
+
+msgid "signal.label.oi"
+msgstr "持仓"
+
+msgid "signal.label.big_ratio"
+msgstr "大户多空"
+
+msgid "signal.label.all_ratio"
+msgstr "全体多空"
+
+msgid "signal.label.taker_ratio"
+msgstr "主动多空"
+
+msgid "signal.label.sentiment_diff"
+msgstr "情绪差值"
+
+msgid "signal.label.risk_score"
+msgstr "风险分"
+
+msgid "signal.label.oi_streak"
+msgstr "OI连续"
+
+msgid "signal.label.sentiment_momentum"
+msgstr "情绪动量"
+
+msgid "signal.label.big"
+msgstr "大户"
+
+msgid "signal.label.taker"
+msgstr "主动"
+
+msgid "signal.label.bars"
+msgstr "根"
+
+msgid "signal.label.mfi"
+msgstr "MFI"
+
+msgid "signal.label.kdj"
+msgstr "KDJ"
+
+msgid "signal.label.rsi_pos"
+msgstr "RSI位置"
+
+msgid "signal.label.rsi_div"
+msgstr "RSI背离"
+
+msgid "signal.label.none"
+msgstr "无"
+
+msgid "signal.label.obv_slope"
+msgstr "OBV斜率"
+
+msgid "signal.label.cvd"
+msgstr "CVD"
+
+msgid "signal.label.vol_ratio"
+msgstr "量比"
+
+msgid "signal.label.bull_bear"
+msgstr "多空力量"
+
+msgid "signal.label.bull"
+msgstr "多"
+
+msgid "signal.label.bear"
+msgstr "空"
+
+msgid "signal.label.support"
+msgstr "支撑"
+
+msgid "signal.label.resistance"
+msgstr "阻力"
+
+msgid "signal.label.distance"
+msgstr "距"
+
+msgid "signal.label.boll_pctb"
+msgstr "布林%b"
+
+msgid "signal.label.supertrend"
+msgstr "精准趋势"
+
+msgid "signal.label.direction"
+msgstr "方向"
+
+msgid "signal.label.strength"
+msgstr "强度"
+
+msgid "signal.label.atr"
+msgstr "ATR"
+
+msgid "signal.label.liquidity"
+msgstr "流动性"
+
+msgid "signal.label.pattern_count"
+msgstr "形态数"
+
+msgid "signal.label.pattern_strength"
+msgstr "形态强度"
+
+msgid "signal.label.latest"
+msgstr "最新"

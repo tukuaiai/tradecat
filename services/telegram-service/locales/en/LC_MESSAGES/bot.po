@@ -1061,3 +1061,173 @@ msgstr "💥 Liquidation"
 
 msgid "card.futures_sentiment.btn"
 msgstr "📊 Futures"
+
+# signals/ui.py
+msgid "signal.status_on"
+msgstr "✅ On"
+
+msgid "signal.status_off"
+msgstr "❌ Off"
+
+msgid "signal.no_enabled"
+msgstr "No signals enabled"
+
+msgid "signal.menu_title"
+msgstr "🔔 Signals"
+
+msgid "signal.menu_push"
+msgstr "Push"
+
+msgid "signal.menu_selected"
+msgstr "Selected"
+
+msgid "signal.rules_count"
+msgstr "{count} rules"
+
+msgid "signal.btn_analysis"
+msgstr "🔍 {coin} Analysis"
+
+msgid "signal.btn_ai"
+msgstr "🤖 AI Analysis"
+
+# signals/formatter.py - signal push content
+msgid "signal.section.market"
+msgstr "💰 Market"
+
+msgid "signal.section.futures"
+msgstr "📊 Futures"
+
+msgid "signal.section.momentum"
+msgstr "📉 Momentum"
+
+msgid "signal.section.volume"
+msgstr "📊 Volume"
+
+msgid "signal.section.levels"
+msgstr "📍 Key Levels"
+
+msgid "signal.section.trend"
+msgstr "📈 Trend"
+
+msgid "signal.section.pattern"
+msgstr "🕯️ Pattern"
+
+msgid "signal.label.price"
+msgstr "Price"
+
+msgid "signal.label.amplitude"
+msgstr "Amplitude"
+
+msgid "signal.label.buy_sell_ratio"
+msgstr "Buy/Sell Ratio"
+
+msgid "signal.label.volume"
+msgstr "Volume"
+
+msgid "signal.label.net_inflow"
+msgstr "Net Inflow"
+
+msgid "signal.label.trades"
+msgstr "Trades"
+
+msgid "signal.label.oi"
+msgstr "OI"
+
+msgid "signal.label.big_ratio"
+msgstr "Whale L/S"
+
+msgid "signal.label.all_ratio"
+msgstr "All L/S"
+
+msgid "signal.label.taker_ratio"
+msgstr "Taker L/S"
+
+msgid "signal.label.sentiment_diff"
+msgstr "Sentiment Diff"
+
+msgid "signal.label.risk_score"
+msgstr "Risk Score"
+
+msgid "signal.label.oi_streak"
+msgstr "OI Streak"
+
+msgid "signal.label.sentiment_momentum"
+msgstr "Sentiment Mom"
+
+msgid "signal.label.big"
+msgstr "Whale"
+
+msgid "signal.label.taker"
+msgstr "Taker"
+
+msgid "signal.label.bars"
+msgstr "bars"
+
+msgid "signal.label.mfi"
+msgstr "MFI"
+
+msgid "signal.label.kdj"
+msgstr "KDJ"
+
+msgid "signal.label.rsi_pos"
+msgstr "RSI Position"
+
+msgid "signal.label.rsi_div"
+msgstr "RSI Divergence"
+
+msgid "signal.label.none"
+msgstr "None"
+
+msgid "signal.label.obv_slope"
+msgstr "OBV Slope"
+
+msgid "signal.label.cvd"
+msgstr "CVD"
+
+msgid "signal.label.vol_ratio"
+msgstr "Vol Ratio"
+
+msgid "signal.label.bull_bear"
+msgstr "Bull/Bear"
+
+msgid "signal.label.bull"
+msgstr "Bull"
+
+msgid "signal.label.bear"
+msgstr "Bear"
+
+msgid "signal.label.support"
+msgstr "Support"
+
+msgid "signal.label.resistance"
+msgstr "Resistance"
+
+msgid "signal.label.distance"
+msgstr "Dist"
+
+msgid "signal.label.boll_pctb"
+msgstr "Boll %b"
+
+msgid "signal.label.supertrend"
+msgstr "SuperTrend"
+
+msgid "signal.label.direction"
+msgstr "Direction"
+
+msgid "signal.label.strength"
+msgstr "Strength"
+
+msgid "signal.label.atr"
+msgstr "ATR"
+
+msgid "signal.label.liquidity"
+msgstr "Liquidity"
+
+msgid "signal.label.pattern_count"
+msgstr "Patterns"
+
+msgid "signal.label.pattern_strength"
+msgstr "Pattern Str"
+
+msgid "signal.label.latest"
+msgstr "Latest"
