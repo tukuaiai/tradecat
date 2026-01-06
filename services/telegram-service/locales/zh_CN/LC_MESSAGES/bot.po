@@ -1231,3 +1231,13 @@ msgstr "形态强度"
 
 msgid "signal.label.latest"
 msgstr "最新"
+
+# bot/non_blocking_ai_handler.py
+msgid "ai.system_busy"
+msgstr "🚫 系统繁忙，同时进行的AI分析过多\n⏳ 请稍等片刻后重试\n💡 您可以先使用其他功能"
+
+msgid "ai.analysis_started"
+msgstr "🤖 {coin} AI分析已启动\n\n⏳ 深度分析进行中，可能需要3-5分钟\n🔄 分析ID: {id}\n\n"
+
+msgid "ai.analysis_failed"
+msgstr "❌ {coin} AI分析失败\n\n"

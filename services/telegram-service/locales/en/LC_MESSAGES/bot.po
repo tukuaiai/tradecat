@@ -1231,3 +1231,13 @@ msgstr "Pattern Str"
 
 msgid "signal.label.latest"
 msgstr "Latest"
+
+# bot/non_blocking_ai_handler.py
+msgid "ai.system_busy"
+msgstr "🚫 System busy, too many AI analyses running\n⏳ Please try again later\n💡 You can use other features first"
+
+msgid "ai.analysis_started"
+msgstr "🤖 {coin} AI analysis started\n\n⏳ Deep analysis in progress, may take 3-5 minutes\n🔄 Analysis ID: {id}\n\n"
+
+msgid "ai.analysis_failed"
+msgstr "❌ {coin} AI analysis failed\n\n"

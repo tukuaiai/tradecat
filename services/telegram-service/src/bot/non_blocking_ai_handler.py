@@ -29,6 +29,8 @@ except ImportError:
         beijing_tz = timezone(timedelta(hours=8))
         return datetime.now(beijing_tz)
 
+from cards.i18n import gettext as _t, resolve_lang
+
 logger = logging.getLogger(__name__)
 
 class NonBlockingAIHandler:
@@ -45,25 +47,23 @@ class NonBlockingAIHandler:
         启动非阻塞AI分析
         返回分析ID，用户可以继续使用其他功能
         """
+        lang = resolve_lang(callback_query)
 
         # 检查并发限制
         if len(self.active_analyses) >= self.max_concurrent_analyses:
             await callback_query.edit_message_text(
-                "🚫 系统繁忙，同时进行的AI分析过多\n"
-                "⏳ 请稍等片刻后重试\n"
-                "💡 您可以先使用其他功能",
+                _t("ai.system_busy", callback_query, lang=lang),
                 parse_mode='Markdown'
             )
             return None
 
         # 生成唯一分析ID
         analysis_id = f"ai_{user_id}_{int(datetime.now().timestamp())}_{uuid.uuid4().hex[:8]}"
+        coin = symbol.replace('USDT', '')
 
         # 立即响应用户，告知分析已开始
         await callback_query.edit_message_text(
-            f"🤖 {symbol.replace('USDT', '')} AI分析已启动\n\n"
-            f"⏳ 深度分析进行中，可能需要3-5分钟\n"
-            f"🔄 分析ID: {analysis_id[-8:]}\n\n",
+            _t("ai.analysis_started", callback_query, lang=lang).format(coin=coin, id=analysis_id[-8:]),
             parse_mode='Markdown'
         )
 
