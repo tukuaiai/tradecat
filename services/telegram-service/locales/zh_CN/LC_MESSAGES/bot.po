@@ -1236,8 +1236,107 @@ msgstr "最新"
 msgid "ai.system_busy"
 msgstr "🚫 系统繁忙，同时进行的AI分析过多\n⏳ 请稍等片刻后重试\n💡 您可以先使用其他功能"
 
-msgid "ai.analysis_started"
+msgid "ai.analysis_started\n"
 msgstr "🤖 {coin} AI分析已启动\n\n⏳ 深度分析进行中，可能需要3-5分钟\n🔄 分析ID: {id}\n\n"
 
-msgid "ai.analysis_failed"
+msgid "ai.analysis_failed\n"
 msgstr "❌ {coin} AI分析失败\n\n"
+
+# 卡片通用按钮
+msgid "btn.10"
+msgstr "10条"
+
+msgid "btn.20"
+msgstr "20条"
+
+msgid "btn.30"
+msgstr "30条"
+
+msgid "btn.spot"
+msgstr "现货"
+
+msgid "btn.futures"
+msgstr "期货"
+
+# 持仓相关按钮
+msgid "btn.oi_value"
+msgstr "持仓金额"
+
+msgid "btn.oi_change_pct"
+msgstr "持仓变动%"
+
+msgid "btn.oi_change"
+msgstr "持仓变动"
+
+msgid "btn.big_volatility"
+msgstr "大户波动"
+
+msgid "btn.big_ratio"
+msgstr "大户多空比"
+
+msgid "btn.big_momentum"
+msgstr "大户动量"
+
+msgid "btn.big_deviation"
+msgstr "大户偏离"
+
+msgid "btn.all_volatility"
+msgstr "全体波动"
+
+msgid "btn.all_ratio"
+msgstr "全体多空比"
+
+msgid "btn.all_deviation"
+msgstr "全体偏离"
+
+msgid "btn.taker_ratio"
+msgstr "主动多空比"
+
+msgid "btn.taker_momentum"
+msgstr "主动动量"
+
+msgid "btn.taker_deviation"
+msgstr "主动偏离"
+
+msgid "btn.back_kdj"
+msgstr "⬅️ 返回KDJ"
+
+# 字段切换按钮 (带❎前缀表示关闭)
+msgid "btn.field.taker_ratio"
+msgstr "主动多空比"
+
+msgid "btn.field.taker_bias"
+msgstr "主动偏离"
+
+msgid "btn.field.taker_momentum"
+msgstr "主动动量"
+
+msgid "btn.field.crowd_ratio"
+msgstr "全体多空比"
+
+msgid "btn.field.crowd_bias"
+msgstr "全体偏离"
+
+msgid "btn.field.crowd_volatility"
+msgstr "全体波动"
+
+msgid "btn.field.top_ratio"
+msgstr "大户多空比"
+
+msgid "btn.field.top_bias"
+msgstr "大户偏离"
+
+msgid "btn.field.top_momentum"
+msgstr "大户动量"
+
+msgid "btn.field.top_volatility"
+msgstr "大户波动"
+
+msgid "btn.field.oi_change_pct"
+msgstr "持仓变动%"
+
+msgid "btn.field.oi_change"
+msgstr "持仓变动"
+
+msgid "btn.field.oi_value"
+msgstr "持仓金额"

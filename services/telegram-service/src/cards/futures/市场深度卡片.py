@@ -221,17 +221,17 @@ class MarketDepthCard(RankingCard):
 
         # 行7 排序方向 + 条数
         kb.append([
-            b("降序", "market_depth_sort_desc", active=sort_order == "desc"),
-            b("升序", "market_depth_sort_asc", active=sort_order == "asc"),
-            b("10条", "market_depth_limit_10", active=current_limit == 10),
-            b("20条", "market_depth_limit_20", active=current_limit == 20),
-            b("30条", "market_depth_limit_30", active=current_limit == 30),
+            b(_t("btn.desc", None, lang=lang), "market_depth_sort_desc", active=sort_order == "desc"),
+            b(_t("btn.asc", None, lang=lang), "market_depth_sort_asc", active=sort_order == "asc"),
+            b(_t("btn.10", None, lang=lang), "market_depth_limit_10", active=current_limit == 10),
+            b(_t("btn.20", None, lang=lang), "market_depth_limit_20", active=current_limit == 20),
+            b(_t("btn.30", None, lang=lang), "market_depth_limit_30", active=current_limit == 30),
         ])
 
         # 行8 主控
         kb.append([
-            _btn_auto(None, "🏠主菜单", "ranking_menu"),
-            _btn_auto(None, "🔄刷新", "market_depth_refresh"),
+            _btn_auto(None, _t("btn.home", None, lang=lang), "ranking_menu"),
+            _btn_auto(None, _t("btn.refresh", None, lang=lang), "market_depth_refresh"),
         ])
 
         return InlineKeyboardMarkup(kb)

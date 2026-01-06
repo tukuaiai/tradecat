@@ -197,8 +197,8 @@ class 流动性排行卡片(RankingCard):
         show_market_row = False
         if show_market_row:
             kb.append([
-                b("现货", "liq_market_spot", active=market == "spot"),
-                b("期货", "liq_market_futures", active=market == "futures"),
+                b(_t("btn.spot", None, lang=lang), "liq_market_spot", active=market == "spot"),
+                b(_t("btn.futures", None, lang=lang), "liq_market_futures", active=market == "futures"),
             ])
 
         gen_row: List[InlineKeyboardButton] = []
@@ -239,16 +239,16 @@ class 流动性排行卡片(RankingCard):
         kb.append([b(p, f"liq_period_{p}", active=p == period) for p in periods])
 
         kb.append([
-            b("降序", "liq_sort_desc", active=sort_order == "desc"),
-            b("升序", "liq_sort_asc", active=sort_order == "asc"),
-            b("10条", "liq_limit_10", active=current_limit == 10),
-            b("20条", "liq_limit_20", active=current_limit == 20),
-            b("30条", "liq_limit_30", active=current_limit == 30),
+            b(_t("btn.desc", None, lang=lang), "liq_sort_desc", active=sort_order == "desc"),
+            b(_t("btn.asc", None, lang=lang), "liq_sort_asc", active=sort_order == "asc"),
+            b(_t("btn.10", None, lang=lang), "liq_limit_10", active=current_limit == 10),
+            b(_t("btn.20", None, lang=lang), "liq_limit_20", active=current_limit == 20),
+            b(_t("btn.30", None, lang=lang), "liq_limit_30", active=current_limit == 30),
         ])
 
         kb.append([
-            _btn_auto(None, "🏠主菜单", "ranking_menu"),
-            _btn_auto(None, "🔄刷新", "liquidity_ranking_refresh"),
+            _btn_auto(None, _t("btn.home", None, lang=lang), "ranking_menu"),
+            _btn_auto(None, _t("btn.refresh", None, lang=lang), "liquidity_ranking_refresh"),
         ])
 
         return InlineKeyboardMarkup(kb)

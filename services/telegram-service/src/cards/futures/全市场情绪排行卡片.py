@@ -174,8 +174,8 @@ class FuturesCrowdSentimentCard(RankingCard):
         kb: List[List[InlineKeyboardButton]] = []
         if self.SHOW_MARKET_SWITCH:
             kb.append([
-                b("现货", "crowd_market_spot", active=market == "spot"),
-                b("期货", "crowd_market_futures", active=market == "futures"),
+                b(_t("btn.spot", None, lang=lang), "crowd_market_spot", active=market == "spot"),
+                b(_t("btn.futures", None, lang=lang), "crowd_market_futures", active=market == "futures"),
             ])
 
         gen_row: List[InlineKeyboardButton] = []
@@ -186,9 +186,9 @@ class FuturesCrowdSentimentCard(RankingCard):
         kb.append(gen_row)
 
         kb.append([
-            InlineKeyboardButton(("全体多空比" if fields_state.get("crowd_ratio", True) else "❎全体多空比"), callback_data="field_crowd_toggle_crowd_ratio"),
-            InlineKeyboardButton(("全体偏离" if fields_state.get("crowd_bias", True) else "❎全体偏离"), callback_data="field_crowd_toggle_crowd_bias"),
-            InlineKeyboardButton(("全体波动" if fields_state.get("crowd_volatility", True) else "❎全体波动"), callback_data="field_crowd_toggle_crowd_volatility"),
+            InlineKeyboardButton((_t("btn.field.crowd_ratio", None, lang=lang) if fields_state.get("crowd_ratio", True) else "❎" + _t("btn.field.crowd_ratio", None, lang=lang)), callback_data="field_crowd_toggle_crowd_ratio"),
+            InlineKeyboardButton((_t("btn.field.crowd_bias", None, lang=lang) if fields_state.get("crowd_bias", True) else "❎" + _t("btn.field.crowd_bias", None, lang=lang)), callback_data="field_crowd_toggle_crowd_bias"),
+            InlineKeyboardButton((_t("btn.field.crowd_volatility", None, lang=lang) if fields_state.get("crowd_volatility", True) else "❎" + _t("btn.field.crowd_volatility", None, lang=lang)), callback_data="field_crowd_toggle_crowd_volatility"),
         ])
 
         kb.append([
@@ -197,25 +197,25 @@ class FuturesCrowdSentimentCard(RankingCard):
         ])
 
         kb.append([
-            b("全体多空比", "crowd_sort_field_crowd_ratio", active=current_sort_field == "crowd_ratio"),
-            b("全体偏离", "crowd_sort_field_crowd_bias", active=current_sort_field == "crowd_bias"),
-            b("全体波动", "crowd_sort_field_crowd_volatility", active=current_sort_field == "crowd_volatility"),
+            b(_t("btn.all_ratio", None, lang=lang), "crowd_sort_field_crowd_ratio", active=current_sort_field == "crowd_ratio"),
+            b(_t("btn.all_deviation", None, lang=lang), "crowd_sort_field_crowd_bias", active=current_sort_field == "crowd_bias"),
+            b(_t("btn.all_volatility", None, lang=lang), "crowd_sort_field_crowd_volatility", active=current_sort_field == "crowd_volatility"),
         ])
 
         periods = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"]
         kb.append([b(p, f"crowd_period_{p}", active=p == period) for p in periods])
 
         kb.append([
-            b("降序", "crowd_sort_desc", active=sort_order == "desc"),
-            b("升序", "crowd_sort_asc", active=sort_order == "asc"),
-            b("10条", "crowd_limit_10", active=current_limit == 10),
-            b("20条", "crowd_limit_20", active=current_limit == 20),
-            b("30条", "crowd_limit_30", active=current_limit == 30),
+            b(_t("btn.desc", None, lang=lang), "crowd_sort_desc", active=sort_order == "desc"),
+            b(_t("btn.asc", None, lang=lang), "crowd_sort_asc", active=sort_order == "asc"),
+            b(_t("btn.10", None, lang=lang), "crowd_limit_10", active=current_limit == 10),
+            b(_t("btn.20", None, lang=lang), "crowd_limit_20", active=current_limit == 20),
+            b(_t("btn.30", None, lang=lang), "crowd_limit_30", active=current_limit == 30),
         ])
 
         kb.append([
-            _btn_auto(None, "🏠主菜单", "ranking_menu"),
-            _btn_auto(None, "🔄刷新", "futures_crowd_sentiment_refresh"),
+            _btn_auto(None, _t("btn.home", None, lang=lang), "ranking_menu"),
+            _btn_auto(None, _t("btn.refresh", None, lang=lang), "futures_crowd_sentiment_refresh"),
         ])
         return InlineKeyboardMarkup(kb)
 

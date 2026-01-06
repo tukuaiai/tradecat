@@ -249,17 +249,17 @@ class VolumeRankingCard(RankingCard):
 
         # 行6 排序方向 + 条数
         kb.append([
-            b("降序", "volume_sort_desc", active=sort_order == "desc"),
-            b("升序", "volume_sort_asc", active=sort_order == "asc"),
-            b("10条", "volume_limit_10", active=current_limit == 10),
-            b("20条", "volume_limit_20", active=current_limit == 20),
-            b("30条", "volume_limit_30", active=current_limit == 30),
+            b(_t("btn.desc", None, lang=lang), "volume_sort_desc", active=sort_order == "desc"),
+            b(_t("btn.asc", None, lang=lang), "volume_sort_asc", active=sort_order == "asc"),
+            b(_t("btn.10", None, lang=lang), "volume_limit_10", active=current_limit == 10),
+            b(_t("btn.20", None, lang=lang), "volume_limit_20", active=current_limit == 20),
+            b(_t("btn.30", None, lang=lang), "volume_limit_30", active=current_limit == 30),
         ])
 
         # 行7 主菜单 + 刷新
         kb.append([
-            _btn_auto(None, "🏠主菜单", "ranking_menu"),
-            _btn_auto(None, "🔄刷新", "volume_ranking_refresh"),
+            _btn_auto(None, _t("btn.home", None, lang=lang), "ranking_menu"),
+            _btn_auto(None, _t("btn.refresh", None, lang=lang), "volume_ranking_refresh"),
         ])
 
         return InlineKeyboardMarkup(kb)

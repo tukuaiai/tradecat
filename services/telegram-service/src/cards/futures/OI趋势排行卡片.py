@@ -174,8 +174,8 @@ class FuturesOITrendCard(RankingCard):
         kb: List[List[InlineKeyboardButton]] = []
         if self.SHOW_MARKET_SWITCH:
             kb.append([
-                b("现货", "ttrend_market_spot", active=market == "spot"),
-                b("期货", "ttrend_market_futures", active=market == "futures"),
+                b(_t("btn.spot", None, lang=lang), "ttrend_market_spot", active=market == "spot"),
+                b(_t("btn.futures", None, lang=lang), "ttrend_market_futures", active=market == "futures"),
             ])
 
         gen_row: List[InlineKeyboardButton] = []
@@ -206,16 +206,16 @@ class FuturesOITrendCard(RankingCard):
         kb.append([b(p, f"ttrend_period_{p}", active=p == period) for p in periods])
 
         kb.append([
-            b("降序", "ttrend_sort_desc", active=sort_order == "desc"),
-            b("升序", "ttrend_sort_asc", active=sort_order == "asc"),
-            b("10条", "ttrend_limit_10", active=current_limit == 10),
-            b("20条", "ttrend_limit_20", active=current_limit == 20),
-            b("30条", "ttrend_limit_30", active=current_limit == 30),
+            b(_t("btn.desc", None, lang=lang), "ttrend_sort_desc", active=sort_order == "desc"),
+            b(_t("btn.asc", None, lang=lang), "ttrend_sort_asc", active=sort_order == "asc"),
+            b(_t("btn.10", None, lang=lang), "ttrend_limit_10", active=current_limit == 10),
+            b(_t("btn.20", None, lang=lang), "ttrend_limit_20", active=current_limit == 20),
+            b(_t("btn.30", None, lang=lang), "ttrend_limit_30", active=current_limit == 30),
         ])
 
         kb.append([
-            _btn_auto(None, "🏠主菜单", "ranking_menu"),
-            _btn_auto(None, "🔄刷新", "futures_oi_trend_refresh"),
+            _btn_auto(None, _t("btn.home", None, lang=lang), "ranking_menu"),
+            _btn_auto(None, _t("btn.refresh", None, lang=lang), "futures_oi_trend_refresh"),
         ])
         return InlineKeyboardMarkup(kb)
 

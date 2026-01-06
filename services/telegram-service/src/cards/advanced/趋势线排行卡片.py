@@ -181,8 +181,8 @@ class 趋势线排行卡片(RankingCard):
         show_market_row = False
         if show_market_row:
             kb.append([
-                b("现货", "tl_market_spot", active=market == "spot"),
-                b("期货", "tl_market_futures", active=market == "futures"),
+                b(_t("btn.spot", None, lang=lang), "tl_market_spot", active=market == "spot"),
+                b(_t("btn.futures", None, lang=lang), "tl_market_futures", active=market == "futures"),
             ])
 
         # 通用字段开关

@@ -1236,8 +1236,107 @@ msgstr "Latest"
 msgid "ai.system_busy"
 msgstr "🚫 System busy, too many AI analyses running\n⏳ Please try again later\n💡 You can use other features first"
 
-msgid "ai.analysis_started"
+msgid "ai.analysis_started\n"
 msgstr "🤖 {coin} AI analysis started\n\n⏳ Deep analysis in progress, may take 3-5 minutes\n🔄 Analysis ID: {id}\n\n"
 
-msgid "ai.analysis_failed"
+msgid "ai.analysis_failed\n"
 msgstr "❌ {coin} AI analysis failed\n\n"
+
+# Card common buttons
+msgid "btn.10"
+msgstr "10"
+
+msgid "btn.20"
+msgstr "20"
+
+msgid "btn.30"
+msgstr "30"
+
+msgid "btn.spot"
+msgstr "Spot"
+
+msgid "btn.futures"
+msgstr "Futures"
+
+# OI related buttons
+msgid "btn.oi_value"
+msgstr "OI Value"
+
+msgid "btn.oi_change_pct"
+msgstr "OI Chg%"
+
+msgid "btn.oi_change"
+msgstr "OI Change"
+
+msgid "btn.big_volatility"
+msgstr "Whale Vol"
+
+msgid "btn.big_ratio"
+msgstr "Whale L/S"
+
+msgid "btn.big_momentum"
+msgstr "Whale Mom"
+
+msgid "btn.big_deviation"
+msgstr "Whale Dev"
+
+msgid "btn.all_volatility"
+msgstr "All Vol"
+
+msgid "btn.all_ratio"
+msgstr "All L/S"
+
+msgid "btn.all_deviation"
+msgstr "All Dev"
+
+msgid "btn.taker_ratio"
+msgstr "Taker L/S"
+
+msgid "btn.taker_momentum"
+msgstr "Taker Mom"
+
+msgid "btn.taker_deviation"
+msgstr "Taker Dev"
+
+msgid "btn.back_kdj"
+msgstr "⬅️ Back to KDJ"
+
+# Field toggle buttons
+msgid "btn.field.taker_ratio"
+msgstr "Taker L/S"
+
+msgid "btn.field.taker_bias"
+msgstr "Taker Bias"
+
+msgid "btn.field.taker_momentum"
+msgstr "Taker Mom"
+
+msgid "btn.field.crowd_ratio"
+msgstr "All L/S"
+
+msgid "btn.field.crowd_bias"
+msgstr "All Bias"
+
+msgid "btn.field.crowd_volatility"
+msgstr "All Vol"
+
+msgid "btn.field.top_ratio"
+msgstr "Whale L/S"
+
+msgid "btn.field.top_bias"
+msgstr "Whale Bias"
+
+msgid "btn.field.top_momentum"
+msgstr "Whale Mom"
+
+msgid "btn.field.top_volatility"
+msgstr "Whale Vol"
+
+msgid "btn.field.oi_change_pct"
+msgstr "OI Chg%"
+
+msgid "btn.field.oi_change"
+msgstr "OI Change"
+
+msgid "btn.field.oi_value"
+msgstr "OI Value"

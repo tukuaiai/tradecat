@@ -174,8 +174,8 @@ class FuturesTakerSentimentCard(RankingCard):
         kb: List[List[InlineKeyboardButton]] = []
         if self.SHOW_MARKET_SWITCH:
             kb.append([
-                b("现货", "taker_market_spot", active=market == "spot"),
-                b("期货", "taker_market_futures", active=market == "futures"),
+                b(_t("btn.spot", None, lang=lang), "taker_market_spot", active=market == "spot"),
+                b(_t("btn.futures", None, lang=lang), "taker_market_futures", active=market == "futures"),
             ])
 
         gen_row: List[InlineKeyboardButton] = []
@@ -186,9 +186,9 @@ class FuturesTakerSentimentCard(RankingCard):
         kb.append(gen_row)
 
         kb.append([
-            InlineKeyboardButton(("主动多空比" if fields_state.get("taker_ratio", True) else "❎主动多空比"), callback_data="field_taker_toggle_taker_ratio"),
-            InlineKeyboardButton(("主动偏离" if fields_state.get("taker_bias", True) else "❎主动偏离"), callback_data="field_taker_toggle_taker_bias"),
-            InlineKeyboardButton(("主动动量" if fields_state.get("taker_momentum", True) else "❎主动动量"), callback_data="field_taker_toggle_taker_momentum"),
+            InlineKeyboardButton((_t("btn.field.taker_ratio", None, lang=lang) if fields_state.get("taker_ratio", True) else "❎" + _t("btn.field.taker_ratio", None, lang=lang)), callback_data="field_taker_toggle_taker_ratio"),
+            InlineKeyboardButton((_t("btn.field.taker_bias", None, lang=lang) if fields_state.get("taker_bias", True) else "❎" + _t("btn.field.taker_bias", None, lang=lang)), callback_data="field_taker_toggle_taker_bias"),
+            InlineKeyboardButton((_t("btn.field.taker_momentum", None, lang=lang) if fields_state.get("taker_momentum", True) else "❎" + _t("btn.field.taker_momentum", None, lang=lang)), callback_data="field_taker_toggle_taker_momentum"),
         ])
 
         kb.append([
@@ -197,25 +197,25 @@ class FuturesTakerSentimentCard(RankingCard):
         ])
 
         kb.append([
-            b("主动多空比", "taker_sort_field_taker_ratio", active=current_sort_field == "taker_ratio"),
-            b("主动偏离", "taker_sort_field_taker_bias", active=current_sort_field == "taker_bias"),
-            b("主动动量", "taker_sort_field_taker_momentum", active=current_sort_field == "taker_momentum"),
+            b(_t("btn.taker_ratio", None, lang=lang), "taker_sort_field_taker_ratio", active=current_sort_field == "taker_ratio"),
+            b(_t("btn.taker_deviation", None, lang=lang), "taker_sort_field_taker_bias", active=current_sort_field == "taker_bias"),
+            b(_t("btn.taker_momentum", None, lang=lang), "taker_sort_field_taker_momentum", active=current_sort_field == "taker_momentum"),
         ])
 
         periods = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"]
         kb.append([b(p, f"taker_period_{p}", active=p == period) for p in periods])
 
         kb.append([
-            b("降序", "taker_sort_desc", active=sort_order == "desc"),
-            b("升序", "taker_sort_asc", active=sort_order == "asc"),
-            b("10条", "taker_limit_10", active=current_limit == 10),
-            b("20条", "taker_limit_20", active=current_limit == 20),
-            b("30条", "taker_limit_30", active=current_limit == 30),
+            b(_t("btn.desc", None, lang=lang), "taker_sort_desc", active=sort_order == "desc"),
+            b(_t("btn.asc", None, lang=lang), "taker_sort_asc", active=sort_order == "asc"),
+            b(_t("btn.10", None, lang=lang), "taker_limit_10", active=current_limit == 10),
+            b(_t("btn.20", None, lang=lang), "taker_limit_20", active=current_limit == 20),
+            b(_t("btn.30", None, lang=lang), "taker_limit_30", active=current_limit == 30),
         ])
 
         kb.append([
-            _btn_auto(None, "🏠主菜单", "ranking_menu"),
-            _btn_auto(None, "🔄刷新", "futures_taker_sentiment_refresh"),
+            _btn_auto(None, _t("btn.home", None, lang=lang), "ranking_menu"),
+            _btn_auto(None, _t("btn.refresh", None, lang=lang), "futures_taker_sentiment_refresh"),
         ])
         return InlineKeyboardMarkup(kb)
 

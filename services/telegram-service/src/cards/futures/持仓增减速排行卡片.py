@@ -175,8 +175,8 @@ class FuturesOIChangeRankingCard(RankingCard):
         kb: List[List[InlineKeyboardButton]] = []
         if self.SHOW_MARKET_SWITCH:
             kb.append([
-                b("现货", "oichg_market_spot", active=market == "spot"),
-                b("期货", "oichg_market_futures", active=market == "futures"),
+                b(_t("btn.spot", None, lang=lang), "oichg_market_spot", active=market == "spot"),
+                b(_t("btn.futures", None, lang=lang), "oichg_market_futures", active=market == "futures"),
             ])
 
         gen_row: List[InlineKeyboardButton] = []
@@ -187,9 +187,9 @@ class FuturesOIChangeRankingCard(RankingCard):
         kb.append(gen_row)
 
         kb.append([
-            InlineKeyboardButton(("持仓变动%" if fields_state.get("oi_change_pct", True) else "❎持仓变动%"), callback_data="field_oichg_toggle_oi_change_pct"),
-            InlineKeyboardButton(("持仓变动" if fields_state.get("oi_change", True) else "❎持仓变动"), callback_data="field_oichg_toggle_oi_change"),
-            InlineKeyboardButton(("持仓金额" if fields_state.get("oi_value", True) else "❎持仓金额"), callback_data="field_oichg_toggle_oi_value"),
+            InlineKeyboardButton((_t("btn.field.oi_change_pct", None, lang=lang) if fields_state.get("oi_change_pct", True) else "❎" + _t("btn.field.oi_change_pct", None, lang=lang)), callback_data="field_oichg_toggle_oi_change_pct"),
+            InlineKeyboardButton((_t("btn.field.oi_change", None, lang=lang) if fields_state.get("oi_change", True) else "❎" + _t("btn.field.oi_change", None, lang=lang)), callback_data="field_oichg_toggle_oi_change"),
+            InlineKeyboardButton((_t("btn.field.oi_value", None, lang=lang) if fields_state.get("oi_value", True) else "❎" + _t("btn.field.oi_value", None, lang=lang)), callback_data="field_oichg_toggle_oi_value"),
         ])
 
         kb.append([
@@ -198,25 +198,25 @@ class FuturesOIChangeRankingCard(RankingCard):
         ])
 
         kb.append([
-            b("持仓变动%", "oichg_sort_field_oi_change_pct", active=current_sort_field == "oi_change_pct"),
-            b("持仓变动", "oichg_sort_field_oi_change", active=current_sort_field == "oi_change"),
-            b("持仓金额", "oichg_sort_field_oi_value", active=current_sort_field == "oi_value"),
+            b(_t("btn.oi_change_pct", None, lang=lang), "oichg_sort_field_oi_change_pct", active=current_sort_field == "oi_change_pct"),
+            b(_t("btn.oi_change", None, lang=lang), "oichg_sort_field_oi_change", active=current_sort_field == "oi_change"),
+            b(_t("btn.oi_value", None, lang=lang), "oichg_sort_field_oi_value", active=current_sort_field == "oi_value"),
         ])
 
         periods = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"]
         kb.append([b(p, f"oichg_period_{p}", active=p == period) for p in periods])
 
         kb.append([
-            b("降序", "oichg_sort_desc", active=sort_order == "desc"),
-            b("升序", "oichg_sort_asc", active=sort_order == "asc"),
-            b("10条", "oichg_limit_10", active=current_limit == 10),
-            b("20条", "oichg_limit_20", active=current_limit == 20),
-            b("30条", "oichg_limit_30", active=current_limit == 30),
+            b(_t("btn.desc", None, lang=lang), "oichg_sort_desc", active=sort_order == "desc"),
+            b(_t("btn.asc", None, lang=lang), "oichg_sort_asc", active=sort_order == "asc"),
+            b(_t("btn.10", None, lang=lang), "oichg_limit_10", active=current_limit == 10),
+            b(_t("btn.20", None, lang=lang), "oichg_limit_20", active=current_limit == 20),
+            b(_t("btn.30", None, lang=lang), "oichg_limit_30", active=current_limit == 30),
         ])
 
         kb.append([
-            _btn_auto(None, "🏠主菜单", "ranking_menu"),
-            _btn_auto(None, "🔄刷新", "futures_oi_change_ranking_refresh"),
+            _btn_auto(None, _t("btn.home", None, lang=lang), "ranking_menu"),
+            _btn_auto(None, _t("btn.refresh", None, lang=lang), "futures_oi_change_ranking_refresh"),
         ])
         return InlineKeyboardMarkup(kb)
 

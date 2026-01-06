@@ -176,8 +176,8 @@ class FuturesTopSentimentCard(RankingCard):
         kb: List[List[InlineKeyboardButton]] = []
         if self.SHOW_MARKET_SWITCH:
             kb.append([
-                b("现货", "top_market_spot", active=market == "spot"),
-                b("期货", "top_market_futures", active=market == "futures"),
+                b(_t("btn.spot", None, lang=lang), "top_market_spot", active=market == "spot"),
+                b(_t("btn.futures", None, lang=lang), "top_market_futures", active=market == "futures"),
             ])
 
         gen_row: List[InlineKeyboardButton] = []
@@ -188,10 +188,10 @@ class FuturesTopSentimentCard(RankingCard):
         kb.append(gen_row)
 
         kb.append([
-            InlineKeyboardButton(("大户多空比" if fields_state.get("top_ratio", True) else "❎大户多空比"), callback_data="field_top_toggle_top_ratio"),
-            InlineKeyboardButton(("大户偏离" if fields_state.get("top_bias", True) else "❎大户偏离"), callback_data="field_top_toggle_top_bias"),
-            InlineKeyboardButton(("大户动量" if fields_state.get("top_momentum", True) else "❎大户动量"), callback_data="field_top_toggle_top_momentum"),
-            InlineKeyboardButton(("大户波动" if fields_state.get("top_volatility", True) else "❎大户波动"), callback_data="field_top_toggle_top_volatility"),
+            InlineKeyboardButton((_t("btn.field.top_ratio", None, lang=lang) if fields_state.get("top_ratio", True) else "❎" + _t("btn.field.top_ratio", None, lang=lang)), callback_data="field_top_toggle_top_ratio"),
+            InlineKeyboardButton((_t("btn.field.top_bias", None, lang=lang) if fields_state.get("top_bias", True) else "❎" + _t("btn.field.top_bias", None, lang=lang)), callback_data="field_top_toggle_top_bias"),
+            InlineKeyboardButton((_t("btn.field.top_momentum", None, lang=lang) if fields_state.get("top_momentum", True) else "❎" + _t("btn.field.top_momentum", None, lang=lang)), callback_data="field_top_toggle_top_momentum"),
+            InlineKeyboardButton((_t("btn.field.top_volatility", None, lang=lang) if fields_state.get("top_volatility", True) else "❎" + _t("btn.field.top_volatility", None, lang=lang)), callback_data="field_top_toggle_top_volatility"),
         ])
 
         kb.append([
@@ -200,26 +200,26 @@ class FuturesTopSentimentCard(RankingCard):
         ])
 
         kb.append([
-            b("大户多空比", "top_sort_field_top_ratio", active=current_sort_field == "top_ratio"),
-            b("大户偏离", "top_sort_field_top_bias", active=current_sort_field == "top_bias"),
-            b("大户动量", "top_sort_field_top_momentum", active=current_sort_field == "top_momentum"),
-            b("大户波动", "top_sort_field_top_volatility", active=current_sort_field == "top_volatility"),
+            b(_t("btn.big_ratio", None, lang=lang), "top_sort_field_top_ratio", active=current_sort_field == "top_ratio"),
+            b(_t("btn.big_deviation", None, lang=lang), "top_sort_field_top_bias", active=current_sort_field == "top_bias"),
+            b(_t("btn.big_momentum", None, lang=lang), "top_sort_field_top_momentum", active=current_sort_field == "top_momentum"),
+            b(_t("btn.big_volatility", None, lang=lang), "top_sort_field_top_volatility", active=current_sort_field == "top_volatility"),
         ])
 
         periods = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"]
         kb.append([b(p, f"top_period_{p}", active=p == period) for p in periods])
 
         kb.append([
-            b("降序", "top_sort_desc", active=sort_order == "desc"),
-            b("升序", "top_sort_asc", active=sort_order == "asc"),
-            b("10条", "top_limit_10", active=current_limit == 10),
-            b("20条", "top_limit_20", active=current_limit == 20),
-            b("30条", "top_limit_30", active=current_limit == 30),
+            b(_t("btn.desc", None, lang=lang), "top_sort_desc", active=sort_order == "desc"),
+            b(_t("btn.asc", None, lang=lang), "top_sort_asc", active=sort_order == "asc"),
+            b(_t("btn.10", None, lang=lang), "top_limit_10", active=current_limit == 10),
+            b(_t("btn.20", None, lang=lang), "top_limit_20", active=current_limit == 20),
+            b(_t("btn.30", None, lang=lang), "top_limit_30", active=current_limit == 30),
         ])
 
         kb.append([
-            _btn_auto(None, "🏠主菜单", "ranking_menu"),
-            _btn_auto(None, "🔄刷新", "futures_top_sentiment_refresh"),
+            _btn_auto(None, _t("btn.home", None, lang=lang), "ranking_menu"),
+            _btn_auto(None, _t("btn.refresh", None, lang=lang), "futures_top_sentiment_refresh"),
         ])
         return InlineKeyboardMarkup(kb)
 

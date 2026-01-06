@@ -172,8 +172,8 @@ class FuturesDivergenceCard(RankingCard):
         kb: List[List[InlineKeyboardButton]] = []
         if self.SHOW_MARKET_SWITCH:
             kb.append([
-                b("现货", "div_market_spot", active=market == "spot"),
-                b("期货", "div_market_futures", active=market == "futures"),
+                b(_t("btn.spot", None, lang=lang), "div_market_spot", active=market == "spot"),
+                b(_t("btn.futures", None, lang=lang), "div_market_futures", active=market == "futures"),
             ])
 
         gen_row: List[InlineKeyboardButton] = []

@@ -224,8 +224,8 @@ class KDJ排行卡片(RankingCard):
         show_market_row = False  # 当前仅期货数据，隐藏市场切换
         if show_market_row:
             kb.append([
-                b("现货", "kdj_market_spot", active=market == "spot"),
-                b("期货", "kdj_market_futures", active=market == "futures"),
+                b(_t("btn.spot", None, lang=lang), "kdj_market_spot", active=market == "spot"),
+                b(_t("btn.futures", None, lang=lang), "kdj_market_futures", active=market == "futures"),
             ])
 
         # 组1 通用排序行
@@ -248,18 +248,18 @@ class KDJ排行卡片(RankingCard):
 
         # 组4 排序方向 + 条数
         kb.append([
-            b("降序", "kdj_sort_desc", active=sort_order == "desc"),
-            b("升序", "kdj_sort_asc", active=sort_order == "asc"),
-            b("10条", "kdj_limit_10", active=current_limit == 10),
-            b("20条", "kdj_limit_20", active=current_limit == 20),
-            b("30条", "kdj_limit_30", active=current_limit == 30),
+            b(_t("btn.desc", None, lang=lang), "kdj_sort_desc", active=sort_order == "desc"),
+            b(_t("btn.asc", None, lang=lang), "kdj_sort_asc", active=sort_order == "asc"),
+            b(_t("btn.10", None, lang=lang), "kdj_limit_10", active=current_limit == 10),
+            b(_t("btn.20", None, lang=lang), "kdj_limit_20", active=current_limit == 20),
+            b(_t("btn.30", None, lang=lang), "kdj_limit_30", active=current_limit == 30),
         ])
 
         # 组5 主控
         kb.append([
-            _btn_auto(None, "🏠主菜单", "ranking_menu"),
-            _btn_auto(None, "⚙️设置", "kdj_settings"),
-            _btn_auto(None, "🔄刷新", "kdj_ranking_refresh"),
+            _btn_auto(None, _t("btn.home", None, lang=lang), "ranking_menu"),
+            _btn_auto(None, _t("btn.settings", None, lang=lang), "kdj_settings"),
+            _btn_auto(None, _t("btn.refresh", None, lang=lang), "kdj_ranking_refresh"),
         ])
 
         return InlineKeyboardMarkup(kb)
@@ -289,7 +289,7 @@ class KDJ排行卡片(RankingCard):
         kb.append(spec_row)
 
         # 返回按钮
-        kb.append([_btn_auto(None, "⬅️ 返回KDJ", "kdj_settings_back")])
+        kb.append([_btn_auto(None, _t("btn.back_kdj", None, lang=lang), "kdj_settings_back")])
 
         return InlineKeyboardMarkup(kb)
 

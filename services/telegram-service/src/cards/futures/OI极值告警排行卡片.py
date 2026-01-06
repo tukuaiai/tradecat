@@ -174,8 +174,8 @@ class FuturesOIZAlertCard(RankingCard):
         kb: List[List[InlineKeyboardButton]] = []
         if self.SHOW_MARKET_SWITCH:
             kb.append([
-                b("现货", "oiz_market_spot", active=market == "spot"),
-                b("期货", "oiz_market_futures", active=market == "futures"),
+                b(_t("btn.spot", None, lang=lang), "oiz_market_spot", active=market == "spot"),
+                b(_t("btn.futures", None, lang=lang), "oiz_market_futures", active=market == "futures"),
             ])
 
         gen_row: List[InlineKeyboardButton] = []
@@ -206,16 +206,16 @@ class FuturesOIZAlertCard(RankingCard):
         kb.append([b(p, f"oiz_period_{p}", active=p == period) for p in periods])
 
         kb.append([
-            b("降序", "oiz_sort_desc", active=sort_order == "desc"),
-            b("升序", "oiz_sort_asc", active=sort_order == "asc"),
-            b("10条", "oiz_limit_10", active=current_limit == 10),
-            b("20条", "oiz_limit_20", active=current_limit == 20),
-            b("30条", "oiz_limit_30", active=current_limit == 30),
+            b(_t("btn.desc", None, lang=lang), "oiz_sort_desc", active=sort_order == "desc"),
+            b(_t("btn.asc", None, lang=lang), "oiz_sort_asc", active=sort_order == "asc"),
+            b(_t("btn.10", None, lang=lang), "oiz_limit_10", active=current_limit == 10),
+            b(_t("btn.20", None, lang=lang), "oiz_limit_20", active=current_limit == 20),
+            b(_t("btn.30", None, lang=lang), "oiz_limit_30", active=current_limit == 30),
         ])
 
         kb.append([
-            _btn_auto(None, "🏠主菜单", "ranking_menu"),
-            _btn_auto(None, "🔄刷新", "futures_oi_z_alert_refresh"),
+            _btn_auto(None, _t("btn.home", None, lang=lang), "ranking_menu"),
+            _btn_auto(None, _t("btn.refresh", None, lang=lang), "futures_oi_z_alert_refresh"),
         ])
         return InlineKeyboardMarkup(kb)
 
