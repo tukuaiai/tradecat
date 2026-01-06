@@ -1042,25 +1042,22 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
         for spine in ax.spines.values():
             spine.set_visible(False)
 
-    # 绘制连接各山脊的 OHLC 价格线
+    # 绘制连接各山脊的 OHLC 价格线（对齐到山脊底部基线）
     if show_ohlc and ohlc_opens and len(ohlc_opens) > 1:
         from matplotlib.lines import Line2D
-        import matplotlib.transforms as transforms
         
-        # 在 figure 坐标系上绘制跨子图的线
-        # 每个子图的 y 中心位置
-        y_centers = []
-        for i, ax in enumerate(axes):
+        # 每个子图的底部基线 y 坐标
+        y_baselines = []
+        for ax in axes:
             bbox = ax.get_position()
-            y_centers.append(bbox.y0 + bbox.height / 2)
+            y_baselines.append(bbox.y0)  # 底部基线
         
         # 价格范围用于 x 坐标转换
         price_range = bin_centers[-1] - bin_centers[0]
         x_min = bin_centers[0]
         
-        def price_to_x(price):
-            # 转换价格到 figure x 坐标 (0-1)
-            ax_bbox = axes[0].get_position()
+        def price_to_x(price, ax_idx):
+            ax_bbox = axes[ax_idx].get_position()
             x_norm = (price - x_min) / price_range
             return ax_bbox.x0 + x_norm * ax_bbox.width
         
@@ -1076,13 +1073,13 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
         for prices, color, label in ohlc_lines:
             valid_prices = [(i, p) for i, p in enumerate(prices) if p is not None]
             if len(valid_prices) > 1:
-                xs = [price_to_x(p) for _, p in valid_prices]
-                ys = [y_centers[i] for i, _ in valid_prices]
+                xs = [price_to_x(p, i) for i, p in valid_prices]
+                ys = [y_baselines[i] for i, _ in valid_prices]
                 line = Line2D(xs, ys, color=color, lw=2, alpha=0.9, transform=fig.transFigure, zorder=10)
                 fig.add_artist(line)
                 # 添加点标记
                 for x, y in zip(xs, ys):
-                    fig.add_artist(plt.Circle((x, y), 0.008, color=color, transform=fig.transFigure, zorder=11))
+                    fig.add_artist(plt.Circle((x, y), 0.006, color=color, transform=fig.transFigure, zorder=11))
             legend_elements.append(Line2D([0], [0], color=color, lw=2, marker='o', markersize=5, label=label))
         
         axes[0].legend(handles=legend_elements, loc='upper right', fontsize=8, framealpha=0.9)
