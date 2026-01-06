@@ -823,28 +823,126 @@ def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
     return _fig_to_png(fig), "image/png"
 
 
+def _fetch_ridge_data_from_db(symbol: str, interval: str, periods: int = 10) -> Tuple[List[Dict], List[Dict]]:
+    """从 TimescaleDB 获取山脊图数据和 OHLC 数据。
+    
+    Returns:
+        (ridge_data, ohlc_data): ridge_data=[{period, prices, volumes}], ohlc_data=[{period, open, high, low, close}]
+    """
+    import os
+    try:
+        import psycopg2
+    except ImportError:
+        logger.warning("psycopg2 not installed")
+        return [], []
+    
+    interval_map = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}
+    minutes = interval_map.get(interval, 60)
+    
+    db_url = os.environ.get("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/market_data")
+    try:
+        conn = psycopg2.connect(db_url)
+    except Exception as e:
+        logger.error("DB connection failed: %s", e)
+        return [], []
+    
+    try:
+        cur = conn.cursor()
+        query = f"""
+            WITH ranked AS (
+                SELECT 
+                    bucket_ts, open, high, low, close, volume,
+                    FLOOR(EXTRACT(EPOCH FROM bucket_ts) / ({minutes} * 60)) AS period_id
+                FROM market_data.candles_1m
+                WHERE symbol = %s
+                ORDER BY bucket_ts DESC
+                LIMIT {periods * minutes}
+            )
+            SELECT 
+                period_id,
+                array_agg(close ORDER BY bucket_ts),
+                array_agg(volume ORDER BY bucket_ts),
+                (array_agg(open ORDER BY bucket_ts))[1] as period_open,
+                MAX(high) as period_high,
+                MIN(low) as period_low,
+                (array_agg(close ORDER BY bucket_ts DESC))[1] as period_close
+            FROM ranked
+            GROUP BY period_id
+            ORDER BY period_id DESC
+            LIMIT {periods}
+        """
+        cur.execute(query, (symbol,))
+        rows = cur.fetchall()
+        
+        ridge_data = []
+        ohlc_data = []
+        for i, (period_id, prices, volumes, p_open, p_high, p_low, p_close) in enumerate(reversed(rows)):
+            label = f"T-{len(rows)-1-i}"
+            ridge_data.append({
+                "period": label,
+                "prices": [float(p) for p in prices if p],
+                "volumes": [float(v) for v in volumes if v],
+            })
+            ohlc_data.append({
+                "period": label,
+                "open": float(p_open) if p_open else None,
+                "high": float(p_high) if p_high else None,
+                "low": float(p_low) if p_low else None,
+                "close": float(p_close) if p_close else None,
+            })
+        return ridge_data, ohlc_data
+    except Exception as e:
+        logger.error("Query failed: %s", e)
+        return [], []
+    finally:
+        conn.close()
+
+
 def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
     """
     VPVR 山脊图 - 展示成交量分布随时间演变。
 
-    必填：
-    - data: [{period, prices: list, volumes: list}] 或
-            [{period, distribution: [{price, volume}]}]
+    方式1 - 直接传数据：
+    - data: [{period, prices: list, volumes: list}]
+    
+    方式2 - 从数据库获取：
+    - symbol: 交易对，如 BTCUSDT
+    - interval: 周期，如 1h, 5m
+    - periods: 周期数量，默认 10
     
     可选：
     - title: 标题
     - bins: 价格分桶数，默认 50
     - overlap: 山脊重叠度，默认 0.5
     - colormap: 颜色映射，默认 viridis
+    - show_ohlc: 是否显示 OHLC 价格线，默认 True
     """
     data = params.get("data")
+    ohlc_data = params.get("ohlc_data", [])
+    
+    # 如果没有 data，尝试从数据库获取
+    if not data and params.get("symbol"):
+        symbol = params["symbol"]
+        interval = params.get("interval", "1h")
+        periods_count = int(params.get("periods", 10))
+        data, ohlc_data = _fetch_ridge_data_from_db(symbol, interval, periods_count)
+        if not data:
+            raise ValueError(f"无法获取 {symbol} {interval} 数据")
+    
     if not data or not isinstance(data, list):
-        raise ValueError("缺少 data 列表")
+        raise ValueError("缺少 data 列表或 symbol 参数")
 
     bins = int(params.get("bins", 50))
     overlap = float(params.get("overlap", 0.5))
     cmap_name = params.get("colormap", "viridis")
-    title = params.get("title", "VPVR Ridge Plot")
+    show_ohlc = params.get("show_ohlc", True)
+    
+    # 自动生成标题
+    if params.get("symbol"):
+        default_title = f"{params['symbol']} VPVR Ridge - {params.get('interval', '1h')} x {params.get('periods', 10)}"
+    else:
+        default_title = "VPVR Ridge Plot"
+    title = params.get("title", default_title)
 
     # 解析数据，构建每个时间段的价格-成交量分布
     periods = []
@@ -854,12 +952,10 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
         period = item.get("period", str(len(periods)))
         
         if "distribution" in item:
-            # 已聚合的分布数据
             dist = item["distribution"]
             prices = [d["price"] for d in dist]
             volumes = [d["volume"] for d in dist]
         elif "prices" in item and "volumes" in item:
-            # 原始价格-成交量数据，需要分桶
             prices = np.array(item["prices"], dtype=float)
             volumes = np.array(item["volumes"], dtype=float)
             if len(prices) != len(volumes) or len(prices) == 0:
@@ -883,11 +979,13 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
     histograms = []
     for prices, volumes in distributions:
         hist, _ = np.histogram(prices, bins=bin_edges, weights=volumes)
-        # 归一化
         hist = hist / (hist.max() + 1e-9)
         histograms.append(hist)
 
     n_periods = len(periods)
+    
+    # 构建 OHLC 字典
+    ohlc_dict = {item["period"]: item for item in ohlc_data} if ohlc_data else {}
     
     if output == "json":
         return (
@@ -896,6 +994,7 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
                 "periods": periods,
                 "bin_centers": bin_centers.tolist(),
                 "distributions": [h.tolist() for h in histograms],
+                "ohlc": ohlc_data,
             },
             "application/json",
         )
@@ -910,6 +1009,10 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
     if n_periods == 1:
         axes = [axes]
 
+    # 收集 OHLC 数据用于画线
+    ohlc_opens, ohlc_highs, ohlc_lows, ohlc_closes = [], [], [], []
+    y_positions = []
+
     for i, (period, hist) in enumerate(zip(periods, histograms)):
         ax = axes[i]
         color = cmap(i / max(1, n_periods - 1))
@@ -918,18 +1021,71 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
         ax.fill_between(bin_centers, hist, alpha=0.8, color=color)
         ax.plot(bin_centers, hist, color="white", lw=0.8)
         
-        # 标记 POC（最大成交量价格）
+        # 标记 POC
         poc_idx = np.argmax(hist)
         poc_price = bin_centers[poc_idx]
         ax.axvline(poc_price, color="white", lw=1, ls="--", alpha=0.6)
         
-        # 设置样式
+        # 收集 OHLC
+        if period in ohlc_dict:
+            ohlc = ohlc_dict[period]
+            ohlc_opens.append(ohlc.get("open"))
+            ohlc_highs.append(ohlc.get("high"))
+            ohlc_lows.append(ohlc.get("low"))
+            ohlc_closes.append(ohlc.get("close"))
+            y_positions.append(i)
+        
         ax.set_yticks([])
         ax.set_ylabel(period, rotation=0, ha="right", va="center", fontsize=9)
         ax.patch.set_alpha(0)
         
         for spine in ax.spines.values():
             spine.set_visible(False)
+
+    # 绘制连接各山脊的 OHLC 价格线
+    if show_ohlc and ohlc_opens and len(ohlc_opens) > 1:
+        from matplotlib.lines import Line2D
+        import matplotlib.transforms as transforms
+        
+        # 在 figure 坐标系上绘制跨子图的线
+        # 每个子图的 y 中心位置
+        y_centers = []
+        for i, ax in enumerate(axes):
+            bbox = ax.get_position()
+            y_centers.append(bbox.y0 + bbox.height / 2)
+        
+        # 价格范围用于 x 坐标转换
+        price_range = bin_centers[-1] - bin_centers[0]
+        x_min = bin_centers[0]
+        
+        def price_to_x(price):
+            # 转换价格到 figure x 坐标 (0-1)
+            ax_bbox = axes[0].get_position()
+            x_norm = (price - x_min) / price_range
+            return ax_bbox.x0 + x_norm * ax_bbox.width
+        
+        # 绘制 4 条连接线
+        ohlc_lines = [
+            (ohlc_opens, '#2196F3', 'Open'),
+            (ohlc_highs, '#4CAF50', 'High'),
+            (ohlc_lows, '#F44336', 'Low'),
+            (ohlc_closes, '#FF9800', 'Close'),
+        ]
+        
+        legend_elements = []
+        for prices, color, label in ohlc_lines:
+            valid_prices = [(i, p) for i, p in enumerate(prices) if p is not None]
+            if len(valid_prices) > 1:
+                xs = [price_to_x(p) for _, p in valid_prices]
+                ys = [y_centers[i] for i, _ in valid_prices]
+                line = Line2D(xs, ys, color=color, lw=2, alpha=0.9, transform=fig.transFigure, zorder=10)
+                fig.add_artist(line)
+                # 添加点标记
+                for x, y in zip(xs, ys):
+                    fig.add_artist(plt.Circle((x, y), 0.008, color=color, transform=fig.transFigure, zorder=11))
+            legend_elements.append(Line2D([0], [0], color=color, lw=2, marker='o', markersize=5, label=label))
+        
+        axes[0].legend(handles=legend_elements, loc='upper right', fontsize=8, framealpha=0.9)
 
     axes[-1].set_xlabel("Price", fontsize=10)
     fig.suptitle(title, fontsize=12, fontweight="bold", y=0.98)
