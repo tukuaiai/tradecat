@@ -11,3 +11,4 @@ mplfinance>=0.12.10b0
 diskcache>=5.6.3
 python-dotenv>=1.0.0
 adjustText>=0.8
+psycopg2-binary>=2.9.0
