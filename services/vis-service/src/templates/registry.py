@@ -823,13 +823,90 @@ def render_vpvr_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
     return _fig_to_png(fig), "image/png"
 
 
+def _fetch_ridge_data_from_db(symbol: str, interval: str, periods: int = 10) -> List[Dict]:
+    """从 TimescaleDB 获取山脊图数据。
+    
+    Args:
+        symbol: 交易对，如 BTCUSDT
+        interval: 周期，如 1h, 5m, 15m, 4h, 1d
+        periods: 周期数量，默认 10
+    
+    Returns:
+        [{period, prices, volumes}] 列表
+    """
+    import os
+    try:
+        import psycopg2
+    except ImportError:
+        logger.warning("psycopg2 not installed, cannot fetch from DB")
+        return []
+    
+    # 解析周期
+    interval_map = {
+        "1m": 1, "5m": 5, "15m": 15, "30m": 30,
+        "1h": 60, "4h": 240, "1d": 1440, "1w": 10080,
+    }
+    minutes = interval_map.get(interval, 60)
+    
+    # 连接数据库
+    db_url = os.environ.get("DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/market_data")
+    try:
+        conn = psycopg2.connect(db_url)
+    except Exception as e:
+        logger.error("DB connection failed: %s", e)
+        return []
+    
+    try:
+        cur = conn.cursor()
+        # 获取最近 periods 个周期的数据
+        # 每个周期包含 minutes 分钟的 K 线
+        query = f"""
+            WITH ranked AS (
+                SELECT 
+                    bucket_ts,
+                    close,
+                    volume,
+                    FLOOR(EXTRACT(EPOCH FROM bucket_ts) / ({minutes} * 60)) AS period_id
+                FROM market_data.candles_1m
+                WHERE symbol = %s
+                ORDER BY bucket_ts DESC
+                LIMIT {periods * minutes}
+            )
+            SELECT period_id, array_agg(close ORDER BY bucket_ts), array_agg(volume ORDER BY bucket_ts)
+            FROM ranked
+            GROUP BY period_id
+            ORDER BY period_id DESC
+            LIMIT {periods}
+        """
+        cur.execute(query, (symbol,))
+        rows = cur.fetchall()
+        
+        result = []
+        for i, (period_id, prices, volumes) in enumerate(reversed(rows)):
+            result.append({
+                "period": f"T-{len(rows)-1-i}",
+                "prices": [float(p) for p in prices if p],
+                "volumes": [float(v) for v in volumes if v],
+            })
+        return result
+    except Exception as e:
+        logger.error("Query failed: %s", e)
+        return []
+    finally:
+        conn.close()
+
+
 def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
     """
     VPVR 山脊图 - 展示成交量分布随时间演变。
 
-    必填：
-    - data: [{period, prices: list, volumes: list}] 或
-            [{period, distribution: [{price, volume}]}]
+    方式1 - 直接传数据：
+    - data: [{period, prices: list, volumes: list}]
+    
+    方式2 - 从数据库获取：
+    - symbol: 交易对，如 BTCUSDT
+    - interval: 周期，如 1h, 5m, 15m
+    - periods: 周期数量，默认 10
     
     可选：
     - title: 标题
@@ -838,13 +915,29 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
     - colormap: 颜色映射，默认 viridis
     """
     data = params.get("data")
+    
+    # 如果没有 data，尝试从数据库获取
+    if not data and params.get("symbol"):
+        symbol = params["symbol"]
+        interval = params.get("interval", "1h")
+        periods_count = int(params.get("periods", 10))
+        data = _fetch_ridge_data_from_db(symbol, interval, periods_count)
+        if not data:
+            raise ValueError(f"无法获取 {symbol} {interval} 数据")
+    
     if not data or not isinstance(data, list):
-        raise ValueError("缺少 data 列表")
+        raise ValueError("缺少 data 列表或 symbol 参数")
 
     bins = int(params.get("bins", 50))
     overlap = float(params.get("overlap", 0.5))
     cmap_name = params.get("colormap", "viridis")
-    title = params.get("title", "VPVR Ridge Plot")
+    
+    # 自动生成标题
+    if params.get("symbol"):
+        default_title = f"{params['symbol']} VPVR Ridge - {params.get('interval', '1h')} x {params.get('periods', 10)}"
+    else:
+        default_title = "VPVR Ridge Plot"
+    title = params.get("title", default_title)
 
     # 解析数据，构建每个时间段的价格-成交量分布
     periods = []

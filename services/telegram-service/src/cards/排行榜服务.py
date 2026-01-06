@@ -128,15 +128,16 @@ class VolumeRankingService(BaseService):
         sort_field: str,
         limit: int,
         fields_state: Dict[str, bool] | None = None,
+        lang: str = "zh_CN",
     ) -> str:
         sort_symbol = "🔽" if sort_order == 'desc' else "🔼"
-        sort_text = "降序" if sort_order == 'desc' else "升序"
+        sort_text = _t("sort.desc", None, lang=lang) if sort_order == 'desc' else _t("sort.asc", None, lang=lang)
         period_display = {
             '5m': '5分钟', '15m': '15分钟', '30m': '30分钟',
             '1h': '1小时', '4h': '4小时', '12h': '12小时',
             '24h': '24小时', '1w': '1周'
         }
-        market_text = '合约' if market_type == 'futures' else '现货'
+        market_text = _t("btn.futures", None, lang=lang) if market_type == 'futures' else _t("btn.spot", None, lang=lang)
         period_text = period_display.get(period, period)
 
         reverse = sort_order == 'desc'

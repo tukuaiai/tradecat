@@ -1365,3 +1365,19 @@ msgstr "成交笔数"
 
 msgid "col.taker_ratio"
 msgstr "主动买卖比"
+
+# 排行榜服务
+msgid "sort.desc"
+msgstr "降序"
+
+msgid "sort.asc"
+msgstr "升序"
+
+msgid "ranking.hot_title"
+msgstr "🎪 热币排行 - {market}{period}交易量"
+
+msgid "col.volume_change"
+msgstr "{period}交易量(±)"
+
+msgid "col.price_change"
+msgstr "{period}涨跌(±)"

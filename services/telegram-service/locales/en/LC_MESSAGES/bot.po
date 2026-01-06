@@ -1365,3 +1365,19 @@ msgstr "Trades"
 
 msgid "col.taker_ratio"
 msgstr "Taker"
+
+# Ranking service
+msgid "sort.desc"
+msgstr "Desc"
+
+msgid "sort.asc"
+msgstr "Asc"
+
+msgid "ranking.hot_title"
+msgstr "🎪 Hot Coins - {market}{period} Volume"
+
+msgid "col.volume_change"
+msgstr "{period} Vol(±)"
+
+msgid "col.price_change"
+msgstr "{period} Chg(±)"
