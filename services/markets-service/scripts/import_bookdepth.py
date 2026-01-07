@@ -29,7 +29,6 @@ def parse_bookdepth_file(fpath: Path) -> list[dict]:
         logger.warning("无法解析文件名: %s", fpath.name)
         return []
     symbol = match.group(1)
-    
     rows = []
     with zipfile.ZipFile(fpath) as zf:
         for name in zf.namelist():
@@ -41,7 +40,6 @@ def parse_bookdepth_file(fpath: Path) -> list[dict]:
                     # 解析时间戳: "2026-01-05 00:00:09" -> timestamptz
                     ts = datetime.strptime(row["timestamp"], "%Y-%m-%d %H:%M:%S")
                     ts = ts.replace(tzinfo=timezone.utc)
-                    
                     rows.append({
                         "timestamp": ts,
                         "exchange": "binance_futures_um",
@@ -57,11 +55,8 @@ def import_to_db(rows: list[dict], ts: TimescaleAdapter) -> int:
     """批量导入到数据库"""
     if not rows:
         return 0
-    
     from psycopg import sql
-    
     cols = ["timestamp", "exchange", "symbol", "percentage", "depth", "notional"]
-    
     with ts.connection() as conn:
         with conn.cursor() as cur:
             # 使用 COPY 高效写入
@@ -71,7 +66,6 @@ def import_to_db(rows: list[dict], ts: TimescaleAdapter) -> int:
                 for row in rows:
                     copy.write_row(tuple(row[c] for c in cols))
         conn.commit()
-    
     return len(rows)
 
 
@@ -79,10 +73,10 @@ def main():
     # 使用 5434 数据库
     db_url = "postgresql://postgres:postgres@localhost:5434/market_data"
     ts = TimescaleAdapter(db_url=db_url)
-    
+
     files = sorted(DATA_DIR.glob("*.zip"))
     logger.info("找到 %d 个文件", len(files))
-    
+
     total = 0
     for fpath in files:
         rows = parse_bookdepth_file(fpath)
@@ -90,10 +84,10 @@ def main():
             n = import_to_db(rows, ts)
             total += n
             logger.info("导入 %s: %d 行", fpath.name, n)
-    
+
     ts.close()
     logger.info("导入完成: 共 %d 行", total)
-    
+
     # 验证
     import subprocess
     result = subprocess.run([
