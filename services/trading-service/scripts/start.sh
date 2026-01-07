@@ -27,8 +27,13 @@ safe_load_env() {
         local perm=$(stat -c %a "$file" 2>/dev/null)
         if [[ "$perm" != "600" && "$perm" != "400" ]]; then
             echo "❌ 错误: $file 权限为 $perm，必须设为 600"
-            echo "   执行: chmod 600 $file"
-            exit 1
+            # 检查是否在Github Codespace环境内
+            if [[ "$file" == /workspaces/tradecat* ]]; then
+                echo "位于Github Codespace环境内，忽视上述错误"
+            else
+                echo "   执行: chmod 600 $file"
+                exit 1
+            fi
         fi
     fi
     
