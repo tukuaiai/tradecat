@@ -55,13 +55,13 @@ class I18nService:
         *,
         locale_dir: Path | str = DEFAULT_LOCALE_DIR,
         domain: str = "bot",
-        default_locale: Optional[str] = None,
+        default_locale: Optional[str] = "en",
         fallback_locale: Optional[str] = None,
         supported_locales: Optional[Iterable[str]] = None,
     ) -> None:
         self.locale_dir = Path(locale_dir)
         self.domain = domain
-        self.default_locale = normalize_locale(default_locale) or "zh_CN"
+        self.default_locale = normalize_locale(default_locale) or "en"
         self.fallback_locale = normalize_locale(fallback_locale) or self.default_locale
         parsed = [normalize_locale(x) for x in (supported_locales or []) if normalize_locale(x)]
         self.supported_locales = parsed or [self.default_locale, "en"]
@@ -115,7 +115,7 @@ class I18nService:
 
 def build_i18n_from_env(locale_dir: Path | str = DEFAULT_LOCALE_DIR) -> I18nService:
     """按环境变量构造 I18nService。"""
-    default_locale = os.getenv("DEFAULT_LOCALE", "zh-CN")
+    default_locale = os.getenv("DEFAULT_LOCALE", "en")
     fallback_locale = os.getenv("FALLBACK_LOCALE", default_locale)
     supported_locales = parse_supported_locales(os.getenv("SUPPORTED_LOCALES", "zh-CN,en"))
     return I18nService(

@@ -20,9 +20,11 @@ class RankingCard(ABC):
         callback_prefixes: Sequence[str] | None = None,
         priority: int = 100,
         entry_callback: str | None = None,
+        button_key: str | None = None,
     ) -> None:
         self.card_id = card_id
         self.button_text = button_text
+        self.button_key = button_key  # i18n 键，如 "card.ema.btn"
         self.category = category
         self.cost = cost
         self.description = description or ""
