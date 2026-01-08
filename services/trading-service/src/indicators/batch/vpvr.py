@@ -250,7 +250,7 @@ def compute_vpvr_ridge_data(
         logger.warning("不支持的 interval: %s", interval)
         return None
     
-    total_candles = lookback + periods  # 需要 lookback + periods 根 K 线
+    total_candles = periods * lookback  # 需要 periods * lookback 根 K 线
     logger.debug("VPVR ridge: symbol=%s, interval=%s, periods=%s, lookback=%s, bins=%s, total=%s",
                  symbol, interval, periods, lookback, bins, total_candles)
     
@@ -278,16 +278,22 @@ def compute_vpvr_ridge_data(
         return None
     
     # rows 已按时间倒序：rows[0] = 最新，rows[1] = 次新...
-    # T-0: OHLC = rows[0], VPVR = rows[1:1+lookback]
-    # T-1: OHLC = rows[1], VPVR = rows[2:2+lookback]
-    # T-i: OHLC = rows[i], VPVR = rows[i+1:i+1+lookback]
+    # 每个周期用不重叠的 lookback 根 K 线
+    # T-0: OHLC = rows[0], VPVR = rows[0:lookback]
+    # T-1: OHLC = rows[lookback], VPVR = rows[lookback:2*lookback]
+    # T-i: OHLC = rows[i*lookback], VPVR = rows[i*lookback:(i+1)*lookback]
     result_periods = []
     for i in range(periods):
-        if i + 1 + lookback > len(rows):
+        start = i * lookback
+        end = start + lookback
+        if end > len(rows):
             break
         
-        # 当前周期的 K 线（用于 OHLC）
-        kline_row = rows[i]
+        # 该周期的 K 线切片
+        chunk = rows[start:end]
+        
+        # OHLC 用该周期第一根（最新的那根）
+        kline_row = chunk[0]
         ohlc = {
             "open": float(kline_row[1]),
             "high": float(kline_row[2]),
@@ -295,8 +301,8 @@ def compute_vpvr_ridge_data(
             "close": float(kline_row[4]),
         }
         
-        # 该 K 线之前的 lookback 根 K 线（用于 VPVR）
-        vpvr_rows = rows[i+1 : i+1+lookback][::-1]  # 反转为时间正序
+        # VPVR 用整个切片（反转为时间正序）
+        vpvr_rows = chunk[::-1]
         
         df = pd.DataFrame(vpvr_rows, columns=["bucket_ts", "open", "high", "low", "close", "volume"])
         for col in ["open", "high", "low", "close", "volume"]:

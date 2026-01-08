@@ -6,18 +6,25 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Dict, List, Optional, Set
+from pathlib import Path
+from typing import Dict, List, Optional
 
 from ..adapters.ccxt import load_symbols, normalize_symbol
 from ..adapters.cryptofeed import preload_symbols
 from ..adapters.metrics import metrics
 from ..adapters.timescale import TimescaleAdapter
 from ..config import settings
+
+# 添加 libs/common 到路径
+_libs_path = Path(__file__).parent.parent.parent.parent.parent.parent / "libs" / "common"
+if str(_libs_path) not in sys.path:
+    sys.path.insert(0, str(_libs_path))
 
 logger = logging.getLogger("ws.book_depth")
 
@@ -60,13 +67,6 @@ class BookDepthCollector:
         优先使用 config/.env 的 SYMBOLS_GROUPS 配置，
         若为 auto/all 则从交易所加载全部。
         """
-        import sys
-        from pathlib import Path
-        # 添加 libs/common 到路径
-        libs_path = Path(__file__).parent.parent.parent.parent.parent.parent / "libs" / "common"
-        if str(libs_path) not in sys.path:
-            sys.path.insert(0, str(libs_path))
-        
         from symbols import get_configured_symbols
         
         configured = get_configured_symbols()
@@ -136,14 +136,19 @@ class BookDepthCollector:
             return
 
         # 获取最优买卖价计算中间价
+        # cryptofeed 的 book 对象: book.book.bids/asks 是 SortedDict
+        # .index(0) 返回 (price, size) 元组
         if not book.book or not book.book.bids or not book.book.asks:
             return
 
-        best_bid = float(book.book.bids.index(0)[0])
-        best_ask = float(book.book.asks.index(0)[0])
-        mid_price = (best_bid + best_ask) / 2
+        try:
+            best_bid_price, _ = book.book.bids.index(0)
+            best_ask_price, _ = book.book.asks.index(0)
+            mid_price = (float(best_bid_price) + float(best_ask_price)) / 2
+        except (IndexError, TypeError):
+            return
 
-        # 转换订单簿格式
+        # 转换订单簿格式: items() 返回 [(price, size), ...]
         bids = [(float(p), float(s)) for p, s in book.book.bids.items()]
         asks = [(float(p), float(s)) for p, s in book.book.asks.items()]
 

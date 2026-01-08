@@ -267,7 +267,7 @@ tradecat/
 │   │
 │   ├── trading-service/        # 指标计算服务
 │   │   ├── src/
-│   │   │   ├── indicators/     # 38个指标
+│   │   │   ├── indicators/     # 32个指标
 │   │   │   ├── core/engine.py  # 计算引擎
 │   │   │   └── simple_scheduler.py
 │   │   ├── scripts/start.sh

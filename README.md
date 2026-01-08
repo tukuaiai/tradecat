@@ -314,10 +314,10 @@ vim config/.env
 </td>
 <td width="50%">
 
-### 📊 38个技术指标
-- **趋势指标** - EMA/MACD/SuperTrend/ADX/Ichimoku
-- **动量指标** - RSI/KDJ/CCI/MFI/WilliamsR
-- **波动指标** - 布林带/ATR/Keltner/支撑阻力
+### 📊 32个技术指标模块
+- **趋势指标** - EMA/MACD/SuperTrend/趋势云/趋势线
+- **动量指标** - RSI/KDJ/MFI/多空比/斐波那契狙击
+- **波动指标** - 布林带/ATR/支撑阻力/VWAP
 - **形态识别** - TA-Lib 61种蜡烛 + 价格形态
 
 </td>
@@ -400,7 +400,7 @@ graph TD
 
     subgraph TS["📊 trading-service<br><small>Python, pandas, numpy, TA-Lib</small>"]
         TR_ENG["engine<br>计算引擎"]
-        TR_IND["indicators<br>38个指标"]
+        TR_IND["indicators<br>32个指标"]
         TR_SCH["scheduler<br>定时调度"]
         TR_PRI["priority<br>高优先级币种筛选"]
     end
@@ -453,7 +453,7 @@ graph TD
 |:---|:---:|:---|:---|
 | **data-service** | - | 加密货币 K线采集、期货指标采集、历史数据回填 | Python, asyncio, ccxt, cryptofeed |
 | **markets-service** | - | 全市场数据采集（美股/A股/宏观/衍生品定价） | yfinance, akshare, fredapi, QuantLib |
-| **trading-service** | - | 38个技术指标计算、高优先级币种筛选、定时调度 | Python, pandas, numpy, TA-Lib |
+| **trading-service** | - | 32个技术指标计算、高优先级币种筛选、定时调度 | Python, pandas, numpy, TA-Lib |
 | **telegram-service** | - | Bot 交互、排行榜展示、信号推送 | python-telegram-bot, aiohttp |
 | **ai-service** | - | AI 分析、Wyckoff 方法论（作为 telegram-service 子模块） | Gemini/OpenAI/Claude/DeepSeek |
 | **predict-service** | - | 预测市场信号（Polymarket/Kalshi/Opinion） | Node.js, Telegram Bot |
@@ -474,7 +474,7 @@ graph LR
     end
     
     subgraph 指标计算
-        C --> D["📊 trading-service<br>38个指标计算"]
+        C --> D["📊 trading-service<br>32个指标计算"]
         D --> E[("📁 market_data.db<br>SQLite")]
     end
     
@@ -785,7 +785,7 @@ tradecat/
 │   │
 │   ├── 📂 trading-service/         # 指标计算服务
 │   │   ├── 📂 src/
-│   │   │   ├── 📂 indicators/      # 38个指标
+│   │   │   ├── 📂 indicators/      # 32个指标
 │   │   │   ├── 📂 core/            # 计算引擎
 │   │   │   └── simple_scheduler.py
 │   │   ├── 📂 scripts/
