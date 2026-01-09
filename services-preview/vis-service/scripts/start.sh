@@ -23,9 +23,13 @@ safe_load_env() {
         local perm
         perm=$(stat -c %a "$file" 2>/dev/null)
         if [[ "$perm" != "600" && "$perm" != "400" ]]; then
-            echo "❌ 错误: $file 权限为 $perm，必须设为 600"
-            echo "   执行: chmod 600 $file"
-            exit 1
+            if [[ "${CODESPACES:-}" == "true" ]]; then
+                echo "⚠️  Codespace 环境，跳过权限检查 ($file: $perm)"
+            else
+                echo "❌ 错误: $file 权限为 $perm，必须设为 600"
+                echo "   执行: chmod 600 $file"
+                exit 1
+            fi
         fi
     fi
 
