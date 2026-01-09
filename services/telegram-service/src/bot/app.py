@@ -3646,12 +3646,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # =============================================================================
-    # 配置管理回调 (env_*)
+    # 配置管理回调 (env_*) - 为"最糟糕的用户"设计
+    # 原则：3步内完成、即时反馈、友好文案、不让用户迷路
     # =============================================================================
     if button_data.startswith("env_"):
         from bot.env_manager import (
             get_editable_configs_by_category, CONFIG_CATEGORIES,
-            get_config, set_config, EDITABLE_CONFIGS
+            get_config, set_config, EDITABLE_CONFIGS, FRIENDLY_MESSAGES
         )
         await query.answer()
         
@@ -3662,25 +3663,55 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             configs = get_editable_configs_by_category().get(category, [])
             
             if not configs:
-                await query.edit_message_text(f"❓ 分类 {category} 无可配置项")
+                await query.edit_message_text("🤔 这个分类暂时没有可配置的项目")
                 return
             
-            lines = [f"{cat_info.get('name', category)}\n"]
+            # 友好的分类标题和说明
+            lines = [
+                f"{cat_info.get('icon', '⚙️')} *{cat_info.get('name', category)}*",
+                f"_{cat_info.get('desc', '')}_\n",
+            ]
+            
             buttons = []
             for cfg in configs:
-                hot = "🔥" if cfg["hot_reload"] else "🔄"
-                value = cfg["value"] or "(未设置)"
-                if len(value) > 20:
-                    value = value[:17] + "..."
-                lines.append(f"{hot} *{cfg['desc']}*: `{value}`")
+                config_info = EDITABLE_CONFIGS.get(cfg["key"], {})
+                icon = config_info.get("icon", "⚙️")
+                name = config_info.get("name", cfg["key"])
+                value = cfg["value"]
+                
+                # 格式化显示值
+                if not value:
+                    display_value = "未设置"
+                elif len(value) > 15:
+                    display_value = value[:12] + "..."
+                else:
+                    # 对于选项类型，显示友好标签
+                    options = config_info.get("options", [])
+                    if options and isinstance(options[0], dict):
+                        for opt in options:
+                            if opt["value"] == value:
+                                display_value = opt["label"]
+                                break
+                        else:
+                            display_value = value
+                    else:
+                        display_value = value
+                
+                hot_icon = "🚀" if cfg["hot_reload"] else "⏳"
+                lines.append(f"{icon} {name.split(' ', 1)[-1]}：{display_value} {hot_icon}")
+                
+                # 按钮只显示简短名称
+                btn_text = name.split(' ', 1)[-1] if ' ' in name else name
                 buttons.append(InlineKeyboardButton(
-                    f"✏️ {cfg['desc']}",
+                    f"✏️ {btn_text}",
                     callback_data=f"env_edit_{cfg['key']}"
                 ))
             
-            # 每行 1 个按钮 + 返回按钮
+            lines.append("\n🚀 = 立即生效  ⏳ = 重启生效")
+            
+            # 每行 1 个按钮，更清晰
             keyboard_rows = [[btn] for btn in buttons]
-            keyboard_rows.append([InlineKeyboardButton("⬅️ 返回", callback_data="env_back")])
+            keyboard_rows.append([InlineKeyboardButton("⬅️ 返回配置中心", callback_data="env_back")])
             
             await query.edit_message_text(
                 "\n".join(lines),
@@ -3695,38 +3726,96 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             config_info = EDITABLE_CONFIGS.get(key, {})
             current_value = get_config(key) or ""
             
-            # 如果有预设选项，显示选项按钮
+            name = config_info.get("name", key)
+            desc = config_info.get("desc", "")
+            help_text = config_info.get("help", "")
+            category = config_info.get("category", "symbols")
+            
+            # 如果有预设选项，显示友好的选项按钮
             options = config_info.get("options")
             if options:
                 buttons = []
-                for opt in options:
-                    prefix = "✅ " if opt == current_value else ""
-                    buttons.append(InlineKeyboardButton(
-                        f"{prefix}{opt}",
-                        callback_data=f"env_set_{key}_{opt}"
-                    ))
-                keyboard_rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
-                keyboard_rows.append([InlineKeyboardButton("⬅️ 返回", callback_data=f"env_cat_{config_info.get('category', 'symbols')}")])
+                # 新格式选项 [{value, label, detail}, ...]
+                if isinstance(options[0], dict):
+                    for opt in options:
+                        is_current = (opt["value"] == current_value)
+                        prefix = "✅ " if is_current else ""
+                        label = opt.get("label", opt["value"])
+                        buttons.append(InlineKeyboardButton(
+                            f"{prefix}{label}",
+                            callback_data=f"env_set_{key}_{opt['value']}"
+                        ))
+                else:
+                    # 旧格式选项 ["a", "b", ...]
+                    for opt in options:
+                        prefix = "✅ " if opt == current_value else ""
+                        buttons.append(InlineKeyboardButton(
+                            f"{prefix}{opt}",
+                            callback_data=f"env_set_{key}_{opt}"
+                        ))
+                
+                # 每行 1-2 个按钮
+                if len(buttons) <= 3:
+                    keyboard_rows = [[btn] for btn in buttons]
+                else:
+                    keyboard_rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
+                keyboard_rows.append([InlineKeyboardButton("⬅️ 返回", callback_data=f"env_cat_{category}")])
+                
+                # 友好的编辑界面
+                text = f"✏️ *{name}*\n\n"
+                text += f"{desc}\n\n"
+                if current_value:
+                    text += f"📍 当前：`{current_value}`\n\n"
+                else:
+                    text += f"📍 当前：未设置\n\n"
+                text += "👇 点击选择："
                 
                 await query.edit_message_text(
-                    f"✏️ *{config_info.get('desc', key)}*\n\n当前值: `{current_value or '(未设置)'}`\n\n请选择新值:",
+                    text,
                     reply_markup=InlineKeyboardMarkup(keyboard_rows),
                     parse_mode='Markdown'
                 )
             else:
                 # 无预设选项，提示用户手动输入
-                example = config_info.get("example", "")
+                placeholder = config_info.get("placeholder", "")
                 context.user_data["env_editing_key"] = key
+                
+                text = f"✏️ *{name}*\n\n"
+                text += f"{desc}\n\n"
+                if help_text:
+                    text += f"💡 {help_text}\n\n"
+                if current_value:
+                    text += f"📍 当前值：`{current_value}`\n\n"
+                else:
+                    text += f"📍 当前值：未设置\n\n"
+                text += "📝 请直接发送新的值：\n"
+                if placeholder:
+                    text += f"_例如：{placeholder}_"
+                
+                keyboard_rows = [
+                    [InlineKeyboardButton("🗑️ 清空此项", callback_data=f"env_clear_{key}")],
+                    [InlineKeyboardButton("⬅️ 返回", callback_data=f"env_cat_{category}")],
+                ]
+                
                 await query.edit_message_text(
-                    f"✏️ *{config_info.get('desc', key)}*\n\n"
-                    f"当前值: `{current_value or '(未设置)'}`\n"
-                    f"示例: `{example}`\n\n"
-                    f"请直接发送新值，或发送 `取消` 放弃修改:",
-                    reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("❌ 取消", callback_data=f"env_cat_{config_info.get('category', 'symbols')}")
-                    ]]),
+                    text,
+                    reply_markup=InlineKeyboardMarkup(keyboard_rows),
                     parse_mode='Markdown'
                 )
+            return
+        
+        # 清空配置 env_clear_<key>
+        if button_data.startswith("env_clear_"):
+            key = button_data.replace("env_clear_", "")
+            success, msg = set_config(key, "")
+            config_info = EDITABLE_CONFIGS.get(key, {})
+            category = config_info.get("category", "symbols")
+            
+            # 添加返回按钮
+            keyboard = InlineKeyboardMarkup([[
+                InlineKeyboardButton("👍 好的", callback_data=f"env_cat_{category}")
+            ]])
+            await query.edit_message_text(msg, reply_markup=keyboard, parse_mode='Markdown')
             return
         
         # 设置选项 env_set_<key>_<value>
@@ -3735,22 +3824,43 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if len(parts) == 2:
                 key, value = parts
                 success, msg = set_config(key, value)
-                await query.edit_message_text(msg, parse_mode='Markdown')
+                config_info = EDITABLE_CONFIGS.get(key, {})
+                category = config_info.get("category", "symbols")
+                
+                # 成功后提供返回按钮
+                keyboard = InlineKeyboardMarkup([[
+                    InlineKeyboardButton("👍 好的", callback_data=f"env_cat_{category}")
+                ]])
+                await query.edit_message_text(msg, reply_markup=keyboard, parse_mode='Markdown')
             return
         
         # 返回主配置菜单
         if button_data == "env_back":
-            from bot.env_manager import get_config_summary
-            summary = get_config_summary()
-            text = f"⚙️ *配置管理*\n\n{summary}\n\n🔥 = 热更新（立即生效）\n🔄 = 需重启生效"
+            # 按优先级排序分类
+            sorted_cats = sorted(CONFIG_CATEGORIES.items(), key=lambda x: x[1].get("priority", 99))
+            
+            text = "⚙️ *配置中心*\n\n"
+            text += "在这里可以调整 Bot 的各项设置~\n\n"
+            text += "👇 选择要配置的类别："
             
             buttons = []
-            for cat_id, cat_info in CONFIG_CATEGORIES.items():
-                buttons.append(InlineKeyboardButton(cat_info["name"], callback_data=f"env_cat_{cat_id}"))
-            keyboard_rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
+            for cat_id, cat_info in sorted_cats:
+                icon = cat_info.get("icon", "⚙️")
+                name = cat_info.get("name", cat_id)
+                buttons.append(InlineKeyboardButton(
+                    f"{icon} {name.replace(icon, '').strip()}",
+                    callback_data=f"env_cat_{cat_id}"
+                ))
             
-            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard_rows), parse_mode='Markdown')
-            return
+            # 每行 2 个按钮
+            keyboard_rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
+            keyboard_rows.append([InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")])
+            
+            await query.edit_message_text(
+                text,
+                reply_markup=InlineKeyboardMarkup(keyboard_rows),
+                parse_mode='Markdown'
+            )
 
     # 语言切换
     if button_data.startswith("set_lang_"):
@@ -5117,50 +5227,65 @@ async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =============================================================================
-# /env 命令 - 配置管理
+# /env 命令 - 配置管理（为"最糟糕的用户"设计）
 # =============================================================================
 async def env_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """配置管理命令 /env - 查看和修改 .env 配置"""
+    """配置管理命令 /env - 友好的可视化配置界面"""
     from bot.env_manager import (
-        get_config_summary, get_editable_configs_by_category,
         CONFIG_CATEGORIES, get_config, set_config, validate_config_value, EDITABLE_CONFIGS
     )
     
     args = context.args if context.args else []
     
-    # /env - 显示配置摘要和分类按钮
+    # /env - 显示友好的配置中心（主入口）
     if not args:
-        summary = get_config_summary()
-        text = f"⚙️ *配置管理*\n\n{summary}\n\n🔥 = 热更新（立即生效）\n🔄 = 需重启生效"
+        # 按优先级排序分类
+        sorted_cats = sorted(CONFIG_CATEGORIES.items(), key=lambda x: x[1].get("priority", 99))
         
-        # 构建分类按钮
+        text = "⚙️ *配置中心*\n\n"
+        text += "👋 在这里可以轻松调整 Bot 的各项设置\n\n"
+        text += "👇 选择要配置的类别："
+        
+        # 构建分类按钮，带图标和描述
         buttons = []
-        for cat_id, cat_info in CONFIG_CATEGORIES.items():
+        for cat_id, cat_info in sorted_cats:
+            icon = cat_info.get("icon", "⚙️")
+            name = cat_info.get("name", cat_id).replace(icon, "").strip()
             buttons.append(InlineKeyboardButton(
-                cat_info["name"],
+                f"{icon} {name}",
                 callback_data=f"env_cat_{cat_id}"
             ))
         
-        # 每行 2 个按钮
+        # 每行 2 个按钮，更友好的布局
         keyboard_rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
+        keyboard_rows.append([InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")])
         keyboard = InlineKeyboardMarkup(keyboard_rows)
         
         await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
         return
     
-    # /env get <key> - 获取配置值
+    # /env get <key> - 获取配置值（保留命令行方式，但用友好文案）
     if args[0].lower() == "get" and len(args) >= 2:
         key = args[1].upper()
+        config_info = EDITABLE_CONFIGS.get(key, {})
+        config_name = config_info.get("name", key)
         value = get_config(key)
+        
         if value is not None:
             # 敏感配置脱敏显示
             if "TOKEN" in key or "SECRET" in key or "PASSWORD" in key:
                 display_value = value[:4] + "****" + value[-4:] if len(value) > 8 else "****"
             else:
                 display_value = value
-            await update.message.reply_text(f"📋 `{key}` = `{display_value}`", parse_mode='Markdown')
+            await update.message.reply_text(
+                f"📋 *{config_name}*\n\n当前值：`{display_value}`",
+                parse_mode='Markdown'
+            )
         else:
-            await update.message.reply_text(f"❓ 配置项 `{key}` 未设置", parse_mode='Markdown')
+            await update.message.reply_text(
+                f"📋 *{config_name}*\n\n当前值：未设置",
+                parse_mode='Markdown'
+            )
         return
     
     # /env set <key> <value> - 设置配置值
@@ -5171,7 +5296,7 @@ async def env_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 验证配置值
         valid, msg = validate_config_value(key, value)
         if not valid:
-            await update.message.reply_text(f"❌ 验证失败: {msg}", parse_mode='Markdown')
+            await update.message.reply_text(msg, parse_mode='Markdown')
             return
         
         # 设置配置
@@ -5181,25 +5306,30 @@ async def env_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # /env list - 列出可配置项
     if args[0].lower() == "list":
-        lines = ["📋 *可配置项列表*\n"]
+        lines = ["📋 *可配置的项目*\n"]
         for key, info in EDITABLE_CONFIGS.items():
-            hot = "🔥" if info.get("hot_reload") else "🔄"
-            lines.append(f"{hot} `{key}` - {info.get('desc', '')}")
+            icon = info.get("icon", "⚙️")
+            name = info.get("name", key)
+            hot = "🚀" if info.get("hot_reload") else "⏳"
+            lines.append(f"{icon} {name} {hot}")
+        lines.append("\n🚀 = 立即生效  ⏳ = 重启生效")
         await update.message.reply_text("\n".join(lines), parse_mode='Markdown')
         return
     
-    # 帮助信息
-    help_text = """⚙️ *配置管理命令*
+    # 帮助信息 - 友好版
+    help_text = """⚙️ *配置帮助*
 
-`/env` - 查看配置摘要
-`/env list` - 列出可配置项
-`/env get <KEY>` - 获取配置值
-`/env set <KEY> <VALUE>` - 设置配置值
+最简单的方式：直接发送 `/env`，然后点击按钮操作~
 
-*示例:*
-`/env get SYMBOLS_GROUPS`
-`/env set SYMBOLS_GROUPS main6`
-`/env set BLOCKED_SYMBOLS BNXUSDT,LUNAUSDT`
+如果你更喜欢命令行：
+
+• `/env` - 打开配置中心
+• `/env list` - 查看所有可配置项
+• `/env get 配置名` - 查看某个配置
+• `/env set 配置名 值` - 修改配置
+
+💡 *小技巧*
+发送 `/env` 后点按钮更方便哦！
 """
     await update.message.reply_text(help_text, parse_mode='Markdown')
 

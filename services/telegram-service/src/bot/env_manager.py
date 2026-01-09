@@ -94,7 +94,7 @@ EDITABLE_CONFIGS = {
     # 功能开关 - 简单的开/关
     "DISABLE_SINGLE_TOKEN_QUERY": {
         "name": "🔍 单币查询",
-        "desc": "发送"BTC!"查询单币详情",
+        "desc": "发送 BTC! 查询单币详情",
         "help": "开启后可以发送如 BTC! 来查询单个币种",
         "category": "features",
         "hot_reload": True,
@@ -297,18 +297,21 @@ def set_config(key: str, value: str) -> Tuple[bool, str]:
     设置配置值
     
     Returns:
-        (success, message)
+        (success, message) - 使用友好文案
     """
-    # 检查是否允许修改
+    config_info = EDITABLE_CONFIGS.get(key, {})
+    config_name = config_info.get("name", key)
+    
+    # 检查是否允许修改（友好提示）
     if key in READONLY_CONFIGS:
-        return False, f"❌ {key} 是只读配置，不允许修改"
+        return False, f"🔒 {config_name} 是系统核心配置，需要在文件中手动修改哦"
     
     if key not in EDITABLE_CONFIGS:
-        return False, f"❌ {key} 不在可修改的配置列表中"
+        return False, f"🤔 暂不支持修改 {key}，如有需要请联系管理员"
     
     # 读取当前文件内容
     if not ENV_PATH.exists():
-        return False, f"❌ .env 文件不存在: {ENV_PATH}"
+        return False, f"📁 配置文件还没准备好，请先完成初始化"
     
     try:
         lines = ENV_PATH.read_text(encoding="utf-8").splitlines()
@@ -317,36 +320,51 @@ def set_config(key: str, value: str) -> Tuple[bool, str]:
         
         for line in lines:
             stripped = line.strip()
-            # 匹配 KEY= 或 KEY =
             if stripped.startswith(f"{key}=") or stripped.startswith(f"{key} ="):
                 new_lines.append(f"{key}={value}")
                 found = True
             else:
                 new_lines.append(line)
         
-        # 如果没找到，添加到文件末尾
         if not found:
             new_lines.append(f"{key}={value}")
         
-        # 写回文件
         ENV_PATH.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-        
-        # 同步更新当前进程的环境变量
         os.environ[key] = value
         
-        # 触发热更新
-        config_info = EDITABLE_CONFIGS.get(key, {})
+        # 触发热更新，使用友好反馈
         if config_info.get("hot_reload"):
             _trigger_hot_reload(key)
-            return True, f"✅ {key} 已更新为: {value}\n（已热更新，立即生效）"
+            # 显示友好的值
+            display_value = _format_display_value(key, value)
+            return True, f"✨ {config_name}\n\n已更新为：{display_value}\n\n🚀 立即生效！"
         else:
-            return True, f"✅ {key} 已更新为: {value}\n⚠️ 需要重启服务才能生效"
+            display_value = _format_display_value(key, value)
+            return True, f"✨ {config_name}\n\n已更新为：{display_value}\n\n💡 重启后生效~"
         
     except PermissionError:
-        return False, f"❌ 没有写入权限: {ENV_PATH}"
+        return False, f"😅 没有写入权限，请检查配置文件权限设置"
     except Exception as e:
         logger.error(f"写入 .env 失败: {e}")
-        return False, f"❌ 写入失败: {e}"
+        return False, f"😅 保存时遇到了问题，请稍后再试\n\n技术信息：{e}"
+
+
+def _format_display_value(key: str, value: str) -> str:
+    """格式化显示值，让用户更容易理解"""
+    config_info = EDITABLE_CONFIGS.get(key, {})
+    options = config_info.get("options", [])
+    
+    # 如果是选项类型，显示选项标签
+    if options and isinstance(options[0], dict):
+        for opt in options:
+            if opt.get("value") == value:
+                return f"{opt.get('label', value)}"
+    
+    # 空值友好显示
+    if not value:
+        return "（已清空）"
+    
+    return f"`{value}`"
 
 
 def _trigger_hot_reload(key: str):
@@ -418,26 +436,51 @@ def get_config_summary() -> str:
 
 
 def validate_config_value(key: str, value: str) -> Tuple[bool, str]:
-    """验证配置值"""
+    """
+    验证配置值
+    使用友好文案，告诉用户如何修正而不是责备
+    """
     config_info = EDITABLE_CONFIGS.get(key)
     if not config_info:
-        return False, "未知的配置项"
+        return False, "🤔 这个配置项暂不支持修改"
+    
+    # 允许清空
+    if not value:
+        return True, "OK"
     
     # 检查选项限制
     options = config_info.get("options")
-    if options and value not in options:
-        return False, f"值必须是以下之一: {', '.join(options)}"
+    if options:
+        # 新格式：[{value, label}, ...]
+        if isinstance(options[0], dict):
+            valid_values = [opt["value"] for opt in options]
+            if value not in valid_values:
+                labels = [f"{opt['label']}" for opt in options]
+                return False, f"💡 请从以下选项中选择：\n" + "\n".join(labels)
+        # 旧格式：["a", "b", ...]
+        elif value not in options:
+            return False, f"💡 请从以下选项中选择：{', '.join(options)}"
     
-    # 特定配置的格式验证
+    # 代理格式验证
     if key in ("HTTP_PROXY", "HTTPS_PROXY") and value:
         if not re.match(r'^(http|https|socks5)://[\w\-\.]+:\d+$', value):
-            return False, "代理格式应为: http://IP:端口 或 socks5://IP:端口"
+            return False, (
+                "💡 代理格式需要这样写：\n"
+                "• http://127.0.0.1:7890\n"
+                "• socks5://127.0.0.1:1080\n\n"
+                "请检查一下格式~"
+            )
     
+    # 币种格式验证
     if key in ("SYMBOLS_EXTRA", "SYMBOLS_EXCLUDE", "BLOCKED_SYMBOLS") and value:
-        # 验证币种格式
         symbols = [s.strip().upper() for s in value.split(",") if s.strip()]
         invalid = [s for s in symbols if not re.match(r'^[A-Z0-9]+USDT$', s)]
         if invalid:
-            return False, f"无效的币种格式: {', '.join(invalid)}（应以 USDT 结尾）"
+            return False, (
+                f"💡 币种格式需要以 USDT 结尾\n\n"
+                f"• 正确：BTCUSDT, ETHUSDT\n"
+                f"• 你输入的：{', '.join(invalid)}\n\n"
+                f"请修改一下~"
+            )
     
     return True, "OK"
