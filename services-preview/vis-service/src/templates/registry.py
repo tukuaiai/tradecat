@@ -1086,18 +1086,19 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
 
 def render_bb_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
     """
-    全市场布林带分布图 - 展示各币种价格在布林带中的相对位置。
+    全市场布林带分布图 - 九宫格矩阵。
 
-    每个币种按 %B 值（价格在布林带中的位置）分布：
-    - %B < 0: 跌破下轨
-    - %B = 0: 在下轨
-    - %B = 0.5: 在中轨
-    - %B = 1: 在上轨
-    - %B > 1: 突破上轨
+    Y轴：%B 值（价格在布林带中的位置）
+    X轴：带宽（波动率）分3区 - 收窄/正常/扩张
 
-    必填 data 字段：symbol, percent_b (百分比b)
+    九宫格解读：
+    - 左上：收窄+超买 → 向上突破前兆
+    - 右上：扩张+超买 → 疯狂追涨
+    - 左下：收窄+超卖 → 向下突破前兆
+    - 右下：扩张+超卖 → 恐慌抛售
+
+    必填 data 字段：symbol, percent_b, bandwidth
     可选 data 字段：
-      - bandwidth: 带宽，决定圆圈大小（带宽大=波动大）
       - price_change: 涨跌幅，决定边框颜色(红跌绿涨)
       - volume: 成交量，决定圆圈颜色深浅
     """
@@ -1105,60 +1106,49 @@ def render_bb_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
     if not data or not isinstance(data, list):
         raise ValueError("缺少 data 列表")
 
-    bands = max(2, int(params.get("bands", 5)))
+    y_bands = max(2, int(params.get("bands", 5)))  # Y轴分区数
+    x_bands = 3  # X轴固定3区：收窄/正常/扩张
 
     df = pd.DataFrame(data)
-    required_cols = {"symbol", "percent_b"}
+    required_cols = {"symbol", "percent_b", "bandwidth"}
     if not required_cols.issubset(df.columns):
-        raise ValueError("data 需包含 symbol, percent_b")
+        raise ValueError("data 需包含 symbol, percent_b, bandwidth")
 
-    df = df.dropna(subset=["percent_b"])
+    df = df.dropna(subset=["percent_b", "bandwidth"])
     df["percent_b"] = df["percent_b"].astype(float)
-    # 过滤无效数据（%B 为 0 且带宽为 0 表示数据不足）
-    if "bandwidth" in df.columns:
-        df = df[(df["bandwidth"] > 0) | (df["percent_b"] != 0)]
-
-    # 去重：每个币种只保留一条（取最新或第一条）
+    df["bandwidth"] = df["bandwidth"].astype(float)
+    df = df[df["bandwidth"] > 0]
     df = df.drop_duplicates(subset=["symbol"], keep="first")
 
     if df.empty:
         raise ValueError("无有效布林带数据")
 
-    # %B 映射到 0-1 范围（允许超出）
-    # 原始 %B: 0=下轨, 0.5=中轨, 1=上轨
-    # 映射后 y: 0=超卖, 0.5=中轨, 1=超买
-    raw_y = df["percent_b"].clip(-0.5, 1.5)  # 允许一定超出
-    df["y"] = ((raw_y + 0.5) / 2).clip(0.01, 0.99)  # 归一化到 0-1
+    # Y轴：%B 映射到 0-1
+    raw_y = df["percent_b"].clip(-0.5, 1.5)
+    df["y"] = ((raw_y + 0.5) / 2).clip(0.02, 0.98)
     df["y_raw"] = df["percent_b"]
 
-    n = len(df)
-    fig_height = min(14, max(10, n * 0.028))
+    # X轴：带宽按分位数分3区
+    bw = df["bandwidth"]
+    q33 = bw.quantile(0.33)
+    q66 = bw.quantile(0.66)
 
-    sns.set_theme(style="white")
-    fig, ax = plt.subplots(1, 1, figsize=(16, fig_height), dpi=150)
+    def bw_to_x_zone(b):
+        if b <= q33:
+            return 0  # 收窄
+        elif b <= q66:
+            return 1  # 正常
+        else:
+            return 2  # 扩张
 
-    # 布林带区域背景色：从超卖（蓝）到超买（红）
-    band_colors = ["#1565C0", "#1976D2", "#4CAF50", "#FFA726", "#E53935"]
-    if bands != 5:
-        cmap = plt.cm.RdYlBu_r  # 红黄蓝反转
-        band_colors = [cmap(i / max(1, bands - 1)) for i in range(bands)]
+    df["x_zone"] = df["bandwidth"].apply(bw_to_x_zone)
 
-    for i in range(bands):
-        y0 = i / bands
-        ax.add_patch(plt.Rectangle((0.0, y0), 1.0, 1/bands, facecolor=band_colors[i], alpha=0.85, edgecolor="none"))
+    # 带宽归一化用于圆圈大小
+    bw_log = np.log10(bw.clip(lower=0.1) + 1)
+    bw_norm = (bw_log - bw_log.min()) / (bw_log.max() - bw_log.min() + 1e-9)
+    df["size_factor"] = 0.4 + bw_norm * 1.0
 
-    rng = np.random.default_rng(42)
-
-    # 带宽归一化 -> 圆圈大小（带宽大=波动大=圆圈大）
-    if "bandwidth" in df.columns:
-        bw = df["bandwidth"].fillna(df["bandwidth"].median())
-        bw_log = np.log10(bw.clip(lower=0.1) + 1)
-        bw_norm = (bw_log - bw_log.min()) / (bw_log.max() - bw_log.min() + 1e-9)
-        df["size_factor"] = 0.3 + bw_norm * 1.2  # 0.3 ~ 1.5
-    else:
-        df["size_factor"] = 1.0
-
-    # 成交量归一化 -> 颜色亮度
+    # 成交量归一化 -> 颜色
     if "volume" in df.columns:
         vol = df["volume"].fillna(df["volume"].median())
         vol_log = np.log10(vol.clip(lower=1))
@@ -1167,30 +1157,66 @@ def render_bb_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
     else:
         df["vol_factor"] = 0.5
 
-    # 智能初始布局
-    df = df.sort_values("y").reset_index(drop=True)
-    y_bins = pd.cut(df["y"], bins=25, labels=False)
-    df["y_bin"] = y_bins.fillna(0).astype(int)
+    n = len(df)
+    fig_height = min(14, max(10, n * 0.025))
 
-    x_positions = []
-    for bin_id in range(25):
-        bin_mask = df["y_bin"] == bin_id
-        bin_count = bin_mask.sum()
-        if bin_count > 0:
-            bin_indices = df[bin_mask].index.tolist()
-            for i, idx in enumerate(bin_indices):
-                x = (i + 0.5) / bin_count * 0.88 + 0.06
-                x += rng.uniform(-0.015, 0.015)
-                x_positions.append((idx, x))
+    sns.set_theme(style="white")
+    fig, ax = plt.subplots(1, 1, figsize=(16, fig_height), dpi=150)
 
-    for idx, x in x_positions:
-        df.loc[idx, "x"] = x
-    df["x"] = df["x"].clip(0.03, 0.97)
+    # Y轴背景色带
+    y_band_colors = ["#1565C0", "#1976D2", "#4CAF50", "#FFA726", "#E53935"]
+    if y_bands != 5:
+        cmap = plt.cm.RdYlBu_r
+        y_band_colors = [cmap(i / max(1, y_bands - 1)) for i in range(y_bands)]
 
-    # 绘制圆圈
+    for i in range(y_bands):
+        y0 = i / y_bands
+        for j in range(x_bands):
+            x0 = j / x_bands
+            ax.add_patch(plt.Rectangle(
+                (x0, y0), 1/x_bands, 1/y_bands,
+                facecolor=y_band_colors[i], alpha=0.75, edgecolor="white", linewidth=0.5
+            ))
+
+    # X轴分区线和标签
+    for i in range(1, x_bands):
+        ax.axvline(x=i/x_bands, color="white", linewidth=2, alpha=0.9)
+
+    # 智能布局：按 x_zone 和 y 分组
+    rng = np.random.default_rng(42)
+    df = df.sort_values(["x_zone", "y"]).reset_index(drop=True)
+
+    # 每个 x_zone 内按 y 分层布局
+    for zone in range(x_bands):
+        zone_df = df[df["x_zone"] == zone]
+        if zone_df.empty:
+            continue
+
+        zone_x_start = zone / x_bands + 0.02
+        zone_x_end = (zone + 1) / x_bands - 0.02
+        zone_width = zone_x_end - zone_x_start
+
+        # 按 y 分 15 层
+        y_bins = pd.cut(zone_df["y"], bins=15, labels=False)
+        zone_df = zone_df.copy()
+        zone_df["y_bin"] = y_bins.fillna(0).astype(int)
+
+        for bin_id in range(15):
+            bin_mask = zone_df["y_bin"] == bin_id
+            bin_indices = zone_df[bin_mask].index.tolist()
+            bin_count = len(bin_indices)
+            if bin_count > 0:
+                for i, idx in enumerate(bin_indices):
+                    x = zone_x_start + (i + 0.5) / max(bin_count, 1) * zone_width
+                    x += rng.uniform(-0.01, 0.01)
+                    df.loc[idx, "x"] = x
+
+    df["x"] = df["x"].clip(0.02, 0.98)
+
+    # 绘制气泡
     base_font = 5.0
     texts = []
-    vol_cmap = plt.cm.YlOrRd  # 黄到红：低成交量黄，高成交量红
+    vol_cmap = plt.cm.YlOrRd
 
     for _, row in df.iterrows():
         label = str(row["symbol"]).replace("USDT", "")
@@ -1198,13 +1224,12 @@ def render_bb_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
             label = label[:6] + ".."
 
         size_factor = row.get("size_factor", 1.0)
-        font_size = base_font * (0.8 + size_factor * 0.7)
+        font_size = base_font * (0.8 + size_factor * 0.6)
 
         vol_factor = row.get("vol_factor", 0.5)
         rgba = vol_cmap(vol_factor)
         point_color = f"#{int(rgba[0]*255):02x}{int(rgba[1]*255):02x}{int(rgba[2]*255):02x}"
 
-        # 涨跌决定边框颜色
         chg = row.get("price_change")
         if chg is not None and chg > 0.005:
             edge_color = "#1a9850"
@@ -1213,7 +1238,7 @@ def render_bb_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
         else:
             edge_color = "#ffffff"
 
-        edge_width = 1.0 + size_factor * 1.2
+        edge_width = 1.0 + size_factor * 1.0
 
         txt = ax.text(
             row["x"], row["y"], label,
@@ -1222,66 +1247,60 @@ def render_bb_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
             color="#1a1a1a",
             fontweight="bold",
             zorder=4,
-            bbox=dict(boxstyle="circle,pad=0.4", facecolor=point_color, edgecolor=edge_color, linewidth=edge_width, alpha=0.92),
+            bbox=dict(boxstyle="circle,pad=0.35", facecolor=point_color, edgecolor=edge_color, linewidth=edge_width, alpha=0.92),
         )
         texts.append(txt)
 
-    # adjustText 微调
+    # adjustText
     try:
         adjust_text(
-            texts,
-            x=df["x"].tolist(),
-            y=df["y"].tolist(),
-            ax=ax,
-            expand=(1.03, 1.05),
-            force_text=(0.2, 0.3),
-            force_static=(0.05, 0.08),
-            force_pull=(0.02, 0.02),
-            arrowprops=dict(arrowstyle="-", color="#666666", lw=0.3, alpha=0.4),
-            time_lim=1.5,
-            only_move={"text": "xy"},
+            texts, x=df["x"].tolist(), y=df["y"].tolist(), ax=ax,
+            expand=(1.02, 1.03), force_text=(0.15, 0.2), force_static=(0.03, 0.05),
+            force_pull=(0.01, 0.01), time_lim=1.2, only_move={"text": "xy"},
+            arrowprops=dict(arrowstyle="-", color="#666666", lw=0.3, alpha=0.3),
         )
     except Exception as e:
         logger.warning("adjustText failed: %s", e)
 
     # 样式
-    for spine in ["top", "right", "bottom"]:
-        ax.spines[spine].set_visible(False)
-    ax.spines["left"].set_color("#444444")
-    ax.spines["left"].set_linewidth(1.2)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
 
-    ax.set_xticks([])
-    # Y 轴标签：%B 值（英文避免字体问题）
-    ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
-    ax.set_yticklabels(["-50%\n(Oversold)", "0%\n(Lower)", "50%\n(Middle)", "100%\n(Upper)", "150%\n(Overbought)"], fontsize=9, color="#333333")
-    ax.set_ylabel("Bollinger %B Position", fontsize=10, color="#333333", labelpad=8)
+    # Y轴标签
+    ax.set_yticks([0.1, 0.3, 0.5, 0.7, 0.9])
+    ax.set_yticklabels(["Oversold\n(<0%)", "Lower\n(0-25%)", "Middle\n(50%)", "Upper\n(75-100%)", "Overbought\n(>100%)"], fontsize=9, color="#333")
+    ax.set_ylabel("Bollinger %B", fontsize=11, color="#333", labelpad=10)
+
+    # X轴标签
+    ax.set_xticks([1/6, 3/6, 5/6])
+    ax.set_xticklabels(["Squeeze\n(Narrowing)", "Normal", "Expansion\n(Volatile)"], fontsize=10, color="#333")
+    ax.set_xlabel("Bandwidth (Volatility)", fontsize=11, color="#333", labelpad=10)
 
     # 图例
     from matplotlib.lines import Line2D
     legend_elements = [
-        Line2D([0], [0], marker='o', color='w', markerfacecolor=band_colors[-1], markersize=10, label='Overbought (>100%)'),
-        Line2D([0], [0], marker='o', color='w', markerfacecolor=band_colors[len(band_colors)//2], markersize=10, label='Middle Band (50%)'),
-        Line2D([0], [0], marker='o', color='w', markerfacecolor=band_colors[0], markersize=10, label='Oversold (<0%)'),
-        Line2D([0], [0], marker='o', color='w', markerfacecolor='#ff6b6b', markersize=11, label='High Volume'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#ff6b6b', markersize=10, label='High Volume'),
         Line2D([0], [0], marker='o', color='w', markerfacecolor='#ffffcc', markersize=8, label='Low Volume'),
-        Line2D([0], [0], marker='o', color='w', markerfacecolor='#ffcc80', markeredgecolor='#1a9850', markersize=10, markeredgewidth=2, label='Up'),
-        Line2D([0], [0], marker='o', color='w', markerfacecolor='#ffcc80', markeredgecolor='#d73027', markersize=10, markeredgewidth=2, label='Down'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#ffcc80', markeredgecolor='#1a9850', markersize=9, markeredgewidth=2, label='Rising'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#ffcc80', markeredgecolor='#d73027', markersize=9, markeredgewidth=2, label='Falling'),
     ]
-    ax.legend(handles=legend_elements, loc='lower right', fontsize=9, framealpha=0.9, edgecolor='#cccccc')
+    ax.legend(handles=legend_elements, loc='upper left', fontsize=9, framealpha=0.9, edgecolor='#ccc')
 
-    ax.set_xlim(-0.01, 1.01)
-    ax.set_ylim(-0.02, 1.02)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
 
-    fig.suptitle(params.get("title", "Bollinger Band Distribution"), fontsize=12, color="#1e293b", fontweight="bold", y=0.98)
-    fig.tight_layout(rect=[0, 0.02, 0.92, 0.96])
+    fig.suptitle(params.get("title", "Bollinger Band Matrix"), fontsize=13, color="#1e293b", fontweight="bold", y=0.98)
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
     if output == "json":
         return (
             {
-                "title": params.get("title", "Bollinger Band Distribution"),
-                "bands": bands,
-                "points": [{"symbol": row["symbol"], "percent_b": float(row["y_raw"]), "x": float(row["x"]),
-                           "size_factor": float(row.get("size_factor", 1)), "vol_factor": float(row.get("vol_factor", 0.5))}
+                "title": params.get("title", "Bollinger Band Matrix"),
+                "y_bands": y_bands,
+                "x_zones": ["squeeze", "normal", "expansion"],
+                "bandwidth_thresholds": {"q33": float(q33), "q66": float(q66)},
+                "points": [{"symbol": row["symbol"], "percent_b": float(row["y_raw"]), "bandwidth": float(row["bandwidth"]),
+                           "x_zone": int(row["x_zone"]), "x": float(row["x"]), "y": float(row["y"])}
                           for _, row in df.iterrows()],
             },
             "application/json",
