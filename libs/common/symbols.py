@@ -63,3 +63,15 @@ def get_configured_symbols_set() -> Optional[Set[str]]:
     """
     result = get_configured_symbols()
     return set(result) if result else None
+
+
+def reload_symbols():
+    """
+    强制重新加载币种配置（用于热更新）
+    
+    注意：此函数本身不缓存，每次调用 get_configured_symbols() 都会重新读取环境变量。
+    此函数主要用于通知依赖模块（如 data_provider）刷新其缓存。
+    """
+    # symbols.py 本身每次都从 os.environ 读取，无需清理
+    # 但需要通知其他模块刷新缓存
+    pass

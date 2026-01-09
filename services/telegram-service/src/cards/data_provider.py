@@ -41,6 +41,17 @@ def _get_allowed_symbols() -> Optional[Set[str]]:
     return _ALLOWED_SYMBOLS
 
 
+def reset_symbols_cache():
+    """
+    重置币种缓存，下次调用 _get_allowed_symbols() 时会重新加载。
+    用于热更新：修改 SYMBOLS_GROUPS 等配置后调用此函数。
+    """
+    global _ALLOWED_SYMBOLS, _SYMBOLS_LOADED
+    _ALLOWED_SYMBOLS = None
+    _SYMBOLS_LOADED = False
+    LOGGER.info("币种缓存已重置，下次请求将重新加载")
+
+
 def _parse_timestamp(ts_str: str) -> datetime:
     """解析时间戳字符串为 datetime，支持多种格式（统一为无时区）"""
     if not ts_str:

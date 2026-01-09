@@ -370,9 +370,14 @@ BINANCE_FUTURES_URL = 'https://fapi.binance.com'
 BINANCE_SPOT_URL = 'https://api.binance.com'
 BINANCE_API_DISABLED = _require_env('BINANCE_API_DISABLED', default='1') == '1'
 
-# 屏蔽币种（从环境变量读取，逗号分隔）
-_blocked_str = _require_env('BLOCKED_SYMBOLS', default='BNXUSDT,ALPACAUSDT')
-BLOCKED_SYMBOLS = set(s.strip().upper() for s in _blocked_str.split(',') if s.strip())
+# 屏蔽币种（动态获取，支持热更新）
+def get_blocked_symbols() -> set:
+    """动态获取屏蔽币种（支持热更新）"""
+    blocked_str = os.environ.get('BLOCKED_SYMBOLS', 'BNXUSDT,ALPACAUSDT')
+    return set(s.strip().upper() for s in blocked_str.split(',') if s.strip())
+
+# 保留全局变量用于向后兼容，但建议使用 get_blocked_symbols()
+BLOCKED_SYMBOLS = get_blocked_symbols()
 
 # 🔁 策略扫描脚本路径（用于定时刷新 CSV 榜单）
 
@@ -973,8 +978,6 @@ class UserRequestHandler:
     """专门处理用户请求的轻量级处理器 - 只读取缓存，不进行网络请求"""
 
     def __init__(self, card_registry: Optional[RankingRegistry] = None):
-        # 需要屏蔽的币种列表（从全局配置读取）
-        self.blocked_symbols = BLOCKED_SYMBOLS
         # 用户状态管理
         self.user_states = {
             'position_sort': 'desc',
@@ -1386,7 +1389,7 @@ class UserRequestHandler:
         processed = []
         for row in rows:
             symbol = row.get('symbol', '')
-            if not symbol or symbol in self.blocked_symbols:
+            if not symbol or symbol in get_blocked_symbols():
                 continue
             volume = float(row.get('quote_volume') or 0)
             price = float(row.get('last_close') or 0)
@@ -1448,7 +1451,7 @@ class UserRequestHandler:
         processed = []
         for row in rows:
             symbol = row.get('symbol', '')
-            if not symbol or symbol in self.blocked_symbols:
+            if not symbol or symbol in get_blocked_symbols():
                 continue
             volume = float(row.get('quote_volume') or 0)
             price = float(row.get('last_close') or 0)
@@ -1508,7 +1511,7 @@ class UserRequestHandler:
         ratio_data = []
         for coin in coinglass_data:
             symbol = coin.get('symbol', '')
-            if not symbol or symbol in self.blocked_symbols:
+            if not symbol or symbol in get_blocked_symbols():
                 continue
 
             # 使用持仓市值比字段
@@ -1590,7 +1593,7 @@ class UserRequestHandler:
         ratio_data = []
         for coin in coinglass_data:
             symbol = coin.get('symbol', '')
-            if not symbol or symbol in self.blocked_symbols:
+            if not symbol or symbol in get_blocked_symbols():
                 continue
 
             # 计算交易量/市值比
@@ -1682,7 +1685,7 @@ class UserRequestHandler:
         ratio_data = []
         for coin in coinglass_data:
             symbol = coin.get('symbol', '')
-            if not symbol or symbol in self.blocked_symbols:
+            if not symbol or symbol in get_blocked_symbols():
                 continue
 
             # 使用持仓交易量比字段的倒数
@@ -1975,7 +1978,7 @@ class UserRequestHandler:
         rows = []
         for row in raw_rows:
             symbol = row.get('symbol', '')
-            if not symbol or symbol in self.blocked_symbols:
+            if not symbol or symbol in get_blocked_symbols():
                 continue
             net_flow = float(row.get('net_quote_flow') or 0)
             buy_quote = float(row.get('buy_quote') or 0)
@@ -2060,7 +2063,7 @@ class UserRequestHandler:
         rows = []
         for row in raw_rows:
             symbol = row.get('symbol', '')
-            if not symbol or symbol in self.blocked_symbols:
+            if not symbol or symbol in get_blocked_symbols():
                 continue
             net_flow = float(row.get('net_quote_flow') or 0)
             buy_quote = float(row.get('buy_quote') or 0)
@@ -2255,8 +2258,6 @@ class TradeCatBot:
         self.cache_file_secondary = CACHE_FILE_SECONDARY
         self._current_cache_file = self.cache_file_primary  # 当前使用的缓存文件
         self._is_updating = False  # 是否正在更新缓存
-        # 需要屏蔽的币种列表（从全局配置读取）
-        self.blocked_symbols = BLOCKED_SYMBOLS
         self.metric_service = BINANCE_DB_METRIC_SERVICE
         if self.metric_service is None:
             logger.warning("⚠️ 币安数据库指标服务未就绪，部分排行榜将回退至缓存逻辑")
@@ -2278,7 +2279,7 @@ class TradeCatBot:
         filtered_data = []
         for item in data_list:
             symbol = item.get('symbol', '')
-            if symbol not in self.blocked_symbols:
+            if symbol not in get_blocked_symbols():
                 filtered_data.append(item)
 
         return filtered_data
@@ -2934,7 +2935,7 @@ class TradeCatBot:
                     if (symbol_info['status'] == 'TRADING' and
                         symbol_info['symbol'].endswith('USDT') and
                         symbol_info['contractType'] == 'PERPETUAL' and
-                        symbol_info['symbol'] not in self.blocked_symbols):
+                        symbol_info['symbol'] not in get_blocked_symbols()):
                         active_symbols.append(symbol_info['symbol'])
 
                 # 获取24小时交易数据进行排序
@@ -2986,7 +2987,7 @@ class TradeCatBot:
             'ARPAUSDT', 'LPTUSDT', 'ENSUSDT', 'PEOPLEUSDT', 'ROSEUSDT'
         ]
         # 过滤掉被屏蔽的币种
-        filtered_symbols = [symbol for symbol in default_symbols if symbol not in self.blocked_symbols]
+        filtered_symbols = [symbol for symbol in default_symbols if symbol not in get_blocked_symbols()]
         self._active_symbols = filtered_symbols
         logger.info(f"使用默认币种列表: {len(filtered_symbols)} 个币种")
         return filtered_symbols
@@ -3002,12 +3003,12 @@ class TradeCatBot:
                 return None
 
             # 计算市场情绪指标
-            filtered_price = [item for item in price_data if item['symbol'].endswith('USDT') and item['symbol'] not in self.blocked_symbols]
+            filtered_price = [item for item in price_data if item['symbol'].endswith('USDT') and item['symbol'] not in get_blocked_symbols()]
             total_coins = len(filtered_price)
             rising_coins = len([item for item in filtered_price if float(item['priceChangePercent']) > 0])
 
             # 计算资金费率情绪
-            filtered_funding = [item for item in funding_data if item['symbol'].endswith('USDT') and item['symbol'] not in self.blocked_symbols]
+            filtered_funding = [item for item in funding_data if item['symbol'].endswith('USDT') and item['symbol'] not in get_blocked_symbols()]
             avg_funding_rate = sum([float(item['lastFundingRate']) for item in filtered_funding]) / len(filtered_funding) if filtered_funding else 0
 
             return {
@@ -3031,7 +3032,7 @@ class TradeCatBot:
             # 过滤数据
             filtered_data = [
                 item for item in price_data
-                if item['symbol'].endswith('USDT') and float(item['quoteVolume']) > 1000000 and item['symbol'] not in self.blocked_symbols
+                if item['symbol'].endswith('USDT') and float(item['quoteVolume']) > 1000000 and item['symbol'] not in get_blocked_symbols()
             ]
 
             # 排序
@@ -3087,7 +3088,7 @@ class TradeCatBot:
         """获取持仓量历史数据 - 支持不同时间周期"""
         try:
             # 主流币种，过滤掉被屏蔽的币种
-            major_symbols = [symbol for symbol in ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT', 'SOLUSDT', 'DOGEUSDT', 'DOTUSDT'] if symbol not in self.blocked_symbols]
+            major_symbols = [symbol for symbol in ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT', 'SOLUSDT', 'DOGEUSDT', 'DOTUSDT'] if symbol not in get_blocked_symbols()]
             hist_data = []
 
             # 周期映射
@@ -3125,7 +3126,7 @@ class TradeCatBot:
         """获取多空比数据 - 改进版本"""
         try:
             # 获取主流币种的多空比数据，过滤掉被屏蔽的币种
-            major_symbols = [symbol for symbol in ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT'] if symbol not in self.blocked_symbols]
+            major_symbols = [symbol for symbol in ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT'] if symbol not in get_blocked_symbols()]
             ratio_data = []
 
             for symbol in major_symbols:
@@ -3163,7 +3164,7 @@ class TradeCatBot:
 
             liquidation_risks = []
             for item in price_data:
-                if not item.get('symbol', '').endswith('USDT') or item.get('symbol', '') in self.blocked_symbols:
+                if not item.get('symbol', '').endswith('USDT') or item.get('symbol', '') in get_blocked_symbols():
                     continue
 
                 try:
@@ -3361,7 +3362,7 @@ class TradeCatBot:
         for item in futures_data:
             try:
                 symbol = item.get('symbol', '')
-                if not symbol or symbol in self.blocked_symbols:
+                if not symbol or symbol in get_blocked_symbols():
                     continue
 
                 # 获取基础持仓量数据
@@ -3664,6 +3665,113 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if button_data == "lang_menu":
         await lang_command(update, context)
         return
+
+    # =============================================================================
+    # 配置管理回调 (env_*)
+    # =============================================================================
+    if button_data.startswith("env_"):
+        from bot.env_manager import (
+            get_editable_configs_by_category, CONFIG_CATEGORIES,
+            get_config, set_config, EDITABLE_CONFIGS
+        )
+        await query.answer()
+        
+        # 分类按钮 env_cat_<category>
+        if button_data.startswith("env_cat_"):
+            category = button_data.replace("env_cat_", "")
+            cat_info = CONFIG_CATEGORIES.get(category, {})
+            configs = get_editable_configs_by_category().get(category, [])
+            
+            if not configs:
+                await query.edit_message_text(f"❓ 分类 {category} 无可配置项")
+                return
+            
+            lines = [f"{cat_info.get('name', category)}\n"]
+            buttons = []
+            for cfg in configs:
+                hot = "🔥" if cfg["hot_reload"] else "🔄"
+                value = cfg["value"] or "(未设置)"
+                if len(value) > 20:
+                    value = value[:17] + "..."
+                lines.append(f"{hot} *{cfg['desc']}*: `{value}`")
+                buttons.append(InlineKeyboardButton(
+                    f"✏️ {cfg['desc']}",
+                    callback_data=f"env_edit_{cfg['key']}"
+                ))
+            
+            # 每行 1 个按钮 + 返回按钮
+            keyboard_rows = [[btn] for btn in buttons]
+            keyboard_rows.append([InlineKeyboardButton("⬅️ 返回", callback_data="env_back")])
+            
+            await query.edit_message_text(
+                "\n".join(lines),
+                reply_markup=InlineKeyboardMarkup(keyboard_rows),
+                parse_mode='Markdown'
+            )
+            return
+        
+        # 编辑按钮 env_edit_<key>
+        if button_data.startswith("env_edit_"):
+            key = button_data.replace("env_edit_", "")
+            config_info = EDITABLE_CONFIGS.get(key, {})
+            current_value = get_config(key) or ""
+            
+            # 如果有预设选项，显示选项按钮
+            options = config_info.get("options")
+            if options:
+                buttons = []
+                for opt in options:
+                    prefix = "✅ " if opt == current_value else ""
+                    buttons.append(InlineKeyboardButton(
+                        f"{prefix}{opt}",
+                        callback_data=f"env_set_{key}_{opt}"
+                    ))
+                keyboard_rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
+                keyboard_rows.append([InlineKeyboardButton("⬅️ 返回", callback_data=f"env_cat_{config_info.get('category', 'symbols')}")])
+                
+                await query.edit_message_text(
+                    f"✏️ *{config_info.get('desc', key)}*\n\n当前值: `{current_value or '(未设置)'}`\n\n请选择新值:",
+                    reply_markup=InlineKeyboardMarkup(keyboard_rows),
+                    parse_mode='Markdown'
+                )
+            else:
+                # 无预设选项，提示用户手动输入
+                example = config_info.get("example", "")
+                context.user_data["env_editing_key"] = key
+                await query.edit_message_text(
+                    f"✏️ *{config_info.get('desc', key)}*\n\n"
+                    f"当前值: `{current_value or '(未设置)'}`\n"
+                    f"示例: `{example}`\n\n"
+                    f"请直接发送新值，或发送 `取消` 放弃修改:",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("❌ 取消", callback_data=f"env_cat_{config_info.get('category', 'symbols')}")
+                    ]]),
+                    parse_mode='Markdown'
+                )
+            return
+        
+        # 设置选项 env_set_<key>_<value>
+        if button_data.startswith("env_set_"):
+            parts = button_data.replace("env_set_", "").split("_", 1)
+            if len(parts) == 2:
+                key, value = parts
+                success, msg = set_config(key, value)
+                await query.edit_message_text(msg, parse_mode='Markdown')
+            return
+        
+        # 返回主配置菜单
+        if button_data == "env_back":
+            from bot.env_manager import get_config_summary
+            summary = get_config_summary()
+            text = f"⚙️ *配置管理*\n\n{summary}\n\n🔥 = 热更新（立即生效）\n🔄 = 需重启生效"
+            
+            buttons = []
+            for cat_id, cat_info in CONFIG_CATEGORIES.items():
+                buttons.append(InlineKeyboardButton(cat_info["name"], callback_data=f"env_cat_{cat_id}"))
+            keyboard_rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
+            
+            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard_rows), parse_mode='Markdown')
+            return
 
     # 语言切换
     if button_data.startswith("set_lang_"):
@@ -5028,6 +5136,95 @@ async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(msg, reply_markup=reply_keyboard)
             await update.message.reply_text(main_text, reply_markup=main_keyboard)
 
+
+# =============================================================================
+# /env 命令 - 配置管理
+# =============================================================================
+async def env_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """配置管理命令 /env - 查看和修改 .env 配置"""
+    from bot.env_manager import (
+        get_config_summary, get_editable_configs_by_category,
+        CONFIG_CATEGORIES, get_config, set_config, validate_config_value, EDITABLE_CONFIGS
+    )
+    
+    args = context.args if context.args else []
+    
+    # /env - 显示配置摘要和分类按钮
+    if not args:
+        summary = get_config_summary()
+        text = f"⚙️ *配置管理*\n\n{summary}\n\n🔥 = 热更新（立即生效）\n🔄 = 需重启生效"
+        
+        # 构建分类按钮
+        buttons = []
+        for cat_id, cat_info in CONFIG_CATEGORIES.items():
+            buttons.append(InlineKeyboardButton(
+                cat_info["name"],
+                callback_data=f"env_cat_{cat_id}"
+            ))
+        
+        # 每行 2 个按钮
+        keyboard_rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
+        keyboard = InlineKeyboardMarkup(keyboard_rows)
+        
+        await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
+        return
+    
+    # /env get <key> - 获取配置值
+    if args[0].lower() == "get" and len(args) >= 2:
+        key = args[1].upper()
+        value = get_config(key)
+        if value is not None:
+            # 敏感配置脱敏显示
+            if "TOKEN" in key or "SECRET" in key or "PASSWORD" in key:
+                display_value = value[:4] + "****" + value[-4:] if len(value) > 8 else "****"
+            else:
+                display_value = value
+            await update.message.reply_text(f"📋 `{key}` = `{display_value}`", parse_mode='Markdown')
+        else:
+            await update.message.reply_text(f"❓ 配置项 `{key}` 未设置", parse_mode='Markdown')
+        return
+    
+    # /env set <key> <value> - 设置配置值
+    if args[0].lower() == "set" and len(args) >= 3:
+        key = args[1].upper()
+        value = " ".join(args[2:])
+        
+        # 验证配置值
+        valid, msg = validate_config_value(key, value)
+        if not valid:
+            await update.message.reply_text(f"❌ 验证失败: {msg}", parse_mode='Markdown')
+            return
+        
+        # 设置配置
+        success, result_msg = set_config(key, value)
+        await update.message.reply_text(result_msg, parse_mode='Markdown')
+        return
+    
+    # /env list - 列出可配置项
+    if args[0].lower() == "list":
+        lines = ["📋 *可配置项列表*\n"]
+        for key, info in EDITABLE_CONFIGS.items():
+            hot = "🔥" if info.get("hot_reload") else "🔄"
+            lines.append(f"{hot} `{key}` - {info.get('desc', '')}")
+        await update.message.reply_text("\n".join(lines), parse_mode='Markdown')
+        return
+    
+    # 帮助信息
+    help_text = """⚙️ *配置管理命令*
+
+`/env` - 查看配置摘要
+`/env list` - 列出可配置项
+`/env get <KEY>` - 获取配置值
+`/env set <KEY> <VALUE>` - 设置配置值
+
+*示例:*
+`/env get SYMBOLS_GROUPS`
+`/env set SYMBOLS_GROUPS main6`
+`/env set BLOCKED_SYMBOLS BNXUSDT,LUNAUSDT`
+"""
+    await update.message.reply_text(help_text, parse_mode='Markdown')
+
+
 async def vol_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """交易量数据查询指令 /vol"""
     if not _is_command_allowed(update):
@@ -5474,6 +5671,29 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
 
     message_text = update.message.text
     lang = _resolve_lang(update)
+
+    # =============================================================================
+    # 处理配置编辑的用户输入
+    # =============================================================================
+    if context.user_data.get("env_editing_key"):
+        from bot.env_manager import set_config, validate_config_value, EDITABLE_CONFIGS
+        key = context.user_data.pop("env_editing_key")
+        
+        if message_text.strip() in ("取消", "cancel", "Cancel"):
+            await update.message.reply_text("❌ 已取消修改")
+            return
+        
+        value = message_text.strip()
+        valid, msg = validate_config_value(key, value)
+        if not valid:
+            await update.message.reply_text(f"❌ 验证失败: {msg}")
+            # 重新设置编辑状态让用户重试
+            context.user_data["env_editing_key"] = key
+            return
+        
+        success, result_msg = set_config(key, value)
+        await update.message.reply_text(result_msg, parse_mode='Markdown')
+        return
 
     if user_handler is None:
         logger.warning("user_handler 未初始化")
@@ -6183,6 +6403,8 @@ def main():
         logger.info("✅ /vis 命令处理器已注册")
         application.add_handler(CommandHandler("lang", lang_command))
         logger.info("✅ /lang 命令处理器已注册")
+        application.add_handler(CommandHandler("env", env_command))
+        logger.info("✅ /env 命令处理器已注册")
 
         # 保留旧命令兼容性
         application.add_handler(CommandHandler("stats", user_command))
