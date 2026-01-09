@@ -1084,6 +1084,212 @@ def render_vpvr_ridge(params: Dict, output: str) -> Tuple[object, str]:
     return _fig_to_png(fig), "image/png"
 
 
+def render_bb_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
+    """
+    全市场布林带分布图 - 展示各币种价格在布林带中的相对位置。
+
+    每个币种按 %B 值（价格在布林带中的位置）分布：
+    - %B < 0: 跌破下轨
+    - %B = 0: 在下轨
+    - %B = 0.5: 在中轨
+    - %B = 1: 在上轨
+    - %B > 1: 突破上轨
+
+    必填 data 字段：symbol, percent_b (百分比b)
+    可选 data 字段：
+      - bandwidth: 带宽，决定圆圈大小（带宽大=波动大）
+      - price_change: 涨跌幅，决定边框颜色(红跌绿涨)
+      - volume: 成交量，决定圆圈颜色深浅
+    """
+    data = params.get("data")
+    if not data or not isinstance(data, list):
+        raise ValueError("缺少 data 列表")
+
+    bands = max(2, int(params.get("bands", 5)))
+
+    df = pd.DataFrame(data)
+    required_cols = {"symbol", "percent_b"}
+    if not required_cols.issubset(df.columns):
+        raise ValueError("data 需包含 symbol, percent_b")
+
+    df = df.dropna(subset=["percent_b"])
+    df["percent_b"] = df["percent_b"].astype(float)
+    # 过滤无效数据（%B 为 0 且带宽为 0 表示数据不足）
+    if "bandwidth" in df.columns:
+        df = df[(df["bandwidth"] > 0) | (df["percent_b"] != 0)]
+
+    # 去重：每个币种只保留一条（取最新或第一条）
+    df = df.drop_duplicates(subset=["symbol"], keep="first")
+
+    if df.empty:
+        raise ValueError("无有效布林带数据")
+
+    # %B 映射到 0-1 范围（允许超出）
+    # 原始 %B: 0=下轨, 0.5=中轨, 1=上轨
+    # 映射后 y: 0=超卖, 0.5=中轨, 1=超买
+    raw_y = df["percent_b"].clip(-0.5, 1.5)  # 允许一定超出
+    df["y"] = ((raw_y + 0.5) / 2).clip(0.01, 0.99)  # 归一化到 0-1
+    df["y_raw"] = df["percent_b"]
+
+    n = len(df)
+    fig_height = min(14, max(10, n * 0.028))
+
+    sns.set_theme(style="white")
+    fig, ax = plt.subplots(1, 1, figsize=(16, fig_height), dpi=150)
+
+    # 布林带区域背景色：从超卖（蓝）到超买（红）
+    band_colors = ["#1565C0", "#1976D2", "#4CAF50", "#FFA726", "#E53935"]
+    if bands != 5:
+        cmap = plt.cm.RdYlBu_r  # 红黄蓝反转
+        band_colors = [cmap(i / max(1, bands - 1)) for i in range(bands)]
+
+    for i in range(bands):
+        y0 = i / bands
+        ax.add_patch(plt.Rectangle((0.0, y0), 1.0, 1/bands, facecolor=band_colors[i], alpha=0.85, edgecolor="none"))
+
+    rng = np.random.default_rng(42)
+
+    # 带宽归一化 -> 圆圈大小（带宽大=波动大=圆圈大）
+    if "bandwidth" in df.columns:
+        bw = df["bandwidth"].fillna(df["bandwidth"].median())
+        bw_log = np.log10(bw.clip(lower=0.1) + 1)
+        bw_norm = (bw_log - bw_log.min()) / (bw_log.max() - bw_log.min() + 1e-9)
+        df["size_factor"] = 0.3 + bw_norm * 1.2  # 0.3 ~ 1.5
+    else:
+        df["size_factor"] = 1.0
+
+    # 成交量归一化 -> 颜色亮度
+    if "volume" in df.columns:
+        vol = df["volume"].fillna(df["volume"].median())
+        vol_log = np.log10(vol.clip(lower=1))
+        vol_norm = (vol_log - vol_log.min()) / (vol_log.max() - vol_log.min() + 1e-9)
+        df["vol_factor"] = vol_norm
+    else:
+        df["vol_factor"] = 0.5
+
+    # 智能初始布局
+    df = df.sort_values("y").reset_index(drop=True)
+    y_bins = pd.cut(df["y"], bins=25, labels=False)
+    df["y_bin"] = y_bins.fillna(0).astype(int)
+
+    x_positions = []
+    for bin_id in range(25):
+        bin_mask = df["y_bin"] == bin_id
+        bin_count = bin_mask.sum()
+        if bin_count > 0:
+            bin_indices = df[bin_mask].index.tolist()
+            for i, idx in enumerate(bin_indices):
+                x = (i + 0.5) / bin_count * 0.88 + 0.06
+                x += rng.uniform(-0.015, 0.015)
+                x_positions.append((idx, x))
+
+    for idx, x in x_positions:
+        df.loc[idx, "x"] = x
+    df["x"] = df["x"].clip(0.03, 0.97)
+
+    # 绘制圆圈
+    base_font = 5.0
+    texts = []
+    vol_cmap = plt.cm.YlOrRd  # 黄到红：低成交量黄，高成交量红
+
+    for _, row in df.iterrows():
+        label = str(row["symbol"]).replace("USDT", "")
+        if len(label) > 6:
+            label = label[:6] + ".."
+
+        size_factor = row.get("size_factor", 1.0)
+        font_size = base_font * (0.8 + size_factor * 0.7)
+
+        vol_factor = row.get("vol_factor", 0.5)
+        rgba = vol_cmap(vol_factor)
+        point_color = f"#{int(rgba[0]*255):02x}{int(rgba[1]*255):02x}{int(rgba[2]*255):02x}"
+
+        # 涨跌决定边框颜色
+        chg = row.get("price_change")
+        if chg is not None and chg > 0.005:
+            edge_color = "#1a9850"
+        elif chg is not None and chg < -0.005:
+            edge_color = "#d73027"
+        else:
+            edge_color = "#ffffff"
+
+        edge_width = 1.0 + size_factor * 1.2
+
+        txt = ax.text(
+            row["x"], row["y"], label,
+            ha="center", va="center",
+            fontsize=font_size,
+            color="#1a1a1a",
+            fontweight="bold",
+            zorder=4,
+            bbox=dict(boxstyle="circle,pad=0.4", facecolor=point_color, edgecolor=edge_color, linewidth=edge_width, alpha=0.92),
+        )
+        texts.append(txt)
+
+    # adjustText 微调
+    try:
+        adjust_text(
+            texts,
+            x=df["x"].tolist(),
+            y=df["y"].tolist(),
+            ax=ax,
+            expand=(1.03, 1.05),
+            force_text=(0.2, 0.3),
+            force_static=(0.05, 0.08),
+            force_pull=(0.02, 0.02),
+            arrowprops=dict(arrowstyle="-", color="#666666", lw=0.3, alpha=0.4),
+            time_lim=1.5,
+            only_move={"text": "xy"},
+        )
+    except Exception as e:
+        logger.warning("adjustText failed: %s", e)
+
+    # 样式
+    for spine in ["top", "right", "bottom"]:
+        ax.spines[spine].set_visible(False)
+    ax.spines["left"].set_color("#444444")
+    ax.spines["left"].set_linewidth(1.2)
+
+    ax.set_xticks([])
+    # Y 轴标签：%B 值（英文避免字体问题）
+    ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
+    ax.set_yticklabels(["-50%\n(Oversold)", "0%\n(Lower)", "50%\n(Middle)", "100%\n(Upper)", "150%\n(Overbought)"], fontsize=9, color="#333333")
+    ax.set_ylabel("Bollinger %B Position", fontsize=10, color="#333333", labelpad=8)
+
+    # 图例
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Line2D([0], [0], marker='o', color='w', markerfacecolor=band_colors[-1], markersize=10, label='Overbought (>100%)'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor=band_colors[len(band_colors)//2], markersize=10, label='Middle Band (50%)'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor=band_colors[0], markersize=10, label='Oversold (<0%)'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#ff6b6b', markersize=11, label='High Volume'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#ffffcc', markersize=8, label='Low Volume'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#ffcc80', markeredgecolor='#1a9850', markersize=10, markeredgewidth=2, label='Up'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#ffcc80', markeredgecolor='#d73027', markersize=10, markeredgewidth=2, label='Down'),
+    ]
+    ax.legend(handles=legend_elements, loc='lower right', fontsize=9, framealpha=0.9, edgecolor='#cccccc')
+
+    ax.set_xlim(-0.01, 1.01)
+    ax.set_ylim(-0.02, 1.02)
+
+    fig.suptitle(params.get("title", "Bollinger Band Distribution"), fontsize=12, color="#1e293b", fontweight="bold", y=0.98)
+    fig.tight_layout(rect=[0, 0.02, 0.92, 0.96])
+
+    if output == "json":
+        return (
+            {
+                "title": params.get("title", "Bollinger Band Distribution"),
+                "bands": bands,
+                "points": [{"symbol": row["symbol"], "percent_b": float(row["y_raw"]), "x": float(row["x"]),
+                           "size_factor": float(row.get("size_factor", 1)), "vol_factor": float(row.get("vol_factor", 0.5))}
+                          for _, row in df.iterrows()],
+            },
+            "application/json",
+        )
+
+    return _fig_to_png(fig), "image/png"
+
+
 def register_defaults() -> TemplateRegistry:
     """注册内置模板，并返回注册表实例。"""
 
@@ -1294,5 +1500,31 @@ def register_defaults() -> TemplateRegistry:
             },
         ),
         render_vpvr_ridge,
+    )
+    registry.register(
+        TemplateMeta(
+            template_id="bb-zone-strip",
+            name="布林带分布图",
+            description="全市场布林带 %B 位置分布，展示各币种在布林带中的相对位置（超买/超卖）",
+            outputs=["png", "json"],
+            params=[
+                "data(list[{symbol, percent_b, bandwidth?, price_change?, volume?}])",
+                "bands?(int, default 5)",
+                "title?",
+            ],
+            sample={
+                "template_id": "bb-zone-strip",
+                "output": "png",
+                "params": {
+                    "bands": 5,
+                    "data": [
+                        {"symbol": "BTCUSDT", "percent_b": 0.85, "bandwidth": 15.5, "price_change": 0.02},
+                        {"symbol": "ETHUSDT", "percent_b": 0.45, "bandwidth": 20.3, "price_change": -0.01},
+                        {"symbol": "SOLUSDT", "percent_b": 0.12, "bandwidth": 25.8, "price_change": -0.03},
+                    ],
+                },
+            },
+        ),
+        render_bb_zone_strip,
     )
     return registry
