@@ -2562,6 +2562,3 @@ msgstr "K线+均线+量能"
 
 msgid "error.vis_failed"
 msgstr "可视化功能暂不可用"
-
-msgid "btn.back"
-msgstr "⬅️ 返回"

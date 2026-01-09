@@ -2522,3 +2522,43 @@ msgstr "Price"
 
 msgid "signal.simple.strength"
 msgstr "Strength"
+
+# Visualization module
+msgid "kb.vis"
+msgstr "📈 Charts"
+
+msgid "vis.menu.title"
+msgstr "📈 Select Chart Type"
+
+msgid "vis.select_symbol"
+msgstr "{name}\nSelect Symbol:"
+
+msgid "vis.select_interval"
+msgstr "{name}\nSelect Interval:"
+
+msgid "vis.rendering"
+msgstr "Rendering..."
+
+msgid "vis.render_error"
+msgstr "Render failed: {error}"
+
+msgid "vis.template.vpvr_ridge"
+msgstr "📊 VPVR Ridge"
+
+msgid "vis.template.vpvr_ridge_desc"
+msgstr "Volume distribution over time"
+
+msgid "vis.template.vpvr_strip"
+msgstr "🎯 VPVR Strip"
+
+msgid "vis.template.vpvr_strip_desc"
+msgstr "Market-wide value area positions"
+
+msgid "vis.template.kline"
+msgstr "🕯️ Candlestick"
+
+msgid "vis.template.kline_desc"
+msgstr "Candlestick + MA + Volume"
+
+msgid "error.vis_failed"
+msgstr "Visualization unavailable"
