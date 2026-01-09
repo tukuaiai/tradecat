@@ -1182,35 +1182,78 @@ def render_bb_zone_strip(params: Dict, output: str) -> Tuple[object, str]:
     for i in range(1, x_bands):
         ax.axvline(x=i/x_bands, color="white", linewidth=2, alpha=0.9)
 
-    # 智能布局：按 x_zone 和 y 分组
-    rng = np.random.default_rng(42)
-    df = df.sort_values(["x_zone", "y"]).reset_index(drop=True)
+    # 贪心算法防重叠布局
+    # 估算气泡半径（基于 size_factor）
+    def get_radius(size_factor):
+        return 0.018 + size_factor * 0.012  # 归一化坐标系下的半径
 
-    # 每个 x_zone 内按 y 分层布局
+    # 检测两个气泡是否重叠
+    def is_overlap(x1, y1, r1, x2, y2, r2, margin=0.002):
+        dx = (x1 - x2) * 1.6  # X 方向拉伸（图宽）
+        dy = y1 - y2
+        dist = (dx**2 + dy**2) ** 0.5
+        return dist < (r1 + r2 + margin)
+
+    # 按 x_zone 分组，每组内贪心布局
+    placed = []  # [(x, y, radius), ...]
+    df["x"] = 0.5  # 初始化
+    df["y_final"] = df["y"]
+
     for zone in range(x_bands):
-        zone_df = df[df["x_zone"] == zone]
-        if zone_df.empty:
+        zone_mask = df["x_zone"] == zone
+        zone_indices = df[zone_mask].index.tolist()
+        if not zone_indices:
             continue
 
-        zone_x_start = zone / x_bands + 0.02
-        zone_x_end = (zone + 1) / x_bands - 0.02
+        zone_x_start = zone / x_bands + 0.025
+        zone_x_end = (zone + 1) / x_bands - 0.025
         zone_width = zone_x_end - zone_x_start
 
-        # 按 y 分 15 层
-        y_bins = pd.cut(zone_df["y"], bins=15, labels=False)
-        zone_df = zone_df.copy()
-        zone_df["y_bin"] = y_bins.fillna(0).astype(int)
+        # 按成交量排序（大的先放，占据好位置）
+        zone_df = df.loc[zone_indices].copy()
+        zone_df = zone_df.sort_values("vol_factor", ascending=False)
 
-        for bin_id in range(15):
-            bin_mask = zone_df["y_bin"] == bin_id
-            bin_indices = zone_df[bin_mask].index.tolist()
-            bin_count = len(bin_indices)
-            if bin_count > 0:
-                for i, idx in enumerate(bin_indices):
-                    x = zone_x_start + (i + 0.5) / max(bin_count, 1) * zone_width
-                    x += rng.uniform(-0.01, 0.01)
-                    df.loc[idx, "x"] = x
+        zone_placed = []
+        for idx in zone_df.index:
+            row = df.loc[idx]
+            target_y = row["y"]
+            radius = get_radius(row["size_factor"])
 
+            # 贪心搜索：在 zone 内找一个不重叠的位置
+            best_x, best_y = None, None
+            min_penalty = float("inf")
+
+            # 搜索网格
+            for try_x in np.linspace(zone_x_start + radius, zone_x_end - radius, 12):
+                for y_offset in [0, -0.02, 0.02, -0.04, 0.04, -0.06, 0.06]:
+                    try_y = np.clip(target_y + y_offset, 0.03, 0.97)
+
+                    # 检查与已放置气泡的重叠
+                    overlap_count = 0
+                    for px, py, pr in zone_placed:
+                        if is_overlap(try_x, try_y, radius, px, py, pr):
+                            overlap_count += 1
+
+                    # 惩罚：重叠数 + 偏离原位置
+                    penalty = overlap_count * 10 + abs(y_offset) * 5
+                    if penalty < min_penalty:
+                        min_penalty = penalty
+                        best_x, best_y = try_x, try_y
+
+                    if overlap_count == 0 and y_offset == 0:
+                        break
+                if min_penalty == 0:
+                    break
+
+            if best_x is None:
+                best_x = zone_x_start + zone_width * 0.5
+                best_y = target_y
+
+            df.loc[idx, "x"] = best_x
+            df.loc[idx, "y_final"] = best_y
+            zone_placed.append((best_x, best_y, radius))
+
+    df["y"] = df["y_final"]
     df["x"] = df["x"].clip(0.02, 0.98)
 
     # 绘制气泡
