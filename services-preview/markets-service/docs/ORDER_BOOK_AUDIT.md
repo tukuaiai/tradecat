@@ -93,6 +93,19 @@ if last_update_id < prev_id:
 | `order_book_full_written` | full 写入行数 |
 | `order_book_write_errors` | 写入错误次数 |
 | `order_book_out_of_order` | 乱序跳过次数 |
+| `delay_avg/max` | 数据延迟 (ms) |
+
+### 3.4 健康检查
+
+- **延迟监控**: `receipt_ts - event_ts`，超 5s 告警
+- **心跳检测**: 30s 无数据告警
+- **统计日志**: 每 60s 输出
+
+```
+INFO 统计: received=12000, tick=4000, full=800, errors=0, oos=0, delay_avg=50ms, delay_max=200ms
+WARN 心跳超时: 35s 无数据
+WARN 高延迟: BTCUSDT delay=6000ms
+```
 
 ---
 
@@ -175,3 +188,4 @@ ORDER_BOOK_SYMBOLS=            # 可选，逗号分隔
 | 2026-01-09 | 修复: 原始格式 `[["price","qty"],...]` |
 | 2026-01-09 | 修复: lastUpdateId 采集、乱序检测 |
 | 2026-01-09 | 增强: 错误日志、统计指标 |
+| 2026-01-09 | 增强: 延迟监控、心跳检测 |

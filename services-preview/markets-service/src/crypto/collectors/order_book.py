@@ -271,12 +271,23 @@ class OrderBookCollector:
             return
 
         now = time.time()
+        self._last_msg_time = now  # 心跳更新
+        
         ts = datetime.fromtimestamp(book.timestamp, tz=timezone.utc)
         bids_dict = book.book.bids.to_dict()
         asks_dict = book.book.asks.to_dict()
         
         # 提取原始元数据 (cryptofeed: sequence_number = lastUpdateId)
         last_update_id = getattr(book, 'sequence_number', None)
+        
+        # 延迟监控: receipt_ts - event_ts
+        delay_ms = int((receipt_ts - book.timestamp) * 1000)
+        if delay_ms > 0:
+            self._stats["total_delay_ms"] += delay_ms
+            if delay_ms > self._stats["max_delay_ms"]:
+                self._stats["max_delay_ms"] = delay_ms
+            if delay_ms > 5000:  # 延迟超过 5 秒告警
+                logger.warning("高延迟: %s delay=%dms", sym, delay_ms)
         
         self._stats["received"] += 1
         
@@ -473,10 +484,15 @@ class OrderBookCollector:
             while True:
                 await asyncio.sleep(60)
                 s = self._stats
+                avg_delay = s["total_delay_ms"] // max(s["received"], 1)
+                # 心跳检测
+                idle_sec = int(time.time() - self._last_msg_time) if self._last_msg_time > 0 else 0
+                if idle_sec > 30:
+                    logger.warning("心跳超时: %ds 无数据", idle_sec)
                 logger.info(
-                    "统计: received=%d, tick=%d, full=%d, errors=%d, out_of_order=%d",
+                    "统计: received=%d, tick=%d, full=%d, errors=%d, oos=%d, delay_avg=%dms, delay_max=%dms",
                     s["received"], s["written_tick"], s["written_full"],
-                    s["errors"], s["out_of_order"]
+                    s["errors"], s["out_of_order"], avg_delay, s["max_delay_ms"]
                 )
 
         try:
@@ -492,10 +508,11 @@ class OrderBookCollector:
     def _log_final_stats(self) -> None:
         """输出最终统计"""
         s = self._stats
+        avg_delay = s["total_delay_ms"] // max(s["received"], 1)
         logger.info(
-            "采集结束统计: received=%d, tick=%d, full=%d, errors=%d, out_of_order=%d",
+            "采集结束: received=%d, tick=%d, full=%d, errors=%d, oos=%d, delay_avg=%dms, delay_max=%dms",
             s["received"], s["written_tick"], s["written_full"],
-            s["errors"], s["out_of_order"]
+            s["errors"], s["out_of_order"], avg_delay, s["max_delay_ms"]
         )
 
     async def _final_flush(self) -> None:
