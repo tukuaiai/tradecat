@@ -68,7 +68,7 @@ if str(REPO_ROOT) not in sys.path:
 # 延后导入依赖于 sys.path 的模块
 from libs.common.i18n import build_i18n_from_env
 
-# 当以脚本方式运行（__main__）时，为避免 utils.signal_formatter 反向导入失败，显式注册模块别名
+# 当以脚本方式运行时，显式注册模块别名
 if __name__ == "__main__":
     sys.modules.setdefault("main", sys.modules[__name__])
 
@@ -254,18 +254,6 @@ sys.path = [p for p in sys.path if p != str(SRC_ROOT)]
 sys.path.insert(0, str(SRC_ROOT))
 sys.path = [p for p in sys.path if not (p.endswith('/src') and not Path(p).exists())]
 
-
-def _load_signal_formatter():
-    """避免与 ai.utils 冲突，按绝对路径加载信号格式化器"""
-    module_name = "telegram_signal_formatter"
-    if module_name in sys.modules:
-        return sys.modules[module_name].SignalFormatter
-    module_path = SRC_ROOT / "bot" / "signal_formatter.py"
-    spec = importlib.util.spec_from_file_location(module_name, module_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    sys.modules[module_name] = module
-    return module.SignalFormatter
 
 # 数据库指标服务（可选）
 BINANCE_DB_METRIC_SERVICE = None
@@ -2261,15 +2249,6 @@ class TradeCatBot:
         self.metric_service = BINANCE_DB_METRIC_SERVICE
         if self.metric_service is None:
             logger.warning("⚠️ 币安数据库指标服务未就绪，部分排行榜将回退至缓存逻辑")
-
-        # 初始化信号格式化器
-        try:
-            SignalFormatter = _load_signal_formatter()
-            self.signal_formatter = SignalFormatter()
-            logger.info("✅ 信号格式化器初始化成功")
-        except Exception as e:
-            logger.error(f"❌ 信号格式化器初始化失败: {e}")
-            self.signal_formatter = None
 
     def filter_blocked_symbols(self, data_list):
         """过滤掉被屏蔽的币种"""
@@ -6465,179 +6444,6 @@ def main():
         logger.error(f"❌ 机器人启动失败: {e}")
         import traceback
         traceback.print_exc()
-
-
-def add_signal_formatting_to_bot():
-    """为TradeCatBot类添加信号格式化方法"""
-
-    def format_signal_message(self, signal_type: str, symbol: str, alert_value: float) -> str:
-        """格式化信号消息"""
-        try:
-            if not self.signal_formatter:
-                return _t("error.signal_not_init", None)
-
-            result = None
-            if signal_type == "funding_rate":
-                result = self.signal_formatter.format_funding_rate_signal(symbol, alert_value)
-            elif signal_type == "open_interest":
-                result = self.signal_formatter.format_open_interest_signal(symbol, alert_value)
-            elif signal_type == "rsi":
-                result = self.signal_formatter.format_rsi_signal(symbol, alert_value)
-            else:
-                return f"❌ 未知信号类型: {signal_type}"
-
-            # 如果信号格式化函数返回None，表示数据不可用，返回None而不是错误消息
-            return result
-
-        except Exception as e:
-            logger.error(f"格式化信号消息错误: {e}")
-            return None  # 异常时也返回None而不是错误消息
-
-    def send_formatted_signal(self, signal_type: str, symbol: str, alert_value: float, chat_id: str = None):
-        """发送格式化的信号消息"""
-        try:
-            message = self.format_signal_message(signal_type, symbol, alert_value)
-
-            # 只有在消息不为None时才发送
-            if message:
-                if chat_id:
-                    # 发送到指定聊天（这里需要实际的发送实现）
-                    logger.info(f"发送信号到 {chat_id}: {signal_type} - {symbol}")
-                    # 实际发送逻辑需要根据具体的bot实现来添加
-                    print(f"📡 发送信号到 {chat_id}:\n{message}")
-                else:
-                    # 发送到所有订阅用户（这里需要实际的广播实现）
-                    logger.info(f"广播信号: {signal_type} - {symbol}")
-                    # 实际广播逻辑需要根据具体的bot实现来添加
-                    print(f"📡 广播信号:\n{message}")
-            else:
-                logger.debug(f"📊 跳过 {symbol} 信号发送，数据不可用")
-
-        except Exception as e:
-            logger.error(f"发送格式化信号错误: {e}")
-
-    def get_formatted_signal_preview(self, signal_type: str, symbol: str, alert_value: float) -> str:
-        """获取格式化信号预览"""
-        try:
-            result = self.format_signal_message(signal_type, symbol, alert_value)
-            if result is None:
-                return _t("data.temporarily_unavailable", None)
-            return result
-        except Exception as e:
-            logger.error(f"获取信号预览错误: {e}")
-            return _t("data.temporarily_unavailable", None)
-
-    # 添加发送消息的方法
-    async def send_message_to_user(self, user_id: int, message: str, parse_mode: str = 'HTML'):
-        """发送消息给指定用户"""
-        try:
-            # 这里需要实际的Telegram Bot API实现
-            # 如果bot有telegram app实例，使用它
-            if hasattr(self, 'app') and self.app:
-                await self.app.bot.send_message(
-                    chat_id=user_id,
-                    text=message,
-                    parse_mode=parse_mode
-                )
-                logger.info(f"✅ 消息发送成功给用户 {user_id}")
-            else:
-                # 如果没有app实例，使用直接的Bot API调用
-                import requests
-                BOT_TOKEN = _require_env('BOT_TOKEN', required=True)
-                url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-                payload = {
-                    'chat_id': user_id,
-                    'text': message,
-                    'parse_mode': parse_mode
-                }
-                # 配置SSL验证
-                verify_ssl = certifi.where() if CERTIFI_AVAILABLE else True
-                response = requests.post(url, json=payload, timeout=10, verify=verify_ssl)
-                if response.status_code == 200:
-                    logger.info(f"✅ 消息发送成功给用户 {user_id}")
-                else:
-                    logger.error(f"❌ 消息发送失败: {response.status_code}")
-        except Exception as e:
-            logger.error(f"❌ 发送消息给用户 {user_id} 失败: {e}")
-            raise e
-
-    async def send_signal_to_user(self, user_id: int, signal_type: str, symbol: str, alert_value: float, custom_message: str = None):
-        """发送格式化信号给指定用户（带GIF动画）"""
-        try:
-            # 如果提供了自定义消息，使用自定义消息，否则格式化信号消息
-            if custom_message:
-                message = custom_message
-            else:
-                message = self.format_signal_message(signal_type, symbol, alert_value)
-                if not message:
-                    logger.warning(f"无法格式化信号 {signal_type} - {symbol}，跳过发送")
-                    return
-
-            # 根据信号类型选择对应的GIF文件
-            gif_file_map = {
-                'funding_rate': str((ANIMATION_DIR / '狙击信号.gif.mp4').resolve()),
-                'open_interest': str((ANIMATION_DIR / '趋势信号.gif.mp4').resolve()),
-                'rsi': str((ANIMATION_DIR / '情绪信号.gif.mp4').resolve())
-            }
-
-            gif_file = gif_file_map.get(signal_type)
-
-            # 发送消息（带GIF动画）
-            if gif_file and os.path.exists(gif_file):
-                try:
-                    if hasattr(self, 'app') and self.app:
-                        with open(gif_file, 'rb') as gif:
-                            await self.app.bot.send_animation(
-                                chat_id=user_id,
-                                animation=gif,
-                                caption=message,  # 将信号文本作为GIF的说明文字
-                                parse_mode='HTML',
-                                duration=3,  # 动画时长
-                                width=320,   # 动画宽度
-                                height=240   # 动画高度
-                            )
-                        logger.info(f"✅ 成功发送带GIF的 {signal_type} 信号给用户 {user_id}")
-                    else:
-                        # 如果没有app实例，回退到纯文本消息
-                        await self.send_message_to_user(user_id, message, 'HTML')
-                        logger.info(f"✅ 成功发送 {signal_type} 信号给用户 {user_id} (纯文本)")
-                except Exception as gif_error:
-                    logger.warning(f"⚠️ 发送GIF失败，使用纯文本: {gif_error}")
-                    # GIF发送失败时，回退到纯文本消息
-                    await self.send_message_to_user(user_id, message, 'HTML')
-            else:
-                # 没有GIF文件时，发送纯文本消息
-                await self.send_message_to_user(user_id, message, 'HTML')
-                logger.info(f"✅ 成功发送 {signal_type} 信号给用户 {user_id}")
-
-        except Exception as e:
-            logger.error(f"❌ 发送信号给用户 {user_id} 失败: {e}")
-            raise e
-
-    async def start_bot(self):
-        """启动机器人（占位符方法）"""
-        logger.info("✅ 机器人启动完成")
-        return True
-
-    async def stop_bot(self):
-        """停止机器人（占位符方法）"""
-        logger.info("🛑 机器人已停止")
-        return True
-
-    # 将方法添加到TradeCatBot类
-    TradeCatBot.format_signal_message = format_signal_message
-    TradeCatBot.send_formatted_signal = send_formatted_signal
-    TradeCatBot.get_formatted_signal_preview = get_formatted_signal_preview
-    TradeCatBot.send_message_to_user = send_message_to_user
-    TradeCatBot.send_signal_to_user = send_signal_to_user
-    TradeCatBot.start_bot = start_bot
-    TradeCatBot.stop_bot = stop_bot
-
-    logger.info("✅ 信号格式化和发送方法已添加到TradeCatBot类")
-
-# 调用函数添加方法
-add_signal_formatting_to_bot()
-
 
 
 if __name__ == "__main__":

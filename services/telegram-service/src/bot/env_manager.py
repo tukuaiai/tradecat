@@ -3,10 +3,11 @@
 """
 环境变量管理模块 - 通过 Bot 管理 .env 配置
 
-功能：
-- 读取/写入 config/.env 文件
-- 白名单控制可修改的配置项
-- 支持热更新（修改后立即生效）
+设计原则（为"最糟糕的用户"设计）：
+- 所有操作最多 3 步
+- 友好的文案，禁止责备性词汇
+- 即时反馈，让用户知道发生了什么
+- 主动提供帮助和示例
 """
 
 import os
@@ -23,112 +24,162 @@ ENV_PATH = _PROJECT_ROOT / "config" / ".env"
 
 # =============================================================================
 # 配置白名单（允许通过 Bot 修改）
+# 设计原则：用人话描述，提供清晰的帮助信息
 # =============================================================================
 EDITABLE_CONFIGS = {
-    # 代理设置
+    # 代理设置 - 最常见的配置需求
     "HTTP_PROXY": {
-        "desc": "HTTP 代理",
-        "desc_en": "HTTP Proxy",
+        "name": "🌐 HTTP 代理",
+        "desc": "访问 Telegram/Binance 时使用的代理",
+        "help": "格式：http://IP:端口\n例如：http://127.0.0.1:7890",
         "category": "proxy",
         "hot_reload": False,
-        "example": "http://127.0.0.1:7890",
+        "placeholder": "http://127.0.0.1:7890",
+        "icon": "🌐",
     },
     "HTTPS_PROXY": {
-        "desc": "HTTPS 代理",
-        "desc_en": "HTTPS Proxy",
+        "name": "🔒 HTTPS 代理",
+        "desc": "通常和 HTTP 代理设置相同即可",
+        "help": "格式：http://IP:端口\n大多数情况下填和 HTTP 代理一样的值",
         "category": "proxy",
         "hot_reload": False,
-        "example": "http://127.0.0.1:7890",
+        "placeholder": "http://127.0.0.1:7890",
+        "icon": "🔒",
     },
-    # 币种管理
+    
+    # 币种管理 - 核心配置
     "SYMBOLS_GROUPS": {
-        "desc": "币种分组",
-        "desc_en": "Symbol Groups",
+        "name": "💰 监控币种",
+        "desc": "选择要监控的币种范围",
+        "help": "选择一个预设分组，或输入自定义",
         "category": "symbols",
         "hot_reload": True,
-        "example": "main4",
-        "options": ["main4", "main6", "main20", "auto", "all"],
+        "options": [
+            {"value": "main4", "label": "🔥 主流4币", "detail": "BTC/ETH/SOL/BNB"},
+            {"value": "main6", "label": "⭐ 主流6币", "detail": "+XRP/DOGE"},
+            {"value": "main20", "label": "📊 主流20币", "detail": "常见主流币"},
+            {"value": "auto", "label": "🤖 智能选择", "detail": "自动选高交易量币"},
+            {"value": "all", "label": "🌍 全部币种", "detail": "600+币种，资源消耗大"},
+        ],
+        "icon": "💰",
     },
     "SYMBOLS_EXTRA": {
-        "desc": "额外添加币种",
-        "desc_en": "Extra Symbols",
+        "name": "➕ 额外添加",
+        "desc": "在分组基础上额外添加的币种",
+        "help": "输入币种代码，多个用逗号分隔\n例如：PEPEUSDT,WIFUSDT",
         "category": "symbols",
         "hot_reload": True,
-        "example": "BTCUSDT,ETHUSDT",
+        "placeholder": "PEPEUSDT,WIFUSDT",
+        "icon": "➕",
     },
     "SYMBOLS_EXCLUDE": {
-        "desc": "排除币种",
-        "desc_en": "Exclude Symbols",
+        "name": "➖ 排除币种",
+        "desc": "从分组中排除这些币种",
+        "help": "输入不想监控的币种\n例如：LUNAUSDT",
         "category": "symbols",
         "hot_reload": True,
-        "example": "LUNAUSDT",
+        "placeholder": "LUNAUSDT",
+        "icon": "➖",
     },
     "BLOCKED_SYMBOLS": {
-        "desc": "屏蔽币种（不显示）",
-        "desc_en": "Blocked Symbols",
+        "name": "🚫 屏蔽显示",
+        "desc": "这些币种不会出现在排行榜中",
+        "help": "用于隐藏异常或不想看到的币种\n例如：BNXUSDT,ALPACAUSDT",
         "category": "symbols",
         "hot_reload": True,
-        "example": "BNXUSDT,ALPACAUSDT",
+        "placeholder": "BNXUSDT,ALPACAUSDT",
+        "icon": "🚫",
     },
-    # 功能开关
+    
+    # 功能开关 - 简单的开/关
     "DISABLE_SINGLE_TOKEN_QUERY": {
-        "desc": "禁用单币查询",
-        "desc_en": "Disable Single Token Query",
+        "name": "🔍 单币查询",
+        "desc": "发送"BTC!"查询单币详情",
+        "help": "开启后可以发送如 BTC! 来查询单个币种",
         "category": "features",
         "hot_reload": True,
-        "options": ["0", "1"],
+        "options": [
+            {"value": "0", "label": "✅ 开启", "detail": "可用单币查询"},
+            {"value": "1", "label": "⏸️ 关闭", "detail": "节省资源"},
+        ],
+        "icon": "🔍",
+        "invert_display": True,  # 0=开启，显示逻辑反转
     },
     "BINANCE_API_DISABLED": {
-        "desc": "禁用 Binance API",
-        "desc_en": "Disable Binance API",
+        "name": "📡 实时数据",
+        "desc": "从 Binance 获取实时价格",
+        "help": "关闭后使用缓存数据，开启需要代理",
         "category": "features",
         "hot_reload": True,
-        "options": ["0", "1"],
+        "options": [
+            {"value": "0", "label": "✅ 开启", "detail": "实时价格，需代理"},
+            {"value": "1", "label": "⏸️ 关闭", "detail": "使用缓存数据"},
+        ],
+        "icon": "📡",
+        "invert_display": True,
     },
+    
     # 展示设置
     "DEFAULT_LOCALE": {
-        "desc": "默认语言",
-        "desc_en": "Default Language",
+        "name": "🌍 界面语言",
+        "desc": "Bot 显示的语言",
+        "help": "切换后立即生效",
         "category": "display",
         "hot_reload": True,
-        "options": ["zh-CN", "en"],
+        "options": [
+            {"value": "zh-CN", "label": "🇨🇳 中文", "detail": ""},
+            {"value": "en", "label": "🇺🇸 English", "detail": ""},
+        ],
+        "icon": "🌍",
     },
     "SNAPSHOT_HIDDEN_FIELDS": {
-        "desc": "单币快照隐藏字段",
-        "desc_en": "Hidden Fields in Snapshot",
+        "name": "🙈 隐藏字段",
+        "desc": "单币快照中不显示的字段",
+        "help": "输入要隐藏的字段名，用逗号分隔",
         "category": "display",
         "hot_reload": True,
-        "example": "最近翻转时间",
+        "placeholder": "最近翻转时间",
+        "icon": "🙈",
     },
+    
     # 卡片开关
     "CARDS_ENABLED": {
-        "desc": "启用的卡片",
-        "desc_en": "Enabled Cards",
+        "name": "📊 启用卡片",
+        "desc": "只显示这些排行卡片",
+        "help": "留空显示全部，或输入要显示的卡片名",
         "category": "cards",
         "hot_reload": True,
-        "example": "资金流向,MACD",
+        "placeholder": "资金流向,MACD",
+        "icon": "📊",
     },
     "CARDS_DISABLED": {
-        "desc": "禁用的卡片",
-        "desc_en": "Disabled Cards",
+        "name": "🚫 禁用卡片",
+        "desc": "不显示这些排行卡片",
+        "help": "输入要隐藏的卡片名，用逗号分隔",
         "category": "cards",
         "hot_reload": True,
-        "example": "K线形态",
+        "placeholder": "K线形态",
+        "icon": "🚫",
     },
+    
     # 指标开关
     "INDICATORS_ENABLED": {
-        "desc": "启用的指标",
-        "desc_en": "Enabled Indicators",
+        "name": "📈 启用指标",
+        "desc": "只计算这些指标",
+        "help": "留空计算全部，需重启生效",
         "category": "indicators",
         "hot_reload": False,
-        "example": "macd,rsi",
+        "placeholder": "macd,rsi",
+        "icon": "📈",
     },
     "INDICATORS_DISABLED": {
-        "desc": "禁用的指标",
-        "desc_en": "Disabled Indicators",
+        "name": "🚫 禁用指标",
+        "desc": "不计算这些指标",
+        "help": "可节省资源，需重启生效",
         "category": "indicators",
         "hot_reload": False,
-        "example": "k线形态",
+        "placeholder": "k线形态",
+        "icon": "🚫",
     },
 }
 
@@ -139,14 +190,61 @@ READONLY_CONFIGS = {
     "POSTGRES_PASSWORD", "POSTGRES_USER",
 }
 
-# 配置分类
+# 配置分类 - 用户最关心的放前面
 CONFIG_CATEGORIES = {
-    "proxy": {"name": "🌐 代理设置", "name_en": "Proxy Settings"},
-    "symbols": {"name": "💰 币种管理", "name_en": "Symbol Management"},
-    "features": {"name": "⚡ 功能开关", "name_en": "Feature Switches"},
-    "display": {"name": "🎨 展示设置", "name_en": "Display Settings"},
-    "cards": {"name": "📊 卡片开关", "name_en": "Card Switches"},
-    "indicators": {"name": "📈 指标开关", "name_en": "Indicator Switches"},
+    "symbols": {
+        "name": "💰 币种管理",
+        "desc": "设置要监控哪些币种",
+        "icon": "💰",
+        "priority": 1,
+    },
+    "features": {
+        "name": "⚡ 功能开关",
+        "desc": "开启或关闭某些功能",
+        "icon": "⚡",
+        "priority": 2,
+    },
+    "proxy": {
+        "name": "🌐 网络代理",
+        "desc": "国内访问需要设置代理",
+        "icon": "🌐",
+        "priority": 3,
+    },
+    "display": {
+        "name": "🎨 显示设置",
+        "desc": "语言、界面相关",
+        "icon": "🎨",
+        "priority": 4,
+    },
+    "cards": {
+        "name": "📊 卡片管理",
+        "desc": "控制显示哪些排行卡片",
+        "icon": "📊",
+        "priority": 5,
+    },
+    "indicators": {
+        "name": "📈 指标计算",
+        "desc": "控制计算哪些指标",
+        "icon": "📈",
+        "priority": 6,
+    },
+}
+
+# =============================================================================
+# 友好文案（禁止责备性词汇）
+# =============================================================================
+FRIENDLY_MESSAGES = {
+    "save_success": "✨ 保存成功！",
+    "save_success_hot": "✨ 保存成功，已立即生效！",
+    "save_success_restart": "✨ 保存成功！重启后生效~",
+    "validation_hint": "💡 小提示：",
+    "input_prompt": "📝 请输入新的值：",
+    "current_value": "当前：",
+    "not_set": "未设置",
+    "back": "⬅️ 返回",
+    "cancel": "❌ 取消",
+    "confirm": "✅ 确认",
+    "clear": "🗑️ 清空",
 }
 
 
