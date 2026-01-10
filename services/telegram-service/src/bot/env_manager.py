@@ -14,7 +14,7 @@ import os
 import re
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -23,24 +23,48 @@ _PROJECT_ROOT = Path(__file__).parents[4]
 ENV_PATH = _PROJECT_ROOT / "config" / ".env"
 
 # =============================================================================
+# i18n 支持
+# =============================================================================
+def _get_i18n() -> Callable[[str, str], str]:
+    """获取 i18n 翻译函数"""
+    try:
+        from bot.app import I18N
+        return lambda key, lang=None: I18N.gettext(key, lang=lang)
+    except ImportError:
+        return lambda key, lang=None: key
+
+
+def _t(key: str, lang: Optional[str] = None, **kwargs) -> str:
+    """翻译辅助函数"""
+    i18n_func = _get_i18n()
+    text = i18n_func(key, lang)
+    if kwargs:
+        try:
+            return text.format(**kwargs)
+        except (KeyError, ValueError):
+            return text
+    return text
+
+
+# =============================================================================
 # 配置白名单（允许通过 Bot 修改）
-# 设计原则：用人话描述，提供清晰的帮助信息
+# 使用 i18n 键替代硬编码文案
 # =============================================================================
 EDITABLE_CONFIGS = {
     # 代理设置 - 最常见的配置需求
     "HTTP_PROXY": {
-        "name": "🌐 HTTP 代理",
-        "desc": "访问 Telegram/Binance 时使用的代理",
-        "help": "格式：http://IP:端口\n例如：http://127.0.0.1:7890",
+        "name_key": "env.http_proxy.name",
+        "desc_key": "env.http_proxy.desc",
+        "help_key": "env.http_proxy.help",
         "category": "proxy",
         "hot_reload": False,
         "placeholder": "http://127.0.0.1:7890",
         "icon": "🌐",
     },
     "HTTPS_PROXY": {
-        "name": "🔒 HTTPS 代理",
-        "desc": "通常和 HTTP 代理设置相同即可",
-        "help": "格式：http://IP:端口\n大多数情况下填和 HTTP 代理一样的值",
+        "name_key": "env.https_proxy.name",
+        "desc_key": "env.https_proxy.desc",
+        "help_key": "env.https_proxy.help",
         "category": "proxy",
         "hot_reload": False,
         "placeholder": "http://127.0.0.1:7890",
@@ -49,42 +73,42 @@ EDITABLE_CONFIGS = {
     
     # 币种管理 - 核心配置
     "SYMBOLS_GROUPS": {
-        "name": "💰 监控币种",
-        "desc": "选择要监控的币种范围",
-        "help": "选择一个预设分组，或输入自定义",
+        "name_key": "env.symbols_groups.name",
+        "desc_key": "env.symbols_groups.desc",
+        "help_key": "env.symbols_groups.help",
         "category": "symbols",
         "hot_reload": True,
         "options": [
-            {"value": "main4", "label": "🔥 主流4币", "detail": "BTC/ETH/SOL/BNB"},
-            {"value": "main6", "label": "⭐ 主流6币", "detail": "+XRP/DOGE"},
-            {"value": "main20", "label": "📊 主流20币", "detail": "常见主流币"},
-            {"value": "auto", "label": "🤖 智能选择", "detail": "自动选高交易量币"},
-            {"value": "all", "label": "🌍 全部币种", "detail": "600+币种，资源消耗大"},
+            {"value": "main4", "label_key": "env.symbols_groups.opt.main4", "detail_key": "env.symbols_groups.opt.main4_detail"},
+            {"value": "main6", "label_key": "env.symbols_groups.opt.main6", "detail_key": "env.symbols_groups.opt.main6_detail"},
+            {"value": "main20", "label_key": "env.symbols_groups.opt.main20", "detail_key": "env.symbols_groups.opt.main20_detail"},
+            {"value": "auto", "label_key": "env.symbols_groups.opt.auto", "detail_key": "env.symbols_groups.opt.auto_detail"},
+            {"value": "all", "label_key": "env.symbols_groups.opt.all", "detail_key": "env.symbols_groups.opt.all_detail"},
         ],
         "icon": "💰",
     },
     "SYMBOLS_EXTRA": {
-        "name": "➕ 额外添加",
-        "desc": "在分组基础上额外添加的币种",
-        "help": "输入币种代码，多个用逗号分隔\n例如：PEPEUSDT,WIFUSDT",
+        "name_key": "env.symbols_extra.name",
+        "desc_key": "env.symbols_extra.desc",
+        "help_key": "env.symbols_extra.help",
         "category": "symbols",
         "hot_reload": True,
         "placeholder": "PEPEUSDT,WIFUSDT",
         "icon": "➕",
     },
     "SYMBOLS_EXCLUDE": {
-        "name": "➖ 排除币种",
-        "desc": "从分组中排除这些币种",
-        "help": "输入不想监控的币种\n例如：LUNAUSDT",
+        "name_key": "env.symbols_exclude.name",
+        "desc_key": "env.symbols_exclude.desc",
+        "help_key": "env.symbols_exclude.help",
         "category": "symbols",
         "hot_reload": True,
         "placeholder": "LUNAUSDT",
         "icon": "➖",
     },
     "BLOCKED_SYMBOLS": {
-        "name": "🚫 屏蔽显示",
-        "desc": "这些币种不会出现在排行榜中",
-        "help": "用于隐藏异常或不想看到的币种\n例如：BNXUSDT,ALPACAUSDT",
+        "name_key": "env.blocked_symbols.name",
+        "desc_key": "env.blocked_symbols.desc",
+        "help_key": "env.blocked_symbols.help",
         "category": "symbols",
         "hot_reload": True,
         "placeholder": "BNXUSDT,ALPACAUSDT",
@@ -93,27 +117,27 @@ EDITABLE_CONFIGS = {
     
     # 功能开关 - 简单的开/关
     "DISABLE_SINGLE_TOKEN_QUERY": {
-        "name": "🔍 单币查询",
-        "desc": "发送 BTC! 查询单币详情",
-        "help": "开启后可以发送如 BTC! 来查询单个币种",
+        "name_key": "env.single_query.name",
+        "desc_key": "env.single_query.desc",
+        "help_key": "env.single_query.help",
         "category": "features",
         "hot_reload": True,
         "options": [
-            {"value": "0", "label": "✅ 开启", "detail": "可用单币查询"},
-            {"value": "1", "label": "⏸️ 关闭", "detail": "节省资源"},
+            {"value": "0", "label_key": "env.opt.enabled", "detail_key": "env.single_query.enabled_detail"},
+            {"value": "1", "label_key": "env.opt.disabled", "detail_key": "env.single_query.disabled_detail"},
         ],
         "icon": "🔍",
-        "invert_display": True,  # 0=开启，显示逻辑反转
+        "invert_display": True,
     },
     "BINANCE_API_DISABLED": {
-        "name": "📡 实时数据",
-        "desc": "从 Binance 获取实时价格",
-        "help": "关闭后使用缓存数据，开启需要代理",
+        "name_key": "env.realtime_data.name",
+        "desc_key": "env.realtime_data.desc",
+        "help_key": "env.realtime_data.help",
         "category": "features",
         "hot_reload": True,
         "options": [
-            {"value": "0", "label": "✅ 开启", "detail": "实时价格，需代理"},
-            {"value": "1", "label": "⏸️ 关闭", "detail": "使用缓存数据"},
+            {"value": "0", "label_key": "env.opt.enabled", "detail_key": "env.realtime_data.enabled_detail"},
+            {"value": "1", "label_key": "env.opt.disabled", "detail_key": "env.realtime_data.disabled_detail"},
         ],
         "icon": "📡",
         "invert_display": True,
@@ -121,64 +145,64 @@ EDITABLE_CONFIGS = {
     
     # 展示设置
     "DEFAULT_LOCALE": {
-        "name": "🌍 界面语言",
-        "desc": "Bot 显示的语言",
-        "help": "切换后立即生效",
+        "name_key": "env.locale.name",
+        "desc_key": "env.locale.desc",
+        "help_key": "env.locale.help",
         "category": "display",
         "hot_reload": True,
         "options": [
-            {"value": "zh-CN", "label": "🇨🇳 中文", "detail": ""},
-            {"value": "en", "label": "🇺🇸 English", "detail": ""},
+            {"value": "zh-CN", "label_key": "env.locale.opt.zh", "detail_key": ""},
+            {"value": "en", "label_key": "env.locale.opt.en", "detail_key": ""},
         ],
         "icon": "🌍",
     },
     "SNAPSHOT_HIDDEN_FIELDS": {
-        "name": "🙈 隐藏字段",
-        "desc": "单币快照中不显示的字段",
-        "help": "输入要隐藏的字段名，用逗号分隔",
+        "name_key": "env.hidden_fields.name",
+        "desc_key": "env.hidden_fields.desc",
+        "help_key": "env.hidden_fields.help",
         "category": "display",
         "hot_reload": True,
-        "placeholder": "最近翻转时间",
+        "placeholder_key": "env.hidden_fields.placeholder",
         "icon": "🙈",
     },
     
     # 卡片开关
     "CARDS_ENABLED": {
-        "name": "📊 启用卡片",
-        "desc": "只显示这些排行卡片",
-        "help": "留空显示全部，或输入要显示的卡片名",
+        "name_key": "env.cards_enabled.name",
+        "desc_key": "env.cards_enabled.desc",
+        "help_key": "env.cards_enabled.help",
         "category": "cards",
         "hot_reload": True,
-        "placeholder": "资金流向,MACD",
+        "placeholder_key": "env.cards_enabled.placeholder",
         "icon": "📊",
     },
     "CARDS_DISABLED": {
-        "name": "🚫 禁用卡片",
-        "desc": "不显示这些排行卡片",
-        "help": "输入要隐藏的卡片名，用逗号分隔",
+        "name_key": "env.cards_disabled.name",
+        "desc_key": "env.cards_disabled.desc",
+        "help_key": "env.cards_disabled.help",
         "category": "cards",
         "hot_reload": True,
-        "placeholder": "K线形态",
+        "placeholder_key": "env.cards_disabled.placeholder",
         "icon": "🚫",
     },
     
     # 指标开关
     "INDICATORS_ENABLED": {
-        "name": "📈 启用指标",
-        "desc": "只计算这些指标",
-        "help": "留空计算全部，需重启生效",
+        "name_key": "env.indicators_enabled.name",
+        "desc_key": "env.indicators_enabled.desc",
+        "help_key": "env.indicators_enabled.help",
         "category": "indicators",
         "hot_reload": False,
         "placeholder": "macd,rsi",
         "icon": "📈",
     },
     "INDICATORS_DISABLED": {
-        "name": "🚫 禁用指标",
-        "desc": "不计算这些指标",
-        "help": "可节省资源，需重启生效",
+        "name_key": "env.indicators_disabled.name",
+        "desc_key": "env.indicators_disabled.desc",
+        "help_key": "env.indicators_disabled.help",
         "category": "indicators",
         "hot_reload": False,
-        "placeholder": "k线形态",
+        "placeholder_key": "env.indicators_disabled.placeholder",
         "icon": "🚫",
     },
 }
@@ -190,69 +214,119 @@ READONLY_CONFIGS = {
     "POSTGRES_PASSWORD", "POSTGRES_USER",
 }
 
-# 配置分类 - 用户最关心的放前面
+# 配置分类 - 使用 i18n 键
 CONFIG_CATEGORIES = {
     "symbols": {
-        "name": "💰 币种管理",
-        "desc": "设置要监控哪些币种",
+        "name_key": "env.cat.symbols.name",
+        "desc_key": "env.cat.symbols.desc",
         "icon": "💰",
         "priority": 1,
     },
     "features": {
-        "name": "⚡ 功能开关",
-        "desc": "开启或关闭某些功能",
+        "name_key": "env.cat.features.name",
+        "desc_key": "env.cat.features.desc",
         "icon": "⚡",
         "priority": 2,
     },
     "proxy": {
-        "name": "🌐 网络代理",
-        "desc": "国内访问需要设置代理",
+        "name_key": "env.cat.proxy.name",
+        "desc_key": "env.cat.proxy.desc",
         "icon": "🌐",
         "priority": 3,
     },
     "display": {
-        "name": "🎨 显示设置",
-        "desc": "语言、界面相关",
+        "name_key": "env.cat.display.name",
+        "desc_key": "env.cat.display.desc",
         "icon": "🎨",
         "priority": 4,
     },
     "cards": {
-        "name": "📊 卡片管理",
-        "desc": "控制显示哪些排行卡片",
+        "name_key": "env.cat.cards.name",
+        "desc_key": "env.cat.cards.desc",
         "icon": "📊",
         "priority": 5,
     },
     "indicators": {
-        "name": "📈 指标计算",
-        "desc": "控制计算哪些指标",
+        "name_key": "env.cat.indicators.name",
+        "desc_key": "env.cat.indicators.desc",
         "icon": "📈",
         "priority": 6,
     },
 }
 
+
 # =============================================================================
-# 友好文案（禁止责备性词汇）
+# 辅助函数：获取本地化文案
 # =============================================================================
-FRIENDLY_MESSAGES = {
-    "save_success": "✨ 保存成功！",
-    "save_success_hot": "✨ 保存成功，已立即生效！",
-    "save_success_restart": "✨ 保存成功！重启后生效~",
-    "validation_hint": "💡 小提示：",
-    "input_prompt": "📝 请输入新的值：",
-    "current_value": "当前：",
-    "not_set": "未设置",
-    "back": "⬅️ 返回",
-    "cancel": "❌ 取消",
-    "confirm": "✅ 确认",
-    "clear": "🗑️ 清空",
-}
+def get_config_name(key: str, lang: Optional[str] = None) -> str:
+    """获取配置项名称"""
+    config_info = EDITABLE_CONFIGS.get(key, {})
+    name_key = config_info.get("name_key")
+    if name_key:
+        return _t(name_key, lang)
+    return key
 
 
+def get_config_desc(key: str, lang: Optional[str] = None) -> str:
+    """获取配置项描述"""
+    config_info = EDITABLE_CONFIGS.get(key, {})
+    desc_key = config_info.get("desc_key")
+    if desc_key:
+        return _t(desc_key, lang)
+    return ""
+
+
+def get_config_help(key: str, lang: Optional[str] = None) -> str:
+    """获取配置项帮助"""
+    config_info = EDITABLE_CONFIGS.get(key, {})
+    help_key = config_info.get("help_key")
+    if help_key:
+        return _t(help_key, lang)
+    return ""
+
+
+def get_option_label(opt: dict, lang: Optional[str] = None) -> str:
+    """获取选项标签"""
+    label_key = opt.get("label_key")
+    if label_key:
+        return _t(label_key, lang)
+    return opt.get("label", opt.get("value", ""))
+
+
+def get_option_detail(opt: dict, lang: Optional[str] = None) -> str:
+    """获取选项详情"""
+    detail_key = opt.get("detail_key")
+    if detail_key:
+        return _t(detail_key, lang)
+    return opt.get("detail", "")
+
+
+def get_category_name(cat_key: str, lang: Optional[str] = None) -> str:
+    """获取分类名称"""
+    cat_info = CONFIG_CATEGORIES.get(cat_key, {})
+    name_key = cat_info.get("name_key")
+    if name_key:
+        return _t(name_key, lang)
+    return cat_key
+
+
+def get_category_desc(cat_key: str, lang: Optional[str] = None) -> str:
+    """获取分类描述"""
+    cat_info = CONFIG_CATEGORIES.get(cat_key, {})
+    desc_key = cat_info.get("desc_key")
+    if desc_key:
+        return _t(desc_key, lang)
+    return ""
+
+
+# =============================================================================
+# 核心功能函数
+# =============================================================================
 def read_env() -> Dict[str, str]:
     """读取 .env 文件为字典"""
     result = {}
     if not ENV_PATH.exists():
-        logger.warning(f".env 文件不存在: {ENV_PATH}")
+        logger.warning(f".env file not found: {ENV_PATH}")
         return result
     
     try:
@@ -269,7 +343,7 @@ def read_env() -> Dict[str, str]:
                 value = value[1:-1]
             result[key] = value
     except Exception as e:
-        logger.error(f"读取 .env 失败: {e}")
+        logger.error(f"Failed to read .env: {e}")
     
     return result
 
@@ -292,26 +366,26 @@ def get_config(key: str) -> Optional[str]:
     return env_dict.get(key)
 
 
-def set_config(key: str, value: str) -> Tuple[bool, str]:
+def set_config(key: str, value: str, lang: Optional[str] = None) -> Tuple[bool, str]:
     """
     设置配置值
     
     Returns:
         (success, message) - 使用友好文案
     """
+    config_name = get_config_name(key, lang)
     config_info = EDITABLE_CONFIGS.get(key, {})
-    config_name = config_info.get("name", key)
     
-    # 检查是否允许修改（友好提示）
+    # 检查是否允许修改
     if key in READONLY_CONFIGS:
-        return False, f"🔒 {config_name} 是系统核心配置，需要在文件中手动修改哦"
+        return False, _t("env.msg.readonly", lang, name=config_name)
     
     if key not in EDITABLE_CONFIGS:
-        return False, f"🤔 暂不支持修改 {key}，如有需要请联系管理员"
+        return False, _t("env.msg.not_supported", lang, key=key)
     
     # 读取当前文件内容
     if not ENV_PATH.exists():
-        return False, f"📁 配置文件还没准备好，请先完成初始化"
+        return False, _t("env.msg.file_not_ready", lang)
     
     try:
         lines = ENV_PATH.read_text(encoding="utf-8").splitlines()
@@ -332,37 +406,37 @@ def set_config(key: str, value: str) -> Tuple[bool, str]:
         ENV_PATH.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
         os.environ[key] = value
         
-        # 触发热更新，使用友好反馈
+        # 格式化显示值
+        display_value = _format_display_value(key, value, lang)
+        
+        # 触发热更新
         if config_info.get("hot_reload"):
             _trigger_hot_reload(key)
-            # 显示友好的值
-            display_value = _format_display_value(key, value)
-            return True, f"✨ {config_name}\n\n已更新为：{display_value}\n\n🚀 立即生效！"
+            return True, _t("env.msg.save_hot", lang, name=config_name, value=display_value)
         else:
-            display_value = _format_display_value(key, value)
-            return True, f"✨ {config_name}\n\n已更新为：{display_value}\n\n💡 重启后生效~"
+            return True, _t("env.msg.save_restart", lang, name=config_name, value=display_value)
         
     except PermissionError:
-        return False, f"😅 没有写入权限，请检查配置文件权限设置"
+        return False, _t("env.msg.no_permission", lang)
     except Exception as e:
-        logger.error(f"写入 .env 失败: {e}")
-        return False, f"😅 保存时遇到了问题，请稍后再试\n\n技术信息：{e}"
+        logger.error(f"Failed to write .env: {e}")
+        return False, _t("env.msg.save_error", lang, error=str(e))
 
 
-def _format_display_value(key: str, value: str) -> str:
-    """格式化显示值，让用户更容易理解"""
+def _format_display_value(key: str, value: str, lang: Optional[str] = None) -> str:
+    """格式化显示值"""
     config_info = EDITABLE_CONFIGS.get(key, {})
     options = config_info.get("options", [])
     
     # 如果是选项类型，显示选项标签
-    if options and isinstance(options[0], dict):
+    if options:
         for opt in options:
             if opt.get("value") == value:
-                return f"{opt.get('label', value)}"
+                return get_option_label(opt, lang)
     
     # 空值友好显示
     if not value:
-        return "（已清空）"
+        return _t("env.msg.cleared", lang)
     
     return f"`{value}`"
 
@@ -371,28 +445,25 @@ def _trigger_hot_reload(key: str):
     """触发热更新"""
     try:
         if key in ("SYMBOLS_GROUPS", "SYMBOLS_EXTRA", "SYMBOLS_EXCLUDE"):
-            # 重置币种缓存
             from cards.data_provider import reset_symbols_cache
             reset_symbols_cache()
-            logger.info(f"已重置币种缓存: {key}")
+            logger.info(f"Reset symbols cache: {key}")
         
         if key == "BLOCKED_SYMBOLS":
-            # BLOCKED_SYMBOLS 通过动态获取，无需额外操作
-            logger.info(f"已更新屏蔽币种: {key}")
+            logger.info(f"Updated blocked symbols: {key}")
         
         if key in ("CARDS_ENABLED", "CARDS_DISABLED"):
-            # 卡片注册表热更新
             from cards.registry import reload_card_config
             reload_card_config()
-            logger.info(f"已重载卡片配置: {key}")
+            logger.info(f"Reloaded card config: {key}")
             
     except ImportError as e:
-        logger.warning(f"热更新模块导入失败: {e}")
+        logger.warning(f"Hot reload module import failed: {e}")
     except Exception as e:
-        logger.error(f"热更新失败: {e}")
+        logger.error(f"Hot reload failed: {e}")
 
 
-def get_editable_configs_by_category() -> Dict[str, List[dict]]:
+def get_editable_configs_by_category(lang: Optional[str] = None) -> Dict[str, List[dict]]:
     """按分类获取可编辑的配置"""
     result = {cat: [] for cat in CONFIG_CATEGORIES}
     
@@ -405,17 +476,18 @@ def get_editable_configs_by_category() -> Dict[str, List[dict]]:
         result[category].append({
             "key": key,
             "value": current_value,
-            "desc": info.get("desc", key),
-            "desc_en": info.get("desc_en", key),
+            "name": get_config_name(key, lang),
+            "desc": get_config_desc(key, lang),
+            "help": get_config_help(key, lang),
             "hot_reload": info.get("hot_reload", False),
             "options": info.get("options"),
-            "example": info.get("example"),
+            "icon": info.get("icon", ""),
         })
     
     return result
 
 
-def get_config_summary() -> str:
+def get_config_summary(lang: Optional[str] = None) -> str:
     """获取配置摘要（用于显示）"""
     env_dict = read_env()
     lines = []
@@ -425,24 +497,26 @@ def get_config_summary() -> str:
         if not configs:
             continue
         
-        lines.append(f"\n{cat_info['name']}")
+        lines.append(f"\n{get_category_name(category, lang)}")
         for key, info in configs:
             value = os.environ.get(key) or env_dict.get(key, "")
             display_value = value if len(value) < 30 else value[:27] + "..."
             hot = "🔥" if info.get("hot_reload") else "🔄"
-            lines.append(f"  {hot} {info['desc']}: {display_value or '(未设置)'}")
+            desc = get_config_desc(key, lang)
+            not_set = _t("env.msg.not_set", lang)
+            lines.append(f"  {hot} {desc}: {display_value or f'({not_set})'}")
     
     return "\n".join(lines)
 
 
-def validate_config_value(key: str, value: str) -> Tuple[bool, str]:
+def validate_config_value(key: str, value: str, lang: Optional[str] = None) -> Tuple[bool, str]:
     """
     验证配置值
-    使用友好文案，告诉用户如何修正而不是责备
+    使用友好文案，告诉用户如何修正
     """
     config_info = EDITABLE_CONFIGS.get(key)
     if not config_info:
-        return False, "🤔 这个配置项暂不支持修改"
+        return False, _t("env.msg.not_supported_edit", lang)
     
     # 允许清空
     if not value:
@@ -451,36 +525,21 @@ def validate_config_value(key: str, value: str) -> Tuple[bool, str]:
     # 检查选项限制
     options = config_info.get("options")
     if options:
-        # 新格式：[{value, label}, ...]
-        if isinstance(options[0], dict):
-            valid_values = [opt["value"] for opt in options]
-            if value not in valid_values:
-                labels = [f"{opt['label']}" for opt in options]
-                return False, f"💡 请从以下选项中选择：\n" + "\n".join(labels)
-        # 旧格式：["a", "b", ...]
-        elif value not in options:
-            return False, f"💡 请从以下选项中选择：{', '.join(options)}"
+        valid_values = [opt["value"] for opt in options]
+        if value not in valid_values:
+            labels = [get_option_label(opt, lang) for opt in options]
+            return False, _t("env.msg.choose_option", lang) + "\n" + "\n".join(labels)
     
     # 代理格式验证
     if key in ("HTTP_PROXY", "HTTPS_PROXY") and value:
         if not re.match(r'^(http|https|socks5)://[\w\-\.]+:\d+$', value):
-            return False, (
-                "💡 代理格式需要这样写：\n"
-                "• http://127.0.0.1:7890\n"
-                "• socks5://127.0.0.1:1080\n\n"
-                "请检查一下格式~"
-            )
+            return False, _t("env.msg.proxy_format", lang)
     
     # 币种格式验证
     if key in ("SYMBOLS_EXTRA", "SYMBOLS_EXCLUDE", "BLOCKED_SYMBOLS") and value:
         symbols = [s.strip().upper() for s in value.split(",") if s.strip()]
         invalid = [s for s in symbols if not re.match(r'^[A-Z0-9]+USDT$', s)]
         if invalid:
-            return False, (
-                f"💡 币种格式需要以 USDT 结尾\n\n"
-                f"• 正确：BTCUSDT, ETHUSDT\n"
-                f"• 你输入的：{', '.join(invalid)}\n\n"
-                f"请修改一下~"
-            )
+            return False, _t("env.msg.symbol_format", lang, invalid=", ".join(invalid))
     
     return True, "OK"

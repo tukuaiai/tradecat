@@ -2663,3 +2663,410 @@ msgstr "Cache Status"
 
 msgid "admin.reloaded"
 msgstr "Config reloaded"
+
+# =============================================================================
+# env_manager.py - Config management i18n
+# =============================================================================
+
+# Config categories
+msgid "env.cat.symbols.name"
+msgstr "💰 Symbols"
+
+msgid "env.cat.symbols.desc"
+msgstr "Configure which symbols to monitor"
+
+msgid "env.cat.features.name"
+msgstr "⚡ Features"
+
+msgid "env.cat.features.desc"
+msgstr "Enable or disable features"
+
+msgid "env.cat.proxy.name"
+msgstr "🌐 Proxy"
+
+msgid "env.cat.proxy.desc"
+msgstr "Network proxy settings"
+
+msgid "env.cat.display.name"
+msgstr "🎨 Display"
+
+msgid "env.cat.display.desc"
+msgstr "Language and UI settings"
+
+msgid "env.cat.cards.name"
+msgstr "📊 Cards"
+
+msgid "env.cat.cards.desc"
+msgstr "Control which ranking cards to show"
+
+msgid "env.cat.indicators.name"
+msgstr "📈 Indicators"
+
+msgid "env.cat.indicators.desc"
+msgstr "Control which indicators to calculate"
+
+# HTTP Proxy
+msgid "env.http_proxy.name"
+msgstr "🌐 HTTP Proxy"
+
+msgid "env.http_proxy.desc"
+msgstr "Proxy for accessing Telegram/Binance"
+
+msgid "env.http_proxy.help"
+msgstr "Format: http://IP:port\nExample: http://127.0.0.1:7890"
+
+# HTTPS Proxy
+msgid "env.https_proxy.name"
+msgstr "🔒 HTTPS Proxy"
+
+msgid "env.https_proxy.desc"
+msgstr "Usually same as HTTP proxy"
+
+msgid "env.https_proxy.help"
+msgstr "Format: http://IP:port\nUsually same value as HTTP proxy"
+
+# Symbols Groups
+msgid "env.symbols_groups.name"
+msgstr "💰 Symbols"
+
+msgid "env.symbols_groups.desc"
+msgstr "Select symbol groups to monitor"
+
+msgid "env.symbols_groups.help"
+msgstr "Choose a preset group or enter custom"
+
+msgid "env.symbols_groups.opt.main4"
+msgstr "🔥 Top 4"
+
+msgid "env.symbols_groups.opt.main4_detail"
+msgstr "BTC/ETH/SOL/BNB"
+
+msgid "env.symbols_groups.opt.main6"
+msgstr "⭐ Top 6"
+
+msgid "env.symbols_groups.opt.main6_detail"
+msgstr "+XRP/DOGE"
+
+msgid "env.symbols_groups.opt.main20"
+msgstr "📊 Top 20"
+
+msgid "env.symbols_groups.opt.main20_detail"
+msgstr "Common majors"
+
+msgid "env.symbols_groups.opt.auto"
+msgstr "🤖 Auto"
+
+msgid "env.symbols_groups.opt.auto_detail"
+msgstr "Auto-select high volume"
+
+msgid "env.symbols_groups.opt.all"
+msgstr "🌍 All"
+
+msgid "env.symbols_groups.opt.all_detail"
+msgstr "600+ symbols, high resource"
+
+# Extra symbols
+msgid "env.symbols_extra.name"
+msgstr "➕ Extra Symbols"
+
+msgid "env.symbols_extra.desc"
+msgstr "Add more symbols to the group"
+
+msgid "env.symbols_extra.help"
+msgstr "Enter symbol codes, comma separated\nExample: PEPEUSDT,WIFUSDT"
+
+# Exclude symbols
+msgid "env.symbols_exclude.name"
+msgstr "➖ Exclude"
+
+msgid "env.symbols_exclude.desc"
+msgstr "Remove symbols from the group"
+
+msgid "env.symbols_exclude.help"
+msgstr "Enter symbols to exclude\nExample: LUNAUSDT"
+
+# Blocked symbols
+msgid "env.blocked_symbols.name"
+msgstr "🚫 Hidden"
+
+msgid "env.blocked_symbols.desc"
+msgstr "Hide these from rankings"
+
+msgid "env.blocked_symbols.help"
+msgstr "Hide anomalous or unwanted symbols\nExample: BNXUSDT,ALPACAUSDT"
+
+# Single query
+msgid "env.single_query.name"
+msgstr "🔍 Coin Query"
+
+msgid "env.single_query.desc"
+msgstr "Send BTC! to query coin details"
+
+msgid "env.single_query.help"
+msgstr "When enabled, send e.g. BTC! to query single coin"
+
+msgid "env.single_query.enabled_detail"
+msgstr "Coin query available"
+
+msgid "env.single_query.disabled_detail"
+msgstr "Save resources"
+
+# Realtime data
+msgid "env.realtime_data.name"
+msgstr "📡 Realtime Data"
+
+msgid "env.realtime_data.desc"
+msgstr "Get realtime prices from Binance"
+
+msgid "env.realtime_data.help"
+msgstr "When disabled uses cached data, needs proxy when enabled"
+
+msgid "env.realtime_data.enabled_detail"
+msgstr "Realtime, needs proxy"
+
+msgid "env.realtime_data.disabled_detail"
+msgstr "Use cached data"
+
+# Locale
+msgid "env.locale.name"
+msgstr "🌍 Language"
+
+msgid "env.locale.desc"
+msgstr "Bot display language"
+
+msgid "env.locale.help"
+msgstr "Takes effect immediately"
+
+msgid "env.locale.opt.zh"
+msgstr "🇨🇳 Chinese"
+
+msgid "env.locale.opt.en"
+msgstr "🇺🇸 English"
+
+# Hidden fields
+msgid "env.hidden_fields.name"
+msgstr "🙈 Hidden Fields"
+
+msgid "env.hidden_fields.desc"
+msgstr "Fields hidden in coin snapshot"
+
+msgid "env.hidden_fields.help"
+msgstr "Enter field names to hide, comma separated"
+
+msgid "env.hidden_fields.placeholder"
+msgstr "Last Reversal"
+
+# Cards enabled
+msgid "env.cards_enabled.name"
+msgstr "📊 Enabled Cards"
+
+msgid "env.cards_enabled.desc"
+msgstr "Only show these ranking cards"
+
+msgid "env.cards_enabled.help"
+msgstr "Leave empty to show all, or enter card names"
+
+msgid "env.cards_enabled.placeholder"
+msgstr "Money Flow,MACD"
+
+# Cards disabled
+msgid "env.cards_disabled.name"
+msgstr "🚫 Disabled Cards"
+
+msgid "env.cards_disabled.desc"
+msgstr "Hide these ranking cards"
+
+msgid "env.cards_disabled.help"
+msgstr "Enter card names to hide, comma separated"
+
+msgid "env.cards_disabled.placeholder"
+msgstr "K Pattern"
+
+# Indicators enabled
+msgid "env.indicators_enabled.name"
+msgstr "📈 Enabled Indicators"
+
+msgid "env.indicators_enabled.desc"
+msgstr "Only calculate these indicators"
+
+msgid "env.indicators_enabled.help"
+msgstr "Leave empty for all, restart required"
+
+# Indicators disabled
+msgid "env.indicators_disabled.name"
+msgstr "🚫 Disabled Indicators"
+
+msgid "env.indicators_disabled.desc"
+msgstr "Skip these indicators"
+
+msgid "env.indicators_disabled.help"
+msgstr "Save resources, restart required"
+
+msgid "env.indicators_disabled.placeholder"
+msgstr "k pattern"
+
+# Common options
+msgid "env.opt.enabled"
+msgstr "✅ Enabled"
+
+msgid "env.opt.disabled"
+msgstr "⏸️ Disabled"
+
+# Messages
+msgid "env.msg.readonly"
+msgstr "🔒 {name} is a core config, please edit manually in file"
+
+msgid "env.msg.not_supported"
+msgstr "🤔 Modifying {key} is not supported, contact admin if needed"
+
+msgid "env.msg.file_not_ready"
+msgstr "📁 Config file not ready, please complete initialization first"
+
+msgid "env.msg.save_hot"
+msgstr "✨ {name}\n\nUpdated to: {value}\n\n🚀 Effective immediately!"
+
+msgid "env.msg.save_restart"
+msgstr "✨ {name}\n\nUpdated to: {value}\n\n💡 Restart to take effect~"
+
+msgid "env.msg.no_permission"
+msgstr "😅 No write permission, please check file permissions"
+
+msgid "env.msg.save_error"
+msgstr "😅 Error saving config, please try later\n\nDetails: {error}"
+
+msgid "env.msg.cleared"
+msgstr "(cleared)"
+
+msgid "env.msg.not_set"
+msgstr "Not set"
+
+msgid "env.msg.not_supported_edit"
+msgstr "🤔 This config is not editable"
+
+msgid "env.msg.choose_option"
+msgstr "💡 Please choose from:"
+
+msgid "env.msg.proxy_format"
+msgstr "💡 Proxy format should be:\n• http://127.0.0.1:7890\n• socks5://127.0.0.1:1080\n\nPlease check format~"
+
+msgid "env.msg.symbol_format"
+msgstr "💡 Symbols must end with USDT\n\n• Correct: BTCUSDT, ETHUSDT\n• You entered: {invalid}\n\nPlease fix~"
+
+# =============================================================================
+# pg_formatter.py / pg_engine.py - PG Signal i18n
+# =============================================================================
+
+# Signal titles
+msgid "signal.pg.price_surge"
+msgstr "Price Surge"
+
+msgid "signal.pg.price_dump"
+msgstr "Price Dump"
+
+msgid "signal.pg.volume_spike"
+msgstr "Volume Spike"
+
+msgid "signal.pg.taker_buy_dominant"
+msgstr "Taker Buy Dominant"
+
+msgid "signal.pg.taker_sell_dominant"
+msgstr "Taker Sell Dominant"
+
+msgid "signal.pg.oi_surge"
+msgstr "OI Surge"
+
+msgid "signal.pg.oi_dump"
+msgstr "OI Dump"
+
+msgid "signal.pg.top_extreme_long"
+msgstr "Top Traders Extreme Long"
+
+msgid "signal.pg.top_extreme_short"
+msgstr "Top Traders Extreme Short"
+
+msgid "signal.pg.taker_flip_long"
+msgstr "Taker Flip Long"
+
+msgid "signal.pg.taker_flip_short"
+msgstr "Taker Flip Short"
+
+# Signal messages
+msgid "signal.pg.msg.price_surge"
+msgstr "🚀 Price surge! 5min +{pct}%"
+
+msgid "signal.pg.msg.price_dump"
+msgstr "💥 Price dump! 5min -{pct}%"
+
+msgid "signal.pg.msg.volume_spike"
+msgstr "📊 Volume spike! {ratio}x ({vol}M)"
+
+msgid "signal.pg.msg.taker_buy"
+msgstr "🟢 Taker buy ratio {pct}% (>{threshold}%)"
+
+msgid "signal.pg.msg.taker_sell"
+msgstr "🔴 Taker sell ratio {pct}% (>{threshold}%)"
+
+msgid "signal.pg.msg.oi_surge"
+msgstr "📈 OI surge! 5min +{pct}% (${oi}B)"
+
+msgid "signal.pg.msg.oi_dump"
+msgstr "📉 OI dump! 5min -{pct}% (${oi}B)"
+
+msgid "signal.pg.msg.top_long"
+msgstr "⚠️ Top traders extreme long! L/S {ratio} (>{threshold})"
+
+msgid "signal.pg.msg.top_short"
+msgstr "⚠️ Top traders extreme short! L/S {ratio} (<{threshold})"
+
+msgid "signal.pg.msg.taker_flip_long"
+msgstr "🔄 Taker flipped long! {prev} → {curr}"
+
+msgid "signal.pg.msg.taker_flip_short"
+msgstr "🔄 Taker flipped short! {prev} → {curr}"
+
+# Format labels
+msgid "signal.pg.label.direction"
+msgstr "Direction"
+
+msgid "signal.pg.label.price"
+msgstr "Price"
+
+msgid "signal.pg.label.change"
+msgstr "Change"
+
+msgid "signal.pg.label.strength"
+msgstr "Strength"
+
+msgid "signal.pg.label.amplify"
+msgstr "Amplify"
+
+msgid "signal.pg.label.volume"
+msgstr "Volume"
+
+msgid "signal.pg.label.ratio"
+msgstr "Ratio"
+
+msgid "signal.pg.label.oi_change"
+msgstr "Change"
+
+msgid "signal.pg.label.oi_value"
+msgstr "OI"
+
+msgid "signal.pg.label.ls_ratio"
+msgstr "L/S Ratio"
+
+msgid "signal.pg.label.flip"
+msgstr "Change"
+
+msgid "signal.pg.label.detail"
+msgstr "Detail"
+
+# Batch format
+msgid "signal.pg.no_signal"
+msgstr "No signals"
+
+msgid "signal.pg.batch_title"
+msgstr "📡 Realtime Signals ({count})"
+
+msgid "signal.pg.more"
+msgstr "... {count} more"
