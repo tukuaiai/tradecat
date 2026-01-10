@@ -231,6 +231,16 @@ async def handle(update, context) -> bool:
         _save_sub(uid, sub)
     elif data == "sig_menu":
         pass
+    elif data == "sig_hist_recent":
+        # 显示最近信号历史
+        text = get_history_text(limit=20)
+        await q.edit_message_text(text, reply_markup=get_history_kb())
+        return True
+    elif data == "sig_hist_stats":
+        # 显示信号统计
+        text = get_history_stats_text(days=7)
+        await q.edit_message_text(text, reply_markup=get_history_kb())
+        return True
     else:
         return False
 
@@ -255,4 +265,57 @@ def get_signal_push_kb(symbol: str) -> InlineKeyboardMarkup:
             InlineKeyboardButton(analyze_text, callback_data=f"single_query_{symbol}"),
             InlineKeyboardButton(ai_text, callback_data=f"ai_coin_{symbol}"),
         ]
+    ])
+
+
+def get_history_text(limit: int = 20, symbol: str = None) -> str:
+    """获取信号历史文本"""
+    try:
+        from .history import get_history
+        history = get_history()
+        records = history.get_recent(limit=limit, symbol=symbol)
+        return history.format_history_text(records, "信号历史")
+    except Exception as e:
+        logger.warning(f"获取历史失败: {e}")
+        return "📜 信号历史\n\n暂无记录"
+
+
+def get_history_stats_text(days: int = 7) -> str:
+    """获取信号统计文本"""
+    try:
+        from .history import get_history
+        history = get_history()
+        stats = history.get_stats(days=days)
+        
+        lines = [f"📊 信号统计 (近{days}天)", ""]
+        lines.append(f"总数: {stats['total']}条")
+        
+        if stats.get("by_direction"):
+            dir_icons = {"BUY": "🟢", "SELL": "🔴", "ALERT": "⚠️"}
+            dir_text = " | ".join([f"{dir_icons.get(k, '')} {k}: {v}" for k, v in stats["by_direction"].items()])
+            lines.append(f"方向: {dir_text}")
+        
+        if stats.get("by_source"):
+            src_text = " | ".join([f"{k}: {v}" for k, v in stats["by_source"].items()])
+            lines.append(f"来源: {src_text}")
+        
+        if stats.get("by_symbol"):
+            lines.append("\n币种 Top5:")
+            for item in stats["by_symbol"][:5]:
+                lines.append(f"  {item['symbol'].replace('USDT', '')}: {item['count']}条")
+        
+        return "\n".join(lines)
+    except Exception as e:
+        logger.warning(f"获取统计失败: {e}")
+        return "📊 信号统计\n\n暂无数据"
+
+
+def get_history_kb() -> InlineKeyboardMarkup:
+    """信号历史查询键盘"""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📜 最近20条", callback_data="sig_hist_recent"),
+            InlineKeyboardButton("📊 统计", callback_data="sig_hist_stats"),
+        ],
+        [_btn(None, "btn.back_home", "main_menu")]
     ])

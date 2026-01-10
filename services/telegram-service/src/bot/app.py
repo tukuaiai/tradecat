@@ -5259,8 +5259,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parse_mode='Markdown'
                 )
 
+        # 信号历史查询
+        elif query.data == "signal_history":
+            from signals.ui import get_history_text, get_history_kb
+            text = get_history_text(limit=20)
+            await query.edit_message_text(text, reply_markup=get_history_kb())
+
         # 信号/订阅/AI相关回调 - 统一返回开发中提示
-        elif query.data in {"show_subscription", "show_subscription_settings", "signal_history",
+        elif query.data in {"show_subscription", "show_subscription_settings",
                            "subscription_config", "subscription_help", "confirm_subscribe",
                            "confirm_unsubscribe", "aggregated_alerts", "start_coin_analysis",
                            "start_ai_analysis", "start_basis_analysis", "start_batch_analysis",
