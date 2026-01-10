@@ -501,10 +501,15 @@ class PGSignalEngine:
     
     def notify(self, signals: List[PGSignal]):
         """通知回调"""
+        from .pg_formatter import get_pg_formatter
+        formatter = get_pg_formatter()
+        
         for signal in signals:
+            # 使用模板格式化消息
+            formatted_msg = formatter.format(signal)
             for callback in self.callbacks:
                 try:
-                    callback(signal)
+                    callback(signal, formatted_msg)
                 except Exception as e:
                     logger.error(f"Callback error: {e}")
     
