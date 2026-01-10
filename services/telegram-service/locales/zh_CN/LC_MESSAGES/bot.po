@@ -2663,3 +2663,410 @@ msgstr "缓存状态"
 
 msgid "admin.reloaded"
 msgstr "配置已重载"
+
+# =============================================================================
+# env_manager.py - 配置管理 i18n
+# =============================================================================
+
+# 配置分类
+msgid "env.cat.symbols.name"
+msgstr "💰 币种管理"
+
+msgid "env.cat.symbols.desc"
+msgstr "设置要监控哪些币种"
+
+msgid "env.cat.features.name"
+msgstr "⚡ 功能开关"
+
+msgid "env.cat.features.desc"
+msgstr "开启或关闭某些功能"
+
+msgid "env.cat.proxy.name"
+msgstr "🌐 网络代理"
+
+msgid "env.cat.proxy.desc"
+msgstr "国内访问需要设置代理"
+
+msgid "env.cat.display.name"
+msgstr "🎨 显示设置"
+
+msgid "env.cat.display.desc"
+msgstr "语言、界面相关"
+
+msgid "env.cat.cards.name"
+msgstr "📊 卡片管理"
+
+msgid "env.cat.cards.desc"
+msgstr "控制显示哪些排行卡片"
+
+msgid "env.cat.indicators.name"
+msgstr "📈 指标计算"
+
+msgid "env.cat.indicators.desc"
+msgstr "控制计算哪些指标"
+
+# HTTP 代理
+msgid "env.http_proxy.name"
+msgstr "🌐 HTTP 代理"
+
+msgid "env.http_proxy.desc"
+msgstr "访问 Telegram/Binance 时使用的代理"
+
+msgid "env.http_proxy.help"
+msgstr "格式：http://IP:端口\n例如：http://127.0.0.1:7890"
+
+# HTTPS 代理
+msgid "env.https_proxy.name"
+msgstr "🔒 HTTPS 代理"
+
+msgid "env.https_proxy.desc"
+msgstr "通常和 HTTP 代理设置相同即可"
+
+msgid "env.https_proxy.help"
+msgstr "格式：http://IP:端口\n大多数情况下填和 HTTP 代理一样的值"
+
+# 监控币种
+msgid "env.symbols_groups.name"
+msgstr "💰 监控币种"
+
+msgid "env.symbols_groups.desc"
+msgstr "选择要监控的币种范围"
+
+msgid "env.symbols_groups.help"
+msgstr "选择一个预设分组，或输入自定义"
+
+msgid "env.symbols_groups.opt.main4"
+msgstr "🔥 主流4币"
+
+msgid "env.symbols_groups.opt.main4_detail"
+msgstr "BTC/ETH/SOL/BNB"
+
+msgid "env.symbols_groups.opt.main6"
+msgstr "⭐ 主流6币"
+
+msgid "env.symbols_groups.opt.main6_detail"
+msgstr "+XRP/DOGE"
+
+msgid "env.symbols_groups.opt.main20"
+msgstr "📊 主流20币"
+
+msgid "env.symbols_groups.opt.main20_detail"
+msgstr "常见主流币"
+
+msgid "env.symbols_groups.opt.auto"
+msgstr "🤖 智能选择"
+
+msgid "env.symbols_groups.opt.auto_detail"
+msgstr "自动选高交易量币"
+
+msgid "env.symbols_groups.opt.all"
+msgstr "🌍 全部币种"
+
+msgid "env.symbols_groups.opt.all_detail"
+msgstr "600+币种，资源消耗大"
+
+# 额外添加
+msgid "env.symbols_extra.name"
+msgstr "➕ 额外添加"
+
+msgid "env.symbols_extra.desc"
+msgstr "在分组基础上额外添加的币种"
+
+msgid "env.symbols_extra.help"
+msgstr "输入币种代码，多个用逗号分隔\n例如：PEPEUSDT,WIFUSDT"
+
+# 排除币种
+msgid "env.symbols_exclude.name"
+msgstr "➖ 排除币种"
+
+msgid "env.symbols_exclude.desc"
+msgstr "从分组中排除这些币种"
+
+msgid "env.symbols_exclude.help"
+msgstr "输入不想监控的币种\n例如：LUNAUSDT"
+
+# 屏蔽显示
+msgid "env.blocked_symbols.name"
+msgstr "🚫 屏蔽显示"
+
+msgid "env.blocked_symbols.desc"
+msgstr "这些币种不会出现在排行榜中"
+
+msgid "env.blocked_symbols.help"
+msgstr "用于隐藏异常或不想看到的币种\n例如：BNXUSDT,ALPACAUSDT"
+
+# 单币查询
+msgid "env.single_query.name"
+msgstr "🔍 单币查询"
+
+msgid "env.single_query.desc"
+msgstr "发送 BTC! 查询单币详情"
+
+msgid "env.single_query.help"
+msgstr "开启后可以发送如 BTC! 来查询单个币种"
+
+msgid "env.single_query.enabled_detail"
+msgstr "可用单币查询"
+
+msgid "env.single_query.disabled_detail"
+msgstr "节省资源"
+
+# 实时数据
+msgid "env.realtime_data.name"
+msgstr "📡 实时数据"
+
+msgid "env.realtime_data.desc"
+msgstr "从 Binance 获取实时价格"
+
+msgid "env.realtime_data.help"
+msgstr "关闭后使用缓存数据，开启需要代理"
+
+msgid "env.realtime_data.enabled_detail"
+msgstr "实时价格，需代理"
+
+msgid "env.realtime_data.disabled_detail"
+msgstr "使用缓存数据"
+
+# 界面语言
+msgid "env.locale.name"
+msgstr "🌍 界面语言"
+
+msgid "env.locale.desc"
+msgstr "Bot 显示的语言"
+
+msgid "env.locale.help"
+msgstr "切换后立即生效"
+
+msgid "env.locale.opt.zh"
+msgstr "🇨🇳 中文"
+
+msgid "env.locale.opt.en"
+msgstr "🇺🇸 English"
+
+# 隐藏字段
+msgid "env.hidden_fields.name"
+msgstr "🙈 隐藏字段"
+
+msgid "env.hidden_fields.desc"
+msgstr "单币快照中不显示的字段"
+
+msgid "env.hidden_fields.help"
+msgstr "输入要隐藏的字段名，用逗号分隔"
+
+msgid "env.hidden_fields.placeholder"
+msgstr "最近翻转时间"
+
+# 启用卡片
+msgid "env.cards_enabled.name"
+msgstr "📊 启用卡片"
+
+msgid "env.cards_enabled.desc"
+msgstr "只显示这些排行卡片"
+
+msgid "env.cards_enabled.help"
+msgstr "留空显示全部，或输入要显示的卡片名"
+
+msgid "env.cards_enabled.placeholder"
+msgstr "资金流向,MACD"
+
+# 禁用卡片
+msgid "env.cards_disabled.name"
+msgstr "🚫 禁用卡片"
+
+msgid "env.cards_disabled.desc"
+msgstr "不显示这些排行卡片"
+
+msgid "env.cards_disabled.help"
+msgstr "输入要隐藏的卡片名，用逗号分隔"
+
+msgid "env.cards_disabled.placeholder"
+msgstr "K线形态"
+
+# 启用指标
+msgid "env.indicators_enabled.name"
+msgstr "📈 启用指标"
+
+msgid "env.indicators_enabled.desc"
+msgstr "只计算这些指标"
+
+msgid "env.indicators_enabled.help"
+msgstr "留空计算全部，需重启生效"
+
+# 禁用指标
+msgid "env.indicators_disabled.name"
+msgstr "🚫 禁用指标"
+
+msgid "env.indicators_disabled.desc"
+msgstr "不计算这些指标"
+
+msgid "env.indicators_disabled.help"
+msgstr "可节省资源，需重启生效"
+
+msgid "env.indicators_disabled.placeholder"
+msgstr "k线形态"
+
+# 通用选项
+msgid "env.opt.enabled"
+msgstr "✅ 开启"
+
+msgid "env.opt.disabled"
+msgstr "⏸️ 关闭"
+
+# 消息
+msgid "env.msg.readonly"
+msgstr "🔒 {name} 是系统核心配置，需要在文件中手动修改哦"
+
+msgid "env.msg.not_supported"
+msgstr "🤔 暂不支持修改 {key}，如有需要请联系管理员"
+
+msgid "env.msg.file_not_ready"
+msgstr "📁 配置文件还没准备好，请先完成初始化"
+
+msgid "env.msg.save_hot"
+msgstr "✨ {name}\n\n已更新为：{value}\n\n🚀 立即生效！"
+
+msgid "env.msg.save_restart"
+msgstr "✨ {name}\n\n已更新为：{value}\n\n💡 重启后生效~"
+
+msgid "env.msg.no_permission"
+msgstr "😅 没有写入权限，请检查配置文件权限设置"
+
+msgid "env.msg.save_error"
+msgstr "😅 保存时遇到了问题，请稍后再试\n\n技术信息：{error}"
+
+msgid "env.msg.cleared"
+msgstr "（已清空）"
+
+msgid "env.msg.not_set"
+msgstr "未设置"
+
+msgid "env.msg.not_supported_edit"
+msgstr "🤔 这个配置项暂不支持修改"
+
+msgid "env.msg.choose_option"
+msgstr "💡 请从以下选项中选择："
+
+msgid "env.msg.proxy_format"
+msgstr "💡 代理格式需要这样写：\n• http://127.0.0.1:7890\n• socks5://127.0.0.1:1080\n\n请检查一下格式~"
+
+msgid "env.msg.symbol_format"
+msgstr "💡 币种格式需要以 USDT 结尾\n\n• 正确：BTCUSDT, ETHUSDT\n• 你输入的：{invalid}\n\n请修改一下~"
+
+# =============================================================================
+# pg_formatter.py / pg_engine.py - PG 信号 i18n
+# =============================================================================
+
+# 信号标题
+msgid "signal.pg.price_surge"
+msgstr "价格急涨"
+
+msgid "signal.pg.price_dump"
+msgstr "价格急跌"
+
+msgid "signal.pg.volume_spike"
+msgstr "成交量暴增"
+
+msgid "signal.pg.taker_buy_dominant"
+msgstr "主动买入主导"
+
+msgid "signal.pg.taker_sell_dominant"
+msgstr "主动卖出主导"
+
+msgid "signal.pg.oi_surge"
+msgstr "持仓量急增"
+
+msgid "signal.pg.oi_dump"
+msgstr "持仓量急减"
+
+msgid "signal.pg.top_extreme_long"
+msgstr "大户极度看多"
+
+msgid "signal.pg.top_extreme_short"
+msgstr "大户极度看空"
+
+msgid "signal.pg.taker_flip_long"
+msgstr "主动成交翻多"
+
+msgid "signal.pg.taker_flip_short"
+msgstr "主动成交翻空"
+
+# 信号消息
+msgid "signal.pg.msg.price_surge"
+msgstr "🚀 价格急涨! 5分钟涨幅 {pct}%"
+
+msgid "signal.pg.msg.price_dump"
+msgstr "💥 价格急跌! 5分钟跌幅 {pct}%"
+
+msgid "signal.pg.msg.volume_spike"
+msgstr "📊 成交量暴增! {ratio}倍 ({vol}M)"
+
+msgid "signal.pg.msg.taker_buy"
+msgstr "🟢 主动买入占比 {pct}% (>{threshold}%)"
+
+msgid "signal.pg.msg.taker_sell"
+msgstr "🔴 主动卖出占比 {pct}% (>{threshold}%)"
+
+msgid "signal.pg.msg.oi_surge"
+msgstr "📈 持仓量急增! 5分钟增加 {pct}% (${oi}B)"
+
+msgid "signal.pg.msg.oi_dump"
+msgstr "📉 持仓量急减! 5分钟减少 {pct}% (${oi}B)"
+
+msgid "signal.pg.msg.top_long"
+msgstr "⚠️ 大户极度看多! 多空比 {ratio} (>{threshold})"
+
+msgid "signal.pg.msg.top_short"
+msgstr "⚠️ 大户极度看空! 多空比 {ratio} (<{threshold})"
+
+msgid "signal.pg.msg.taker_flip_long"
+msgstr "🔄 主动成交翻多! {prev} → {curr}"
+
+msgid "signal.pg.msg.taker_flip_short"
+msgstr "🔄 主动成交翻空! {prev} → {curr}"
+
+# 格式化标签
+msgid "signal.pg.label.direction"
+msgstr "方向"
+
+msgid "signal.pg.label.price"
+msgstr "价格"
+
+msgid "signal.pg.label.change"
+msgstr "涨跌"
+
+msgid "signal.pg.label.strength"
+msgstr "强度"
+
+msgid "signal.pg.label.amplify"
+msgstr "放大"
+
+msgid "signal.pg.label.volume"
+msgstr "成交额"
+
+msgid "signal.pg.label.ratio"
+msgstr "占比"
+
+msgid "signal.pg.label.oi_change"
+msgstr "变化"
+
+msgid "signal.pg.label.oi_value"
+msgstr "持仓"
+
+msgid "signal.pg.label.ls_ratio"
+msgstr "多空比"
+
+msgid "signal.pg.label.flip"
+msgstr "变化"
+
+msgid "signal.pg.label.detail"
+msgstr "详情"
+
+# 批量格式化
+msgid "signal.pg.no_signal"
+msgstr "暂无信号"
+
+msgid "signal.pg.batch_title"
+msgstr "📡 实时信号 ({count}条)"
+
+msgid "signal.pg.more"
+msgstr "... 还有 {count} 条"
