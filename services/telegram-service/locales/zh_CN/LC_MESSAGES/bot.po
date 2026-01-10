@@ -70,6 +70,9 @@ msgstr "ℹ️ 帮助"
 msgid "kb.lang"
 msgstr "🌐 语言"
 
+msgid "kb.config"
+msgstr "⚙️ 配置"
+
 msgid "menu.main_text"
 msgstr ""
 "⚡️ 交易猫\n"
@@ -2614,3 +2617,49 @@ msgstr "💡 交易量/市值比 = 24h交易量 / 市值"
 
 msgid "ranking.hint.volume_oi"
 msgstr "💡 交易量/持仓量比 = 24h交易量 / 持仓量"
+
+# Admin module
+msgid "kb.admin"
+msgstr "⚙️ 管理"
+
+msgid "admin.no_permission"
+msgstr "⛔ 您没有管理员权限"
+
+msgid "admin.title"
+msgstr "管理面板"
+
+msgid "admin.your_id"
+msgstr "您的ID"
+
+msgid "admin.admin_count"
+msgstr "管理员数量"
+
+msgid "admin.templates"
+msgstr "可视化模板"
+
+msgid "admin.hint"
+msgstr "管理员可访问高级配置和统计"
+
+msgid "admin.stats"
+msgstr "📊 统计"
+
+msgid "admin.users"
+msgstr "👥 用户"
+
+msgid "admin.cache"
+msgstr "🗄️ 缓存"
+
+msgid "admin.reload"
+msgstr "🔄 重载"
+
+msgid "admin.stats_title"
+msgstr "系统统计"
+
+msgid "admin.users_title"
+msgstr "管理员列表"
+
+msgid "admin.cache_title"
+msgstr "缓存状态"
+
+msgid "admin.reloaded"
+msgstr "配置已重载"

@@ -258,7 +258,51 @@ sys.path = [p for p in sys.path if not (p.endswith('/src') and not Path(p).exist
 # 数据库指标服务（可选）
 BINANCE_DB_METRIC_SERVICE = None
 
-# ================== 简化权限检查 ==================
+# ================== 权限检查 ==================
+
+# 管理员用户ID列表（从环境变量加载）
+ADMIN_USER_IDS: set = set()
+
+
+def _load_admin_ids():
+    """从环境变量加载管理员ID"""
+    global ADMIN_USER_IDS
+    admin_str = os.getenv("ADMIN_USER_IDS", "")
+    if admin_str:
+        try:
+            ADMIN_USER_IDS = {int(uid.strip()) for uid in admin_str.split(",") if uid.strip().isdigit()}
+            logger.info(f"已加载管理员ID: {ADMIN_USER_IDS}")
+        except Exception as e:
+            logger.error(f"解析 ADMIN_USER_IDS 失败: {e}")
+            ADMIN_USER_IDS = set()
+
+
+# 启动时加载管理员ID
+_load_admin_ids()
+
+
+def _is_admin(update) -> bool:
+    """检查用户是否为管理员"""
+    if not update:
+        return False
+    user_id = None
+    if hasattr(update, 'callback_query') and update.callback_query:
+        user_id = update.callback_query.from_user.id
+    elif hasattr(update, 'message') and update.message:
+        user_id = update.message.from_user.id
+    return user_id in ADMIN_USER_IDS if user_id else False
+
+
+def _get_user_id(update) -> Optional[int]:
+    """获取用户ID"""
+    if not update:
+        return None
+    if hasattr(update, 'callback_query') and update.callback_query:
+        return update.callback_query.from_user.id
+    elif hasattr(update, 'message') and update.message:
+        return update.message.from_user.id
+    return None
+
 
 def _is_command_allowed(update) -> bool:
     """所有命令都允许"""
@@ -1133,9 +1177,15 @@ class UserRequestHandler:
                 InlineKeyboardButton(I18N.gettext("kb.lang", lang=lang), callback_data="lang_menu"),
             ],
             [
+                InlineKeyboardButton(I18N.gettext("kb.config", lang=lang, fallback="⚙️ 配置"), callback_data="env_back"),
                 InlineKeyboardButton(I18N.gettext("kb.help", lang=lang), callback_data="help"),
             ],
         ]
+        # 管理员显示管理按钮
+        if _is_admin(update):
+            keyboard.append([
+                InlineKeyboardButton(I18N.gettext("kb.admin", lang=lang, fallback="🔧 管理"), callback_data="admin_menu"),
+            ])
         return InlineKeyboardMarkup(keyboard)
 
     # ===== 基础行情占位，避免缺失方法导致报错 =====
@@ -1242,6 +1292,7 @@ class UserRequestHandler:
                 KeyboardButton(I18N.gettext("kb.home", lang=lang)),
             ],
             [
+                KeyboardButton(I18N.gettext("kb.config", lang=lang, fallback="⚙️ 配置")),
                 KeyboardButton(I18N.gettext("kb.lang", lang=lang)),
                 KeyboardButton(I18N.gettext("kb.help", lang=lang)),
             ],
@@ -3978,6 +4029,76 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer(_t("error.signal_failed", update), show_alert=True)
             return
 
+    # 管理员菜单
+    if button_data == "admin_menu" or button_data.startswith("admin_"):
+        # 检查管理员权限
+        if not _is_admin(update):
+            await query.answer(_t(update, "admin.no_permission", "⛔ 无权限"), show_alert=True)
+            return
+        await query.answer()
+        
+        if button_data == "admin_menu":
+            text = _build_admin_menu_text(update)
+            keyboard = _build_admin_menu_keyboard(update)
+            await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
+            return
+        
+        if button_data == "admin_stats":
+            # 统计信息
+            cache_count = len(cache.keys()) if cache else 0
+            user_count = len(_user_locale_map) if _user_locale_map else 0
+            text = (
+                f"📊 **{_t(update, 'admin.stats_title', '系统统计')}**\n\n"
+                f"🗄️ 缓存条目: {cache_count}\n"
+                f"👥 语言配置用户: {user_count}\n"
+                f"👑 管理员数量: {len(ADMIN_USER_IDS)}\n"
+                f"📈 可视化模板: 9\n"
+            )
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton(_t(update, "btn.back", "⬅️ 返回"), callback_data="admin_menu")],
+            ])
+            await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
+            return
+        
+        if button_data == "admin_users":
+            # 管理员列表
+            admin_list = "\n".join([f"• `{uid}`" for uid in ADMIN_USER_IDS]) or "无"
+            text = (
+                f"👥 **{_t(update, 'admin.users_title', '管理员列表')}**\n\n"
+                f"{admin_list}\n\n"
+                f"💡 在 `config/.env` 中配置 `ADMIN_USER_IDS`"
+            )
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton(_t(update, "btn.back", "⬅️ 返回"), callback_data="admin_menu")],
+            ])
+            await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
+            return
+        
+        if button_data == "admin_cache":
+            # 缓存信息
+            cache_keys = list(cache.keys())[:10] if cache else []
+            cache_list = "\n".join([f"• {k}" for k in cache_keys]) or "空"
+            text = (
+                f"🗄️ **{_t(update, 'admin.cache_title', '缓存状态')}**\n\n"
+                f"总条目: {len(cache.keys()) if cache else 0}\n"
+                f"前10个:\n{cache_list}"
+            )
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton(_t(update, "btn.back", "⬅️ 返回"), callback_data="admin_menu")],
+            ])
+            await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
+            return
+        
+        if button_data == "admin_reload":
+            # 重载配置
+            _load_admin_ids()
+            text = f"✅ {_t(update, 'admin.reloaded', '配置已重载')}\n\n管理员数量: {len(ADMIN_USER_IDS)}"
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton(_t(update, "btn.back", "⬅️ 返回"), callback_data="admin_menu")],
+            ])
+            await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
+            return
+
     # 可视化菜单
     if button_data == "vis_menu" or button_data.startswith("vis_"):
         try:
@@ -5689,6 +5810,56 @@ async def vis_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """管理员配置指令 /admin"""
+    if not _is_command_allowed(update):
+        return
+    # 检查是否为管理员
+    if not _is_admin(update):
+        await update.message.reply_text(_t(update, "admin.no_permission", "⛔ 您没有管理员权限"))
+        return
+    global user_handler
+    if user_handler is None:
+        await update.message.reply_text(_t(update, "start.initializing"))
+        return
+    # 显示管理面板
+    text = _build_admin_menu_text(update)
+    keyboard = _build_admin_menu_keyboard(update)
+    await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
+
+
+def _build_admin_menu_text(update) -> str:
+    """构建管理面板文本"""
+    user_id = _get_user_id(update)
+    admin_count = len(ADMIN_USER_IDS)
+    return (
+        f"⚙️ **{_t(update, 'admin.title', '管理面板')}**\n\n"
+        f"👤 {_t(update, 'admin.your_id', '您的ID')}: `{user_id}`\n"
+        f"👥 {_t(update, 'admin.admin_count', '管理员数量')}: {admin_count}\n"
+        f"📊 {_t(update, 'admin.templates', '可视化模板')}: 9\n\n"
+        f"💡 {_t(update, 'admin.hint', '管理员可访问高级配置和统计')}"
+    )
+
+
+def _build_admin_menu_keyboard(update) -> InlineKeyboardMarkup:
+    """构建管理面板键盘"""
+    lang = _resolve_lang(update) if update else I18N.default_locale
+    keyboard = [
+        [
+            InlineKeyboardButton(I18N.gettext("admin.stats", lang=lang, fallback="📊 统计"), callback_data="admin_stats"),
+            InlineKeyboardButton(I18N.gettext("admin.users", lang=lang, fallback="👥 用户"), callback_data="admin_users"),
+        ],
+        [
+            InlineKeyboardButton(I18N.gettext("admin.cache", lang=lang, fallback="🗄️ 缓存"), callback_data="admin_cache"),
+            InlineKeyboardButton(I18N.gettext("admin.reload", lang=lang, fallback="🔄 重载"), callback_data="admin_reload"),
+        ],
+        [
+            InlineKeyboardButton(I18N.gettext("btn.back_home", lang=lang), callback_data="main_menu"),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
 async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """健康检查 /ping"""
     try:
@@ -5850,6 +6021,9 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
         "📈 Charts": "vis_menu",
         I18N.gettext("kb.home", lang=lang): "main_menu",
         "🏠 主菜单": "main_menu",
+        I18N.gettext("kb.config", lang=lang, fallback="⚙️ 配置"): "env_back",
+        "⚙️ 配置": "env_back",
+        "⚙️ Config": "env_back",
         I18N.gettext("kb.help", lang=lang): "help",
         "ℹ️ 帮助": "help",
         I18N.gettext("kb.lang", lang=lang): "lang_menu",
@@ -6190,6 +6364,26 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     logger.error(f"可视化菜单加载失败: {e}")
                     await update.message.reply_text(_t(update, "error.vis_failed", "可视化功能暂不可用"))
 
+            elif action == "env_back":
+                # 配置中心入口
+                from bot.env_manager import CONFIG_CATEGORIES
+                sorted_cats = sorted(CONFIG_CATEGORIES.items(), key=lambda x: x[1].get("priority", 99))
+                
+                text = "⚙️ *配置中心*\n\n"
+                text += "👋 在这里可以轻松调整 Bot 的各项设置\n\n"
+                text += "👇 选择要配置的类别："
+                
+                buttons = []
+                for cat_id, cat_info in sorted_cats:
+                    name = cat_info.get("name", cat_id)
+                    buttons.append(InlineKeyboardButton(name, callback_data=f"env_cat_{cat_id}"))
+                
+                keyboard_rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
+                keyboard_rows.append([InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")])
+                keyboard = InlineKeyboardMarkup(keyboard_rows)
+                
+                await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
+
             elif action in {"aggregated_alerts", "coin_search"}:
                 await update.message.reply_text(_t(update, "feature.coming_soon"))
                 return
@@ -6525,6 +6719,8 @@ def main():
         logger.info("✅ /ai 命令处理器已注册")
         application.add_handler(CommandHandler("vis", vis_command))
         logger.info("✅ /vis 命令处理器已注册")
+        application.add_handler(CommandHandler("admin", admin_command))
+        logger.info("✅ /admin 命令处理器已注册")
         application.add_handler(CommandHandler("lang", lang_command))
         logger.info("✅ /lang 命令处理器已注册")
         application.add_handler(CommandHandler("env", env_command))

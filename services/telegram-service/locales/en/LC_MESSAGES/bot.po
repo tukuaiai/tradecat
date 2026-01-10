@@ -70,6 +70,9 @@ msgstr "ℹ️ Help"
 msgid "kb.lang"
 msgstr "🌐 Language"
 
+msgid "kb.config"
+msgstr "⚙️ Config"
+
 msgid "menu.main_text"
 msgstr ""
 "⚡️ TradeCat\n"
@@ -2614,3 +2617,49 @@ msgstr "💡 Vol/MCap Ratio = 24h Volume / Market Cap"
 
 msgid "ranking.hint.volume_oi"
 msgstr "💡 Vol/OI Ratio = 24h Volume / Open Interest"
+
+# Admin module
+msgid "kb.admin"
+msgstr "⚙️ Admin"
+
+msgid "admin.no_permission"
+msgstr "⛔ You do not have admin permission"
+
+msgid "admin.title"
+msgstr "Admin Panel"
+
+msgid "admin.your_id"
+msgstr "Your ID"
+
+msgid "admin.admin_count"
+msgstr "Admin Count"
+
+msgid "admin.templates"
+msgstr "Vis Templates"
+
+msgid "admin.hint"
+msgstr "Admins can access advanced settings and stats"
+
+msgid "admin.stats"
+msgstr "📊 Stats"
+
+msgid "admin.users"
+msgstr "👥 Users"
+
+msgid "admin.cache"
+msgstr "🗄️ Cache"
+
+msgid "admin.reload"
+msgstr "🔄 Reload"
+
+msgid "admin.stats_title"
+msgstr "System Statistics"
+
+msgid "admin.users_title"
+msgstr "Admin List"
+
+msgid "admin.cache_title"
+msgstr "Cache Status"
+
+msgid "admin.reloaded"
+msgstr "Config reloaded"
