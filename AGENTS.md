@@ -9,11 +9,13 @@
 ### 1.1 允许的操作
 
 - 修改 `services/*/src/` 下的业务代码
+- 修改 `services-preview/*/src/` 下的业务代码
 - 修改 `config/.env.example` 全局配置模板
-- 添加/修改技术指标 (`services/trading-service/src/indicators/`，当前 38 个类）
+- 添加/修改技术指标 (`services/trading-service/src/indicators/`)
 - 添加/修改排行榜卡片 (`services/telegram-service/src/cards/`)
 - 修改启动脚本 (`services/*/scripts/`, `scripts/`)
-- 更新文档 (`README.md`, `AGENTS.md`)
+- 更新文档 (`README.md`, `README_EN.md`, `AGENTS.md`)
+- 修改 `Makefile`、`pyproject.toml`
 
 ### 1.2 禁止的操作
 
@@ -32,7 +34,7 @@
 | `libs/database/services/telegram-service/market_data.db` | SQLite 指标数据 | 只读 |
 | `backups/timescaledb/` | 数据库备份 | 禁止修改 |
 
-> 提醒：服务启动脚本会检查 `config/.env` 权限（需 600/400），不符合直接退出。`scripts/install.sh` 仍会为各服务复制 `.env`，但运行时只读取 `config/.env`，避免双份配置漂移。
+> 提醒：服务启动脚本会检查 `config/.env` 权限（需 600/400），不符合直接退出。
 
 ---
 
@@ -49,7 +51,6 @@ cd /path/to/tradecat
 
 # 2) 填写全局配置（含 BOT_TOKEN / DB / 代理 等）
 cp config/.env.example config/.env && chmod 600 config/.env
-# 将 DATABASE_URL 端口改为 5433 以与仓库脚本一致（脚本默认 5433，模板默认 5434）
 vim config/.env
 
 # 3) 启动核心服务（data + trading + telegram）
@@ -57,70 +58,66 @@ vim config/.env
 ./scripts/start.sh status
 ```
 
-> 顶层 `./scripts/start.sh` 只管理 data-service / trading-service / telegram-service。  
-> 手动启动预览版服务：`cd services-preview/markets-service && ./scripts/start.sh start`（多市场采集）；`cd services-preview/vis-service && ./scripts/start.sh start`（可视化）；`cd services-preview/order-service && python -m src.market-maker.main`（做市，需 API Key）；ai-service 作为 Telegram 子模块随 Bot 运行。
+> 顶层 `./scripts/start.sh` 管理 data-service / trading-service / telegram-service。
 
-### 2.2 开发/修改流程
+### 2.2 预览版服务启动
 
 ```bash
-# 修改前确认已执行 init.sh 并填好 config/.env
+# signal-service（信号检测）
+cd services/signal-service && ./scripts/start.sh start
 
-# 1. 进入对应服务并激活虚拟环境（如需要）
+# markets-service（多市场采集）
+cd services-preview/markets-service && ./scripts/start.sh start
+
+# vis-service（可视化，端口 8087）
+cd services-preview/vis-service && ./scripts/start.sh start
+
+# order-service（做市，需 API Key）
+cd services-preview/order-service && python -m src
+
+# fate-service（命理服务）
+cd services-preview/fate-service && make run
+
+# predict-service（预测市场，Node.js）
+cd services-preview/predict-service/services/polymarket && npm start
+```
+
+### 2.3 开发/修改流程
+
+```bash
+# 1. 进入对应服务并激活虚拟环境
 cd services/trading-service && source .venv/bin/activate
 
-# 2. 修改代码
-# ...
+# 2. 修改代码...
 
-# 3. 验证
+# 3. 使用服务级 Makefile
+make lint      # 代码检查
+make format    # 代码格式化
+make test      # 运行测试
+
+# 4. 验证
 cd /path/to/tradecat
 ./scripts/verify.sh
 
-# 4. 若涉及命令/配置/目录变更，同步更新 README.md 与 AGENTS.md
-```
-
-### 2.3 提交前检查
-
-```bash
-# 语法检查
-python3 -m py_compile services/*/src/*.py
-
-# 格式检查（如有 ruff）
-ruff check services/
-
-# 运行验证脚本
-./scripts/verify.sh
+# 5. 若涉及命令/配置/目录变更，同步更新 README.md / README_EN.md / AGENTS.md
 ```
 
 ---
 
 ## 3. Must-Run Commands（必须执行的命令清单）
 
-### 3.1 环境初始化
+### 3.1 全局脚本
 
-| 命令 | 说明 | 前置条件 |
-|:---|:---|:---|
-| `./scripts/install.sh` | 一键安装所有依赖 | Python 3.12+ |
-| `./scripts/init.sh` | 初始化所有服务虚拟环境 | Python 3.12+ |
-| `./scripts/init.sh <service>` | 初始化单个服务 | Python 3.12+ |
+| 命令 | 说明 |
+|:---|:---|
+| `./scripts/init.sh` | 初始化所有服务虚拟环境 |
+| `./scripts/init.sh <service>` | 初始化单个服务 |
+| `./scripts/start.sh start\|stop\|status\|restart` | 核心服务管理 |
+| `./scripts/verify.sh` | 验证脚本（ruff + py_compile + i18n） |
+| `./scripts/export_timescaledb.sh` | 导出 TimescaleDB 数据 |
+| `./scripts/timescaledb_compression.sh` | 压缩管理 |
 
-### 3.2 服务管理
-
-| 服务 | 启动 | 停止 | 状态 |
-|:---|:---|:---|:---|
-| data-service | `cd services/data-service && ./scripts/start.sh start` | `./scripts/start.sh stop` | `./scripts/start.sh status` |
-| trading-service | `cd services/trading-service && ./scripts/start.sh start` | `./scripts/start.sh stop` | `./scripts/start.sh status` |
-| telegram-service | `cd services/telegram-service && ./scripts/start.sh start` | `./scripts/start.sh stop` | `./scripts/start.sh status` |
-| ai-service | 作为 telegram-service 子模块运行 | - | - |
-| markets-service | `cd services-preview/markets-service && ./scripts/start.sh start` | `./scripts/start.sh stop` | `./scripts/start.sh status` |
-| vis-service | `cd services-preview/vis-service && ./scripts/start.sh start` | `./scripts/start.sh stop` | `./scripts/start.sh status` |
-| order-service | `cd services-preview/order-service && python -m src.market-maker.main` | Ctrl+C | - |
-| 全部（核心） | `./scripts/start.sh start` | `./scripts/start.sh stop` | `./scripts/start.sh status` |
-
-**注意**: 
-- 顶层 `./scripts/start.sh` 仅管理 data-service / trading-service / telegram-service 三个核心服务
-- 预览版服务（markets/vis/order）需手动进入目录启动
-
-### 3.3 Make 快捷命令
+### 3.2 Make 快捷命令
 
 | 命令 | 说明 |
 |:---|:---|
@@ -131,43 +128,50 @@ ruff check services/
 | `make status` | 查看服务状态 |
 | `make daemon` | 启动守护进程（自动重启） |
 | `make daemon-stop` | 停止守护进程 |
-| `make verify` | 代码验证（等价 `./scripts/verify.sh`：ruff→py_compile 核心文件与 ai-service 全量→i18n msgfmt 校验与键对齐→可选 pytest） |
+| `make verify` | 代码验证 |
 | `make clean` | 清理缓存 |
 | `make export-db` | 导出 TimescaleDB 数据 |
+
+### 3.3 服务级 Makefile（统一接口）
+
+每个服务都有标准化的 Makefile，支持以下 targets：
+
+```bash
+cd services/<service-name>  # 或 services-preview/<service-name>
+
+make help        # 显示帮助
+make venv        # 创建虚拟环境
+make install     # 安装依赖
+make install-dev # 安装开发依赖
+make clean       # 清理缓存
+make reset       # 重建虚拟环境（依赖坏了用这个）
+make lock        # 导出当前依赖到 requirements.lock.txt
+
+make lint        # 代码检查 (ruff)
+make format      # 代码格式化 (ruff)
+make test        # 运行测试 (pytest)
+make test-cov    # 运行测试 + 覆盖率
+make typecheck   # 类型检查 (mypy)
+make check       # 完整检查 (lint + test)
+make syntax      # 语法验证（快速）
+
+make run         # 前台运行（调试用）
+make start       # 后台启动
+make stop        # 停止服务
+make status      # 查看状态
+```
 
 ### 3.4 数据库操作
 
 ```bash
-# 连接 TimescaleDB（默认脚本端口 5433，若 config/.env 改为 5434 需同步调整）
-PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d market_data
+# 连接 TimescaleDB（默认端口 5434）
+PGPASSWORD=postgres psql -h localhost -p 5434 -U postgres -d market_data
 
 # 查看 K线数据量
 SELECT COUNT(*) FROM market_data.candles_1m;
 
 # 连接 SQLite
 sqlite3 libs/database/services/telegram-service/market_data.db
-
-# 导出数据库
-./scripts/export_timescaledb.sh
-```
-
-### 3.5 历史数据导入
-
-从 HuggingFace 下载数据集后导入：
-
-```bash
-# 数据集地址: https://huggingface.co/datasets/123olp/binance-futures-ohlcv-2018-2026
-
-# 1. 恢复表结构
-zstd -d schema.sql.zst -c | psql -h localhost -p 5433 -U postgres -d market_data
-
-# 2. 导入 K线数据
-zstd -d candles_1m.bin.zst -c | psql -h localhost -p 5433 -U postgres -d market_data \
-    -c "COPY market_data.candles_1m FROM STDIN WITH (FORMAT binary)"
-
-# 3. 导入期货数据
-zstd -d futures_metrics_5m.bin.zst -c | psql -h localhost -p 5433 -U postgres -d market_data \
-    -c "COPY market_data.binance_futures_metrics_5m FROM STDIN WITH (FORMAT binary)"
 ```
 
 ---
@@ -176,11 +180,26 @@ zstd -d futures_metrics_5m.bin.zst -c | psql -h localhost -p 5433 -U postgres -d
 
 ### 4.1 架构原则
 
-- **微服务独立**：每个服务有独立的 `.venv`、`requirements.txt`
+- **微服务独立**：每个服务有独立的 `.venv`、`requirements.txt`、`pyproject.toml`、`Makefile`
 - **配置统一**：所有配置集中在 `config/.env`，各服务共用
-- **数据流向**：`data-service → TimescaleDB → trading-service → SQLite → telegram-service / ai-service / vis-service`
+- **数据流向**：`data-service → TimescaleDB → trading-service → SQLite → telegram/ai/signal/vis`
 
-### 4.2 模块边界
+### 4.2 服务清单（10 个）
+
+| 服务 | 位置 | 职责 | 入口 |
+|:---|:---|:---|:---|
+| data-service | services/ | 加密货币数据采集 | `src/__main__.py` |
+| trading-service | services/ | 指标计算 | `src/__main__.py` |
+| telegram-service | services/ | Bot 交互 | `src/main.py` |
+| ai-service | services/ | AI 分析（telegram 子模块） | `src/__main__.py` |
+| signal-service | services/ | 信号检测 | `src/__main__.py` |
+| markets-service | services-preview/ | 全市场采集 | `src/__main__.py` |
+| vis-service | services-preview/ | 可视化渲染 | `src/__main__.py` |
+| order-service | services-preview/ | 交易执行 | `src/__main__.py` |
+| predict-service | services-preview/ | 预测市场（Node.js） | `services/*/` |
+| fate-service | services-preview/ | 命理服务 | `services/telegram-service/` |
+
+### 4.3 模块边界
 
 | 服务 | 职责 | 禁止 |
 |:---|:---|:---|
@@ -189,19 +208,19 @@ zstd -d futures_metrics_5m.bin.zst -c | psql -h localhost -p 5433 -U postgres -d
 | trading-service | 指标计算、写入 SQLite | 禁止直接推送消息 |
 | telegram-service | Bot 交互、读取 SQLite | 禁止写入数据库 |
 | ai-service | AI 分析、Wyckoff 方法论 | 作为 telegram-service 子模块 |
-| predict-service | 预测市场信号、策略推送 | 禁止改动主数据采集链路 |
-| vis-service | 可视化渲染（只读 DB/SQLite，输出 PNG/JSON） | 禁止写入数据库、禁止采集数据 |
+| signal-service | 信号检测、规则引擎 | 只读数据库 |
+| vis-service | 可视化渲染 | 禁止写入数据库 |
 | order-service | 交易执行、做市 | 禁止修改数据采集逻辑 |
 
-### 4.3 依赖添加规则
+### 4.4 依赖添加规则
 
 1. 添加依赖前检查是否已存在
 2. 添加到对应服务的 `requirements.txt`
-3. 运行 `pip freeze | grep <package>` 更新 `requirements.lock.txt`
+3. 运行 `make lock` 更新 `requirements.lock.txt`
 4. 如需系统库（如 TA-Lib），在 README 中说明安装方法
 5. 禁止添加未经验证的依赖
 
-### 4.4 兼容性要求
+### 4.5 兼容性要求
 
 - Python >= 3.12
 - 保持与现有数据库 schema 兼容
@@ -214,26 +233,54 @@ zstd -d futures_metrics_5m.bin.zst -c | psql -h localhost -p 5433 -U postgres -d
 
 ### 5.1 代码风格
 
-- **格式化**：遵循 PEP 8，推荐使用 ruff
+- **格式化**：遵循 PEP 8，使用 ruff
+- **行长**：120 字符
 - **类型注解**：关键函数添加类型注解
 - **文档字符串**：公开函数需有 docstring
 
-### 5.2 命名约定
+### 5.2 项目配置（pyproject.toml 统一标准）
+
+所有服务的 `pyproject.toml` 使用统一配置：
+
+```toml
+[project]
+requires-python = ">=3.12"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+```
+
+### 5.3 命名约定
 
 | 类型 | 约定 | 示例 |
 |:---|:---|:---|
-| 文件名 | 小写下划线 / 中文 | `k_pattern.py`, `排行榜服务.py` |
+| 文件名 | 小写下划线 | `k_pattern.py` |
 | 类名 | PascalCase | `KPattern`, `DataProvider` |
 | 函数名 | snake_case | `compute_indicators()` |
 | 常量 | UPPER_SNAKE | `MAX_WORKERS` |
 
-### 5.3 错误处理
+### 5.4 错误处理
 
 - 使用 `except Exception as e:` 捕获异常并记录日志
 - 禁止裸 `except:`
 - 关键操作添加超时处理
 
-### 5.4 日志规范
+### 5.5 日志规范
 
 ```python
 import logging
@@ -250,124 +297,73 @@ logger.error("错误: %s", error, exc_info=True)
 
 ```
 tradecat/
-├── config/                     # 统一配置（所有服务共用）
-│   ├── .env                    # 生产配置（含密钥，不提交）
-│   ├── .env.example            # 配置模板
-│   └── logrotate.conf          # 日志轮转
+├── config/                         # 统一配置（所有服务共用）
+│   ├── .env                        # 生产配置（含密钥，不提交）
+│   ├── .env.example                # 配置模板
+│   └── logrotate.conf              # 日志轮转
 │
-├── scripts/                    # 全局脚本
-│   ├── install.sh              # 一键安装
-│   ├── init.sh                 # 初始化脚本
-│   ├── start.sh                # 统一启动/守护脚本
-│   ├── verify.sh               # 验证脚本
-│   ├── export_timescaledb.sh   # 数据导出
+├── scripts/                        # 全局脚本
+│   ├── init.sh                     # 初始化脚本
+│   ├── install.sh                  # 一键安装
+│   ├── start.sh                    # 统一启动脚本
+│   ├── verify.sh                   # 验证脚本
+│   ├── export_timescaledb.sh       # 数据导出
 │   └── timescaledb_compression.sh  # 压缩管理
 │
-├── services/                   # 稳定版微服务 (4个)
-│   ├── data-service/           # 加密货币数据采集服务
-│   │   ├── src/
-│   │   │   ├── collectors/     # 采集器（backfill/ws/metrics）
-│   │   │   ├── adapters/       # 适配器（timescale/ccxt）
-│   │   │   └── config.py
-│   │   ├── scripts/start.sh
-│   │   ├── requirements.txt
-│   │   └── requirements.lock.txt
-│   │
-│   ├── trading-service/        # 指标计算服务
-│   │   ├── src/
-│   │   │   ├── indicators/     # 38个指标类（9增量+29批量）
-│   │   │   ├── core/engine.py  # 计算引擎
-│   │   │   └── simple_scheduler.py
-│   │   ├── scripts/start.sh
-│   │   ├── requirements.txt
-│   │   └── requirements.lock.txt
-│   │
-│   ├── telegram-service/       # Telegram Bot
-│   │   ├── src/
-│   │   │   ├── cards/          # 排行榜卡片
-│   │   │   ├── signals/        # 信号检测引擎
-│   │   │   ├── bot/app.py      # Bot 主程序
-│   │   │   └── main.py
-│   │   ├── scripts/start.sh
-│   │   ├── requirements.txt
-│   │   └── requirements.lock.txt
-│   │
-│   └── ai-service/             # AI 分析服务
-│       ├── src/
-│       │   ├── data/           # 数据获取
-│       │   ├── llm/            # LLM 客户端
-│       │   ├── prompt/         # Prompt 管理
-│       │   └── bot/            # Bot 集成
-│       ├── prompts/            # Prompt 模板
-│       ├── scripts/start.sh
-│       └── requirements.txt
+├── services/                       # 稳定版微服务 (5个)
+│   ├── data-service/               # 加密货币数据采集
+│   ├── trading-service/            # 指标计算
+│   ├── telegram-service/           # Telegram Bot
+│   ├── ai-service/                 # AI 分析
+│   └── signal-service/             # 信号检测
 │
-├── services-preview/           # 预览版微服务 (4个，开发中)
-│   ├── markets-service/        # 全市场数据采集（美股/A股/宏观）
-│   │   ├── src/
-│   │   │   ├── providers/      # 数据源适配器 (8个)
-│   │   │   ├── collectors/     # 采集任务调度
-│   │   │   ├── models/         # 标准化数据模型
-│   │   │   └── core/           # 核心框架
-│   │   ├── scripts/start.sh
-│   │   ├── requirements.txt
-│   │   └── requirements.lock.txt
-│   │
-│   ├── predict-service/        # 预测市场信号微服务
-│   │   ├── services/           # 子服务 (polymarket/kalshi/opinion)
-│   │   ├── docs/               # 需求/设计/ADR/Prompt 文档
-│   │   └── libs/               # 共享库
-│   │
-│   ├── vis-service/            # 可视化渲染服务（FastAPI）
-│   │   ├── src/                # 模板注册与渲染
-│   │   ├── scripts/start.sh
-│   │   └── requirements.txt
-│   │
-│   └── order-service/          # 交易执行服务
-│       ├── src/
-│       │   └── market-maker/   # A-S 做市系统
-│       ├── requirements.txt
-│       └── requirements.lock.txt
+├── services-preview/               # 预览版微服务 (5个)
+│   ├── markets-service/            # 全市场数据采集
+│   ├── vis-service/                # 可视化渲染
+│   ├── order-service/              # 交易执行
+│   ├── predict-service/            # 预测市场（Node.js）
+│   └── fate-service/               # 命理服务
 │
 ├── libs/
-│   ├── database/
+│   ├── database/                   # 数据库文件
 │   │   └── services/telegram-service/
-│   │       └── market_data.db  # SQLite 指标数据
-│   └── common/                 # 共享工具库
-│       ├── i18n.py             # 国际化模块
-│       ├── symbols.py          # 币种管理模块
-│       └── proxy_manager.py    # 代理管理器
+│   │       └── market_data.db      # SQLite 指标数据
+│   └── common/                     # 共享工具库
+│       ├── i18n.py                 # 国际化模块
+│       ├── symbols.py              # 币种管理模块
+│       └── proxy_manager.py        # 代理管理器
 │
-├── Makefile                    # 常用命令快捷方式
-├── README.md                   # 项目文档
-└── AGENTS.md                   # 本文档
+├── Makefile                        # 常用命令快捷方式
+├── pyproject.toml                  # 根级项目配置
+├── README.md                       # 项目文档（中文）
+├── README_EN.md                    # 项目文档（英文）
+└── AGENTS.md                       # 本文档
 ```
 
-### 6.1 关键入口文件
+### 6.1 服务标准化结构
 
-| 文件 | 说明 |
-|:---|:---|
-| `services/data-service/src/__main__.py` | data-service 入口 |
-| `services-preview/markets-service/src/__main__.py` | markets-service 入口 |
-| `services/trading-service/src/simple_scheduler.py` | trading-service 调度器 |
-| `services/telegram-service/src/main.py` | telegram-service 入口 |
-| `services/telegram-service/src/bot/app.py` | Bot 主逻辑 |
-| `services/ai-service/src/bot/handler.py` | AI 分析处理器 |
-| `services-preview/vis-service/src/main.py` | vis-service FastAPI 入口 |
+每个服务遵循统一结构：
 
-### 6.2 核心模块
-
-| 模块 | 路径 | 说明 |
-|:---|:---|:---|
-| 指标计算引擎 | `trading-service/src/core/engine.py` | 批量计算指标 |
-| K线形态检测 | `trading-service/src/indicators/batch/k_pattern.py` | TA-Lib + patternpy |
-| 期货情绪聚合 | `trading-service/src/indicators/batch/futures_aggregate.py` | OI/多空比/情绪 |
-| 数据提供者 | `telegram-service/src/cards/data_provider.py` | 读取 SQLite + 币种过滤 |
-| i18n 国际化 | `libs/common/i18n.py` | gettext 封装，支持 zh_CN/en |
-| 可视化模板 | `vis-service/src/templates/registry.py` | 8 个内置模板（line-basic/kline-basic/macd/equity-drawdown/market-vpvr-heat/vpvr-zone-dot/vpvr-zone-grid/vpvr-zone-strip）|
-| 单币快照 | `telegram-service/src/bot/single_token_snapshot.py` | 单币多周期数据表格 |
-| 共享币种模块 | `libs/common/symbols.py` | 统一币种过滤逻辑 |
-| 代理管理器 | `libs/common/proxy_manager.py` | 运行时代理重试+冷却 |
+```
+<service>/
+├── .python-version         # Python 版本 (3.12)
+├── .gitignore              # Git 忽略规则
+├── .venv/                  # 虚拟环境（不提交）
+├── Makefile                # 服务级 Make 命令
+├── pyproject.toml          # 项目配置（含 ruff/pytest/mypy）
+├── requirements.txt        # 运行依赖
+├── requirements-dev.txt    # 开发依赖
+├── requirements.lock.txt   # 锁定依赖
+├── src/                    # 源代码
+│   ├── __init__.py
+│   └── __main__.py         # 入口
+├── tests/                  # 测试
+│   ├── __init__.py
+│   └── conftest.py
+├── scripts/
+│   └── start.sh            # 启动脚本
+└── logs/                   # 日志目录
+```
 
 ---
 
@@ -375,9 +371,6 @@ tradecat/
 
 ### 7.1 TA-Lib 安装失败
 
-**问题**：`pip install TA-Lib` 报错
-
-**解决**：
 ```bash
 # 先安装系统库
 wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
@@ -389,87 +382,30 @@ cd .. && rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
 pip install TA-Lib
 ```
 
-### 7.2 K线形态显示"无形态"
+### 7.2 数据库连接失败
 
-**问题**：K线形态检测不工作
-
-**解决**：
 ```bash
-# 安装形态检测库
-pip install m-patternpy
-pip install tradingpattern --no-deps  # 忽略 numpy 版本冲突
-```
-
-### 7.3 数据库连接失败
-
-**问题**：无法连接 TimescaleDB
-
-**检查**：
-```bash
-# 检查端口
-ss -tlnp | grep 5433
+# 检查端口（默认 5434）
+ss -tlnp | grep 5434
 
 # 测试连接
-PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -c "\l"
+PGPASSWORD=postgres psql -h localhost -p 5434 -U postgres -c "\l"
 ```
 
-### 7.4 Telegram Bot 无法启动
+### 7.3 虚拟环境问题
 
-**问题**：Bot 启动报错
-
-**检查**：
-1. 确认 `config/.env` 中 `BOT_TOKEN` 已设置
-2. 检查代理配置（如需）：
-   ```bash
-   export HTTPS_PROXY=http://127.0.0.1:7890
-   ```
-
-### 7.5 虚拟环境问题
-
-**问题**：找不到模块
-
-**解决**：
 ```bash
-# 确保激活正确的虚拟环境
-source services/<service>/.venv/bin/activate
-
-# 重新安装依赖
-pip install -r requirements.txt
+# 重建虚拟环境（依赖坏了用这个）
+cd services/<service>
+make reset
 ```
 
-### 7.6 端口与配置漂移
+### 7.4 .env 权限问题
 
-**问题**：TimescaleDB 端口不一致或多份 .env 导致读取错误
-
-**说明**：
-- `config/.env.example` 默认端口 **5434**（新库，含 raw/agg/quality schema），但仓库脚本（`scripts/export_timescaledb.sh`、`scripts/timescaledb_compression.sh` 等）默认 **5433**（旧库）。
-- 服务启动脚本仅读取 `config/.env`，且会校验权限 600；`scripts/install.sh` 生成的各服务 `.env` 不再被读取，可能造成配置漂移。
-
-**解决**：
 ```bash
-# 方案 A：统一使用旧库 5433
-sed -i 's@localhost:5434@localhost:5433@' config/.env
-
-# 方案 B：统一使用新库 5434（需同步修改脚本）
-# 修改 scripts/export_timescaledb.sh、scripts/timescaledb_compression.sh 中的端口
-
-# 确保权限符合要求
+# 服务启动脚本要求 600 权限
 chmod 600 config/.env
 ```
-
-### 7.7 新旧库并存（markets-service 相关）
-
-**现象**：`services-preview/markets-service/scripts/init_market_db.sh`、`import_bookdepth.py`、`sync_from_old_db.sh` 及 `scripts/ddl/01_enums_schemas.sql`、`migrate_5434.sql` 默认指向 5434（新库），并包含“5433 -> 5434”迁移脚本；而顶层运维脚本默认 5433。
-
-**约束**：
-- 执行 markets-service 脚本前确认目标端口；若全局改回 5433，需同步这些脚本与 SQL 文件。
-- 避免在未决端口下写入生产库；若不确定，先导出备份：`./scripts/export_timescaledb.sh`。
-
-### 7.8 双库操作指南（旧库 5433 / 新库 5434）
-
-- 旧库（5433，schema=market_data）：被 `scripts/export_timescaledb.sh`、`scripts/timescaledb_compression.sh` 及大部分示例命令使用。沿用旧链路时，请把 `config/.env` 设为 5433，并将 markets-service 相关脚本端口改为 5433。
-- 新库（5434，schema=raw/agg/quality）：`config/.env.example` 与 markets-service 初始化/迁移脚本默认指向。若使用新库，需同步修改顶层运维脚本和 README/AGENTS 示例端口为 5434，确保采集/压缩/导出一致。
-- 禁止混指：服务与脚本端口不一致会导致数据分叉或压缩失败；调整前先备份 `./scripts/export_timescaledb.sh`（当前默认 5433）。<!-- TODO: 若决定迁移到 5434，给出统一替换清单与执行顺序 -->
 
 ---
 
@@ -489,26 +425,23 @@ chmod 600 config/.env
 - `docs`: 文档更新
 - `refactor`: 重构
 - `chore`: 杂项
+- `style`: 代码格式
 
 **示例**：
 ```
 feat(trading): 添加 K线形态检测指标
 fix(telegram): 修复排行榜数据加载错误
 docs: 更新 README 快速开始指南
+chore: standardize project structure for all services
 ```
 
-### 8.2 分支策略
+### 8.2 提交前检查清单
 
-- `main`: 稳定分支
-- `feature/*`: 功能开发
-- `fix/*`: Bug 修复
-
-### 8.3 提交前检查清单
-
-- [ ] 代码通过语法检查
+- [ ] 代码通过 `make lint`
+- [ ] 测试通过 `make test`（如有）
 - [ ] 相关文档已更新
 - [ ] 配置变更已同步到 `config/.env.example`
-- [ ] 新依赖已添加到 `requirements.txt`
+- [ ] 新依赖已添加到 `requirements.txt` 并 `make lock`
 
 ---
 
@@ -520,141 +453,73 @@ docs: 更新 README 快速开始指南
 
 | 变更类型 | 需更新的文档 |
 |:---|:---|
-| 新增/修改命令 | README.md, AGENTS.md |
-| 新增/修改配置项 | README.md, `config/.env.example` |
+| 新增/修改命令 | README.md, README_EN.md, AGENTS.md |
+| 新增/修改配置项 | README.md, README_EN.md, `config/.env.example` |
 | 新增/修改指标 | README.md (指标列表) |
-| 目录结构变更 | README.md, AGENTS.md |
-| 依赖变更 | README.md, `requirements.txt` |
+| 目录结构变更 | README.md, README_EN.md, AGENTS.md |
+| 新增/修改服务 | README.md, README_EN.md, AGENTS.md |
 
-### 9.2 TODO 标注规则
+### 9.2 文档更新原则
 
-对于无法确认的信息，使用以下格式标注：
-
-```markdown
-<!-- TODO: 需确认 <具体问题>，查看 <文件/路径> -->
-```
-
-### 9.3 禁止猜测
-
-- 不确定的端口、路径、命令**必须**标注 TODO
-- 不确定的配置项**必须**查看 `config/.env.example` 确认
-- 不确定的依赖版本**必须**查看 `requirements.txt` 确认
+- 以实时代码为唯一源头
+- 不确定的端口、路径、命令**必须**验证后再写入
+- 三份文档（README.md、README_EN.md、AGENTS.md）保持同步
 
 ---
 
 ## 10. 环境变量参考
 
-所有配置集中在 `config/.env`，详细说明见配置文件注释。
+所有配置集中在 `config/.env`，详细说明见 `config/.env.example`。
 
 ### 10.1 核心配置
 
 | 变量 | 说明 | 示例 |
 |:---|:---|:---|
-| `DATABASE_URL` | TimescaleDB 连接串（模板默认 5434 新库） | `postgresql://postgres:postgres@localhost:5434/market_data` |
-| `MARKET_DB_SCHEMA` | 兼容旧表/视图用 schema | `market_data` |
-| `RAW_DB_SCHEMA` | 1m K线、5m指标真实写入 schema | `raw` |
-| `QUALITY_DB_SCHEMA` | 批次/血缘函数所在 schema | `quality` |
+| `DATABASE_URL` | TimescaleDB 连接串 | `postgresql://postgres:postgres@localhost:5434/market_data` |
 | `BOT_TOKEN` | Telegram Bot Token | `123456:ABC...` |
 | `HTTP_PROXY` | HTTP 代理 | `http://127.0.0.1:9910` |
 | `DEFAULT_LOCALE` | 默认语言 | `en` |
-| `SUPPORTED_LOCALES` | 支持语言列表 | `zh-CN,en` |
-| `FALLBACK_LOCALE` | 翻译回退语言 | `zh-CN` |
 
 ### 10.2 币种管理
 
-| 变量 | 说明 | 示例 |
-|:---|:---|:---|
-| `SYMBOLS_GROUPS` | 使用的分组（默认 `main4`=BTC/ETH/SOL/BNB） | `main4`, `main6`, `main20`, `auto`, `all`, `defi,meme` |
-| `SYMBOLS_GROUP_xxx` | 自定义分组 | `BTCUSDT,ETHUSDT,...` |
-| `SYMBOLS_EXTRA` | 额外添加 | `NEWUSDT` |
-| `SYMBOLS_EXCLUDE` | 强制排除 | `BADUSDT` |
+| 变量 | 说明 |
+|:---|:---|
+| `SYMBOLS_GROUPS` | 使用的分组（main4/main6/main20/auto/all） |
+| `SYMBOLS_EXTRA` | 额外添加的币种 |
+| `SYMBOLS_EXCLUDE` | 强制排除的币种 |
 
 ### 10.3 服务配置
 
 | 变量 | 服务 | 说明 |
 |:---|:---|:---|
-| `BACKFILL_MODE` | data-service | 回填模式，默认 `all`（全量）；可选 `days`/`none`，`full` 等价 `all` |
-| `BACKFILL_START_DATE` | data-service | 全量起始日（可选），设定后按起始日计算回溯天数 |
-| `BACKFILL_DAYS` | data-service | `BACKFILL_MODE=days` 时的回溯天数，默认 30 |
-| `BACKFILL_ON_START` | data-service | 启动时先跑一次补齐（true/false） |
-| `MAX_CONCURRENT` | data-service | 最大并发请求 |
+| `BACKFILL_MODE` | data-service | 回填模式 |
 | `MAX_WORKERS` | trading-service | 计算线程数 |
-| `COMPUTE_BACKEND` | trading-service | 计算后端 (thread/process) |
-| `BINANCE_API_DISABLED` | telegram-service | 禁用 Binance API |
-| `BLOCKED_SYMBOLS` | telegram-service | 屏蔽币种黑名单 |
-| `DISABLE_SINGLE_TOKEN_QUERY` | telegram-service | 禁用单币查询 (0=启用) |
-| `SNAPSHOT_HIDDEN_FIELDS` | telegram-service | 单币快照屏蔽字段 |
-| `AI_INDICATOR_TABLES` | ai-service | 启用的指标表（逗号分隔） |
-| `AI_INDICATOR_TABLES_DISABLED` | ai-service | 禁用的指标表 |
-| `VIS_SERVICE_HOST` | vis-service | 监听地址（默认 0.0.0.0） |
 | `VIS_SERVICE_PORT` | vis-service | 监听端口（默认 8087） |
-| `VIS_SERVICE_TOKEN` | vis-service | 访问令牌（可选） |
-| `VIS_SERVICE_CACHE_TTL_SECONDS` | vis-service | 渲染缓存 TTL（默认 300） |
-| `VIS_SERVICE_CACHE_MAX_ITEMS` | vis-service | 缓存容量上限（默认 128） |
-| `MARKETS_SERVICE_DATABASE_URL` | markets-service | 独立数据库连接（留空复用全局） |
-| `CRYPTO_WRITE_MODE` | markets-service | 加密货币写入模式（raw/legacy） |
-| `ORDER_BOOK_INTERVAL` | markets-service | 逐档盘口采样间隔（默认 10 秒） |
-| `ORDER_BOOK_DEPTH` | markets-service | 每侧档位数（默认 1000） |
-| `ORDER_BOOK_RETENTION_DAYS` | markets-service | 盘口数据保留天数（默认 30） |
 
 ---
 
 ## 11. 快速参考卡片
 
-### 常用命令速查
-
 ```bash
 # 初始化
-./scripts/init.sh               # 初始化所有服务
-./scripts/init.sh data-service  # 初始化单个服务
+./scripts/init.sh
 
-# 启动服务
-./scripts/start.sh start        # 启动所有服务
-./scripts/start.sh stop         # 停止所有服务
-./scripts/start.sh status       # 查看状态
-./scripts/start.sh restart      # 重启
-
-# Make 快捷命令
-make init                       # 初始化
-make start                      # 启动
-make stop                       # 停止
-make status                     # 查看状态
+# 启动/停止
+./scripts/start.sh start|stop|status
 
 # 单服务管理
-cd services/trading-service
-./scripts/start.sh start        # 启动
-./scripts/start.sh stop         # 停止
-./scripts/start.sh status       # 状态
+cd services/<name> && make start|stop|status
 
-# markets-service（多市场采集，预览版）
-cd services-preview/markets-service
-./scripts/start.sh start        # 启动
-./scripts/crypto-daemon.sh      # 加密货币守护进程
-
-# vis-service（可视化渲染，预览版）
-cd services-preview/vis-service
-./scripts/start.sh start        # 启动
-./scripts/start.sh stop         # 停止
-./scripts/start.sh status       # 状态
+# 代码检查
+cd services/<name> && make lint format test
 
 # 验证
-./scripts/verify.sh             # 运行验证
+./scripts/verify.sh
 
 # 数据库
-PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d market_data
+PGPASSWORD=postgres psql -h localhost -p 5434 -U postgres -d market_data
 sqlite3 libs/database/services/telegram-service/market_data.db
 
 # 备份
 ./scripts/export_timescaledb.sh
 ```
-
-### 关键路径速查
-
-| 用途 | 路径 |
-|:---|:---|
-| 统一配置 | `config/.env` |
-| 配置模板 | `config/.env.example` |
-| 指标代码 | `services/trading-service/src/indicators/` |
-| 排行榜卡片 | `services/telegram-service/src/cards/` |
-| SQLite 数据 | `libs/database/services/telegram-service/market_data.db` |
-| 日志目录 | `services/*/logs/` |

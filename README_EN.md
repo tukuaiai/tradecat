@@ -773,7 +773,7 @@ tradecat/
 │   ├── export_timescaledb.sh       # Data export
 │   └── timescaledb_compression.sh  # Compression management
 │
-├── 📂 services/                    # Stable Microservices (4)
+├── 📂 services/                    # Stable Microservices (5)
 │   │
 │   ├── 📂 data-service/            # Crypto data collection service
 │   │   ├── 📂 src/
@@ -781,15 +781,19 @@ tradecat/
 │   │   │   ├── 📂 adapters/        # Adapters
 │   │   │   └── config.py
 │   │   ├── 📂 scripts/
+│   │   ├── Makefile
+│   │   ├── pyproject.toml
 │   │   ├── requirements.txt
 │   │   └── requirements.lock.txt
 │   │
 │   ├── 📂 trading-service/         # Indicator calculation service
 │   │   ├── 📂 src/
-│   │   │   ├── 📂 indicators/      # 38 indicator classes (9 incremental + 29 batch)
+│   │   │   ├── 📂 indicators/      # 38 indicator classes
 │   │   │   ├── 📂 core/            # Compute engine
 │   │   │   └── simple_scheduler.py
 │   │   ├── 📂 scripts/
+│   │   ├── Makefile
+│   │   ├── pyproject.toml
 │   │   ├── requirements.txt
 │   │   └── requirements.lock.txt
 │   │
@@ -800,20 +804,35 @@ tradecat/
 │   │   │   ├── 📂 bot/             # Bot main program
 │   │   │   └── main.py
 │   │   ├── 📂 scripts/
+│   │   ├── Makefile
+│   │   ├── pyproject.toml
 │   │   ├── requirements.txt
 │   │   └── requirements.lock.txt
 │   │
-│   └── 📂 ai-service/              # AI analysis service
+│   ├── 📂 ai-service/              # AI analysis service
+│   │   ├── 📂 src/
+│   │   │   ├── 📂 data/            # Data fetching
+│   │   │   ├── 📂 llm/             # LLM client
+│   │   │   ├── 📂 prompt/          # Prompt management
+│   │   │   └── 📂 bot/             # Bot integration
+│   │   ├── 📂 prompts/             # Prompt templates
+│   │   ├── 📂 scripts/
+│   │   ├── Makefile
+│   │   ├── pyproject.toml
+│   │   └── requirements.txt
+│   │
+│   └── 📂 signal-service/          # Signal detection service
 │       ├── 📂 src/
-│       │   ├── 📂 data/            # Data fetching
-│       │   ├── 📂 llm/             # LLM client
-│       │   ├── 📂 prompt/          # Prompt management
-│       │   └── 📂 bot/             # Bot integration
-│       ├── 📂 prompts/             # Prompt templates
+│       │   ├── 📂 engines/         # Detection engines
+│       │   ├── 📂 rules/           # Signal rules
+│       │   └── 📂 formatters/      # Output formatters
 │       ├── 📂 scripts/
+│       ├── 📂 tests/
+│       ├── Makefile
+│       ├── pyproject.toml
 │       └── requirements.txt
 │
-├── 📂 services-preview/            # Preview Microservices (4, in development)
+├── 📂 services-preview/            # Preview Microservices (5, in development)
 │   │
 │   ├── 📂 markets-service/         # Multi-market data collection (US/China stocks, macro)
 │   │   ├── 📂 src/
@@ -833,13 +852,25 @@ tradecat/
 │   ├── 📂 vis-service/             # Visualization rendering service
 │   │   ├── 📂 src/                 # FastAPI entry & template rendering
 │   │   ├── 📂 scripts/             # Start scripts
+│   │   ├── Makefile
+│   │   ├── pyproject.toml
 │   │   └── requirements.txt
 │   │
-│   └── 📂 order-service/           # Trade execution service
-│       ├── 📂 src/
-│       │   └── 📂 market-maker/    # A-S market making system
-│       ├── requirements.txt
-│       └── requirements.lock.txt
+│   ├── 📂 order-service/           # Trade execution service
+│   │   ├── 📂 src/
+│   │   │   └── 📂 market-maker/    # A-S market making system
+│   │   ├── Makefile
+│   │   ├── pyproject.toml
+│   │   ├── requirements.txt
+│   │   └── requirements.lock.txt
+│   │
+│   └── 📂 fate-service/            # Fortune telling service
+│       ├── 📂 services/            # Sub-services
+│       │   └── 📂 telegram-service/ # Fortune Bot
+│       ├── 📂 libs/                # Shared libraries
+│       ├── Makefile
+│       ├── pyproject.toml
+│       └── requirements-dev.txt
 │
 ├── 📂 libs/                        # Shared libraries
 │   ├── 📂 database/                # Database files
