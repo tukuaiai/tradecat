@@ -8,7 +8,6 @@ import os
 import sys
 import asyncio
 import logging
-import requests
 import time
 import json
 import threading
@@ -18,35 +17,6 @@ import importlib.util
 logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("apscheduler").setLevel(logging.WARNING)
-print("🔐 全局SSL验证已启用 - 使用正确的证书配置")
-
-# SSL证书支持
-try:
-    import certifi
-    CERTIFI_AVAILABLE = True
-    print(f"[OK] certifi可用，证书路径: {certifi.where()}")
-except ImportError:
-    CERTIFI_AVAILABLE = False
-    print("[WARNING] certifi不可用，将使用系统默认证书")
-
-# Windows SSL证书支持
-try:
-    import wincertstore  # noqa: F401
-    WINCERTSTORE_AVAILABLE = True
-    print("[OK] wincertstore库已加载，支持Windows证书存储")
-except ImportError:
-    WINCERTSTORE_AVAILABLE = False
-    print("[INFO] wincertstore库未安装")
-
-# python-certifi-win32支持
-try:
-    import certifi_win32
-    certifi_win32.wincerts.where()  # 这会自动将Windows证书添加到certifi
-    CERTIFI_WIN32_AVAILABLE = True
-    print("[OK] python-certifi-win32已加载，Windows证书已集成到certifi")
-except ImportError:
-    CERTIFI_WIN32_AVAILABLE = False
-    print("[INFO] python-certifi-win32库未安装")
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -853,45 +823,6 @@ class DataManager:
     def validate_data_integrity():
         return {"issues_found": [], "fixes_applied": [], "success": True}
 
-class BinanceFuturesClient:
-    """币安合约API客户端 - 已废弃，数据由 data-service 采集
-    
-    保留空实现以兼容现有代码，所有方法返回空数据。
-    实际数据应从 SQLite/缓存读取。
-    """
-
-    def __init__(self):
-        logger.info("⚠️ BinanceFuturesClient 已废弃，数据由 data-service 提供")
-
-    def ping(self):
-        return {}
-
-    def get_exchange_info(self, force_refresh=False):
-        return None
-
-    def get_depth(self, symbol, limit=500):
-        return None
-
-    def get_premium_index(self, symbol=None):
-        return None
-
-    def get_24hr_ticker(self, symbol=None):
-        return None
-
-    def get_open_interest(self, symbol):
-        return None
-
-    def get_open_interest_hist(self, symbol, period, limit=30, start_time=None, end_time=None):
-        return None
-
-    def get_long_short_ratio(self, symbol, period, limit=30, start_time=None, end_time=None):
-        return None
-
-    def get_global_long_short_account_ratio(self, symbol, period, limit=30, start_time=None, end_time=None):
-        return None
-
-    def get_klines(self, symbol, interval, start_time=None, end_time=None, limit=500):
-        return None
 
 class UserRequestHandler:
     """专门处理用户请求的轻量级处理器 - 只读取缓存，不进行网络请求"""
@@ -2174,7 +2105,6 @@ class UserRequestHandler:
 
 class TradeCatBot:
     def __init__(self):
-        self.futures_client = BinanceFuturesClient()
         self._active_symbols = None
         self._active_symbols_timestamp = 0
         self._is_initialized = False
@@ -2384,38 +2314,13 @@ class TradeCatBot:
         # 首先尝试从文件加载缓存
         cache_loaded = self.load_cache_from_file()
         if cache_loaded:
-            logger.info("📄 使用文件缓存数据，跳过部分网络请求")
+            logger.info("📄 使用文件缓存数据")
         else:
-            logger.info("🌐 文件缓存无效，将重新获取所有数据")
+            logger.info("🌐 文件缓存无效，将从数据库加载")
 
-        # 预加载数据的任务列表 - 扩展更多缓存
+        # 预加载数据的任务列表 - 仅使用本地数据源
         cache_tasks = [
-            # 核心数据源
-            ('ticker_24hr_data', self.fetch_24hr_ticker_data),
-            ('funding_rate_data', self.fetch_funding_rate_data),
-            ('open_interest_data', self.fetch_open_interest_data),
-            ('market_depth_data', self.fetch_market_depth_data),
-            ('liquidation_data', self.fetch_liquidation_data),
-
-            # 多空比数据（不同周期）
-            ('long_short_ratio_data_1d', lambda: self.fetch_long_short_ratio_data('1d')),
-            ('long_short_ratio_data_4h', lambda: self.fetch_long_short_ratio_data('4h')),
-            ('long_short_ratio_data_1h', lambda: self.fetch_long_short_ratio_data('1h')),
-
-            # 持仓量历史数据（不同周期）
-            ('open_interest_hist_24h', lambda: self.fetch_open_interest_hist_data('24h')),
-            ('open_interest_hist_4h', lambda: self.fetch_open_interest_hist_data('4h')),
-            ('open_interest_hist_1h', lambda: self.fetch_open_interest_hist_data('1h')),
-            ('open_interest_hist_15m', lambda: self.fetch_open_interest_hist_data('15m')),
-
-            # K线交易量数据（不同周期）
-            ('volume_kline_data_24h', lambda: self.fetch_kline_volume_data('24h')),
-            ('volume_kline_data_12h', lambda: self.fetch_kline_volume_data('12h')),
-            ('volume_kline_data_4h', lambda: self.fetch_kline_volume_data('4h')),
-            ('volume_kline_data_1h', lambda: self.fetch_kline_volume_data('1h')),
-            ('volume_kline_data_15m', lambda: self.fetch_kline_volume_data('15m')),
-
-            # 预计算的市场指标（减少实时计算压力）
+            # 预计算的市场指标（从 SQLite 读取）
             ('market_sentiment_cache', self.compute_market_sentiment_data),
             ('top_gainers_cache', lambda: self.compute_top_movers_data('gainers')),
             ('top_losers_cache', lambda: self.compute_top_movers_data('losers')),
@@ -2471,40 +2376,7 @@ class TradeCatBot:
         await loop.run_in_executor(None, self.save_cache_to_file)
 
         self._is_initialized = True
-        logger.info("🎉 缓存初始化完成！所有数据已预加载并保存到文件")
-
-        # 启动快速预热模式，确保最关键数据立即可用
-        await self.quick_warmup_cache()
-
-    async def quick_warmup_cache(self):
-        """快速预热关键缓存 - 确保用户立即可以使用最重要的功能"""
-        logger.info("🔥 开始快速预热关键缓存...")
-
-        # 最高优先级：立即确保这些数据可用
-        if BINANCE_API_DISABLED:
-            logger.info("⏸️ BINANCE_API_DISABLED=1，跳过关键数据预热")
-            return
-        critical_tasks = [
-            ('ticker_24hr_data', self.fetch_24hr_ticker_data),
-            ('funding_rate_data', self.fetch_funding_rate_data),
-        ]
-
-        # 如果这些关键数据不在缓存中，立即获取
-        for key, fetch_func in critical_tasks:
-            if key not in cache or not cache[key].get('data'):
-                logger.info(f"🚨 关键数据缺失，立即获取: {key}")
-                try:
-                    loop = asyncio.get_event_loop()
-                    data = await loop.run_in_executor(None, fetch_func)
-                    if data:
-                        cache[key] = {'data': data, 'timestamp': time.time()}
-                        logger.info(f"✅ 关键数据预热完成: {key}")
-                    else:
-                        logger.warning(f"⚠️ 关键数据预热失败: {key}")
-                except Exception as e:
-                    logger.error(f"❌ 关键数据预热异常: {key} - {e}")
-
-        logger.info("🔥 快速预热完成，机器人可立即响应用户请求！")
+        logger.info("🎉 缓存初始化完成！")
 
     def get_cached_data_only(self, key):
         """仅获取缓存数据，不进行网络请求"""
@@ -2636,30 +2508,19 @@ class TradeCatBot:
                     return key, cache[key]
                 return key, None
 
-        # 只更新最关键的数据，减少更新时间
+        # 数据由 data-service 采集，此处仅更新本地计算的缓存
         critical_tasks = [
-            ('ticker_24hr_data', self.fetch_24hr_ticker_data),
-            ('funding_rate_data', self.fetch_funding_rate_data),
+            ('active_symbols_cache', lambda: self.get_active_symbols(force_refresh=True)),
         ]
 
-        # 分批执行，每批之间有延迟，确保用户请求有机会处理
-        logger.info("🚀 开始执行关键任务...")
-        for i, (key, func) in enumerate(critical_tasks):
+        for key, func in critical_tasks:
             try:
-                # 每个任务单独执行，失败不影响其他任务
                 result = await fetch_lightweight(key, func)
                 if result[1] is not None:
                     new_cache_data[result[0]] = result[1]
-
-                # 任务间休息，让用户交互有机会处理
-                if i < len(critical_tasks) - 1:
-                    await asyncio.sleep(0.5)
-
             except Exception as e:
-                logger.error(f"关键任务 {key} 异常: {e}")
-                continue
+                logger.error(f"任务 {key} 异常: {e}")
 
-        # 如果有数据更新成功，原子性更新全局缓存
         if new_cache_data:
             # 快速原子性更新
             cache.update(new_cache_data)
@@ -2677,144 +2538,8 @@ class TradeCatBot:
             logger.warning("⚠️ 本次轻量级更新没有获取到新数据")
 
     async def update_cache_non_blocking(self):
-        """真正非阻塞的缓存更新 - 重定向到轻量级更新（保留兼容性）"""
+        """非阻塞缓存更新 - 重定向到轻量级更新"""
         await self.update_cache_lightweight()
-        return  # 提前返回，避免执行原来的重型更新逻辑
-
-        # 原来的重型更新逻辑保留但不执行
-        global cache
-        logger.info("📊 开始真正非阻塞缓存更新...")
-
-        # 创建新的缓存数据
-        new_cache_data = {}
-
-        # 将所有同步函数包装为异步任务
-        async def fetch_async(key, fetch_func):
-            """异步包装器，在线程池中执行同步API调用"""
-            try:
-                logger.info(f"🔄 更新 {key}...")
-                # 在线程池中执行，避免阻塞事件循环
-                loop = asyncio.get_event_loop()
-                data = await loop.run_in_executor(None, fetch_func)
-
-                if data:
-                    logger.info(f"✅ {key} 更新完成，数据量: {len(data) if isinstance(data, list) else 1}")
-                    return key, {'data': data, 'timestamp': time.time()}
-                else:
-                    logger.warning(f"⚠️ {key} 数据为空，保留旧缓存")
-                    # 保留旧缓存数据
-                    if key in cache:
-                        return key, cache[key]
-                    return key, None
-
-            except Exception as e:
-                logger.error(f"❌ 更新 {key} 失败: {e}")
-                # 保留旧缓存数据
-                if key in cache:
-                    logger.info(f"🔄 保留 {key} 的旧缓存数据")
-                    return key, cache[key]
-                return key, None
-
-        # 分组任务 - 按优先级和依赖关系分批处理
-        high_priority_tasks = [
-            ('ticker_24hr_data', self.fetch_24hr_ticker_data),
-            ('funding_rate_data', self.fetch_funding_rate_data),
-        ]
-
-        medium_priority_tasks = [
-            ('open_interest_data', self.fetch_open_interest_data),
-            ('market_depth_data', self.fetch_market_depth_data),
-            ('liquidation_data', self.fetch_liquidation_data),
-        ]
-
-        low_priority_tasks = [
-            # 多空比数据
-            ('long_short_ratio_data_1d', lambda: self.fetch_long_short_ratio_data('1d')),
-            ('long_short_ratio_data_4h', lambda: self.fetch_long_short_ratio_data('4h')),
-            ('long_short_ratio_data_1h', lambda: self.fetch_long_short_ratio_data('1h')),
-
-            # 持仓量历史数据
-            ('open_interest_hist_24h', lambda: self.fetch_open_interest_hist_data('24h')),
-            ('open_interest_hist_4h', lambda: self.fetch_open_interest_hist_data('4h')),
-            ('open_interest_hist_1h', lambda: self.fetch_open_interest_hist_data('1h')),
-            ('open_interest_hist_15m', lambda: self.fetch_open_interest_hist_data('15m')),
-
-            # K线交易量数据
-            ('volume_kline_data_24h', lambda: self.fetch_kline_volume_data('24h')),
-            ('volume_kline_data_12h', lambda: self.fetch_kline_volume_data('12h')),
-            ('volume_kline_data_4h', lambda: self.fetch_kline_volume_data('4h')),
-            ('volume_kline_data_1h', lambda: self.fetch_kline_volume_data('1h')),
-            ('volume_kline_data_15m', lambda: self.fetch_kline_volume_data('15m')),
-
-            # 预计算数据
-            ('market_sentiment_cache', self.compute_market_sentiment_data),
-            ('top_gainers_cache', lambda: self.compute_top_movers_data('gainers')),
-            ('top_losers_cache', lambda: self.compute_top_movers_data('losers')),
-            ('active_symbols_cache', lambda: self.get_active_symbols(force_refresh=True)),
-        ]
-
-        # 第一批：高优先级任务（并发执行）
-        logger.info("🚀 开始执行高优先级任务...")
-        tasks = [fetch_async(key, func) for key, func in high_priority_tasks]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        for result in results:
-            if isinstance(result, Exception):
-                logger.error(f"高优先级任务异常: {result}")
-            elif result[1] is not None:
-                new_cache_data[result[0]] = result[1]
-
-        # 中间休息，让用户交互有机会处理
-        await asyncio.sleep(0.1)
-
-        # 第二批：中优先级任务（并发执行）
-        logger.info("⚡ 开始执行中优先级任务...")
-        tasks = [fetch_async(key, func) for key, func in medium_priority_tasks]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        for result in results:
-            if isinstance(result, Exception):
-                logger.error(f"中优先级任务异常: {result}")
-            elif result[1] is not None:
-                new_cache_data[result[0]] = result[1]
-
-        # 中间休息，让用户交互有机会处理
-        await asyncio.sleep(0.1)
-
-        # 第三批：低优先级任务（分小批次执行）
-        logger.info("🔄 开始执行低优先级任务...")
-        batch_size = 3  # 每批3个任务
-
-        for i in range(0, len(low_priority_tasks), batch_size):
-            batch = low_priority_tasks[i:i+batch_size]
-            tasks = [fetch_async(key, func) for key, func in batch]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            for result in results:
-                if isinstance(result, Exception):
-                    logger.error(f"低优先级任务异常: {result}")
-                elif result[1] is not None:
-                    new_cache_data[result[0]] = result[1]
-
-            # 每批次之间休息，确保用户交互流畅
-            if i + batch_size < len(low_priority_tasks):
-                await asyncio.sleep(0.2)
-
-        # 统计更新结果
-        updated_count = len([k for k, v in new_cache_data.items() if v is not None and k not in cache or cache[k] != v])
-
-        # 如果有数据更新成功，则更新全局缓存并保存到新文件
-        if new_cache_data:
-            # 原子性更新全局缓存
-            cache.update(new_cache_data)
-
-            # 异步保存到新的缓存文件（在线程池中执行）
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, lambda: self.save_cache_to_file(force_new_file=True))
-
-            logger.info(f"🎉 真正非阻塞缓存更新完成！成功更新 {updated_count} 个数据源")
-        else:
-            logger.warning("⚠️ 没有数据更新成功，保持现有缓存")
 
     def get_cache_file_info(self):
         """获取缓存文件信息"""
@@ -2925,225 +2650,6 @@ class TradeCatBot:
         except Exception as e:
             logger.error(f"计算涨跌幅排行数据失败: {e}")
             return None
-
-    def fetch_funding_rate_data(self):
-        """获取资金费率数据 - 使用新的API方法"""
-        return self.futures_client.get_premium_index()
-
-    def fetch_open_interest_data(self):
-        """获取持仓量数据 - 优化版本"""
-        try:
-            active_symbols = self.get_active_symbols()
-            if not active_symbols:
-                return []
-
-            open_interest_data = []
-            # 批量获取持仓量数据，限制并发数量
-            batch_size = 20
-            for i in range(0, min(len(active_symbols), 50), batch_size):
-                batch_symbols = active_symbols[i:i+batch_size]
-
-                for symbol in batch_symbols:
-                    try:
-                        oi_data = self.futures_client.get_open_interest(symbol)
-                        if oi_data and 'openInterest' in oi_data:
-                            open_interest_data.append(oi_data)
-                    except Exception as e:
-                        logger.debug(f"获取{symbol}持仓量失败: {e}")
-                        continue
-
-                # 避免请求过于频繁
-                if i + batch_size < min(len(active_symbols), 50):
-                    time.sleep(0.1)
-
-            return open_interest_data
-
-        except Exception as e:
-            logger.error(f"获取持仓量数据失败: {e}")
-            return []
-
-    def fetch_open_interest_hist_data(self, period='24h'):
-        """获取持仓量历史数据 - 支持不同时间周期"""
-        try:
-            # 主流币种，过滤掉被屏蔽的币种
-            major_symbols = [symbol for symbol in ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT', 'SOLUSDT', 'DOGEUSDT', 'DOTUSDT'] if symbol not in get_blocked_symbols()]
-            hist_data = []
-
-            # 周期映射
-            period_map = {
-                '24h': '1d',
-                '4h': '4h',
-                '1h': '1h',
-                '15m': '15m'
-            }
-
-            api_period = period_map.get(period, '1d')
-
-            for symbol in major_symbols:
-                try:
-                    data = self.futures_client.get_open_interest_hist(
-                        symbol=symbol,
-                        period=api_period,
-                        limit=1  # 只获取最新的数据
-                    )
-                    if data:
-                        # 添加符号标识
-                        for item in data:
-                            item['symbol'] = symbol
-                        hist_data.extend(data)
-                except Exception as e:
-                    logger.debug(f"获取{symbol}持仓量历史失败: {e}")
-                    continue
-
-            return hist_data
-        except Exception as e:
-            logger.error(f"获取持仓量历史数据失败: {e}")
-            return []
-
-    def fetch_long_short_ratio_data(self, period='1d'):
-        """获取多空比数据 - 改进版本"""
-        try:
-            # 获取主流币种的多空比数据，过滤掉被屏蔽的币种
-            major_symbols = [symbol for symbol in ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT'] if symbol not in get_blocked_symbols()]
-            ratio_data = []
-
-            for symbol in major_symbols:
-                try:
-                    data = self.futures_client.get_global_long_short_account_ratio(
-                        symbol=symbol,
-                        period=period,
-                        limit=1
-                    )
-                    if data:
-                        ratio_data.extend(data)
-                except Exception as e:
-                    logger.debug(f"获取{symbol}多空比失败: {e}")
-                    continue
-
-            return ratio_data
-        except Exception as e:
-            logger.error(f"获取多空比数据失败: {e}")
-            return []
-
-    def fetch_liquidation_data(self):
-        """获取爆仓风险数据 - 基于多种指标的综合评估"""
-        try:
-            price_data = self.futures_client.get_24hr_ticker()
-            funding_data = self.fetch_funding_rate_data()
-
-            if not price_data or not funding_data:
-                return []
-
-            # 创建资金费率映射
-            funding_map = {}
-            for item in funding_data:
-                if 'symbol' in item and 'lastFundingRate' in item:
-                    funding_map[item['symbol']] = float(item['lastFundingRate'])
-
-            liquidation_risks = []
-            for item in price_data:
-                if not item.get('symbol', '').endswith('USDT') or item.get('symbol', '') in get_blocked_symbols():
-                    continue
-
-                try:
-                    symbol = item['symbol']
-                    change_24h = float(item.get('priceChangePercent', 0))
-                    volume = float(item.get('quoteVolume', 0))
-                    funding_rate = funding_map.get(symbol, 0)
-
-                    # 计算综合风险评分
-                    # 1. 波动性风险 (24h涨跌幅)
-                    volatility_risk = abs(change_24h) * 0.4
-
-                    # 2. 资金费率风险
-                    funding_risk = abs(funding_rate * 100) * 30
-
-                    # 3. 流动性风险 (交易量越小风险越高)
-                    liquidity_risk = max(0, (1e8 - volume) / 1e8) * 0.2
-
-                    # 4. 价格趋势风险
-                    trend_risk = abs(change_24h) * 0.1 if abs(change_24h) > 10 else 0
-
-                    risk_score = volatility_risk + funding_risk + liquidity_risk + trend_risk
-
-                    liquidation_risks.append({
-                        'symbol': symbol,
-                        'risk_score': risk_score,
-                        'change_24h': change_24h,
-                        'funding_rate': funding_rate * 100,
-                        'volume': volume,
-                        'volatility_risk': volatility_risk,
-                        'funding_risk': funding_risk,
-                        'liquidity_risk': liquidity_risk
-                    })
-
-                except (ValueError, TypeError, KeyError) as e:
-                    logger.debug(f"处理{item.get('symbol', 'unknown')}数据失败: {e}")
-                    continue
-
-            return sorted(liquidation_risks, key=lambda x: x['risk_score'], reverse=True)
-
-        except Exception as e:
-            logger.error(f"获取爆仓风险数据失败: {e}")
-            return []
-
-    def fetch_market_depth_data(self):
-        """获取市场深度数据 - 支持更多币种"""
-        try:
-            # 直接使用已优化的活跃币种列表
-            active_symbols = self.get_active_symbols()
-            if not active_symbols:
-                logger.error("无法获取活跃交易对列表")
-                return []
-
-            # 为了避免API限制，分批处理深度数据
-            # 每次获取前150个最活跃的币种的深度数据（从100个增加）
-            target_symbols = active_symbols[:150]
-
-            logger.info(f"🔄 开始获取{len(target_symbols)}个币种的市场深度数据")
-
-            depth_data = []
-            success_count = 0
-            batch_size = 30  # 每批处理30个币种
-
-            for i in range(0, len(target_symbols), batch_size):
-                batch_symbols = target_symbols[i:i+batch_size]
-                batch_success = 0
-
-                for symbol in batch_symbols:
-                    try:
-                        depth = self.futures_client.get_depth(symbol, limit=20)
-                        if depth and 'bids' in depth and 'asks' in depth and depth['bids'] and depth['asks']:
-                            # 计算买卖盘深度
-                            bid_depth = sum(float(bid[1]) for bid in depth['bids'][:10])
-                            ask_depth = sum(float(ask[1]) for ask in depth['asks'][:10])
-
-                            if bid_depth > 0 and ask_depth > 0:  # 确保深度数据有效
-                                depth_data.append({
-                                    'symbol': symbol,
-                                    'bid_depth': bid_depth,
-                                    'ask_depth': ask_depth,
-                                    'depth_ratio': bid_depth / ask_depth,
-                                    'spread': float(depth['asks'][0][0]) - float(depth['bids'][0][0])
-                                })
-                                success_count += 1
-                                batch_success += 1
-                    except Exception as e:
-                        logger.debug(f"获取{symbol}深度数据失败: {e}")
-                        continue
-
-                # 批次之间添加小延迟，避免API限制
-                if i + batch_size < len(target_symbols):
-                    time.sleep(0.2)  # 200ms延迟
-
-                logger.debug(f"批次 {i//batch_size + 1}: 成功获取 {batch_success}/{len(batch_symbols)} 个币种深度数据")
-
-            logger.info(f"✅ 成功获取{success_count}个币种的市场深度数据")
-            return depth_data
-
-        except Exception as e:
-            logger.error(f"获取市场深度数据失败: {e}")
-            return []
 
     def load_latest_futures_data(self):
         """CoinGlass 本地数据已下线，直接返回 None。"""
@@ -3408,69 +2914,6 @@ class TradeCatBot:
         ]
         return InlineKeyboardMarkup(keyboard)
 
-    def fetch_24hr_ticker_data(self):
-        """获取24小时价格变动数据"""
-        return self.futures_client.get_24hr_ticker()
-
-    def fetch_kline_volume_data(self, period='24h'):
-        """获取指定时间周期的K线交易量数据"""
-        try:
-            # 周期映射到K线间隔
-            period_map = {
-                '24h': '1d',  # 24小时
-                '12h': '12h', # 12小时
-                '4h': '4h',   # 4小时
-                '15m': '15m'  # 15分钟
-            }
-
-            interval = period_map.get(period, '1d')
-            major_symbols = self.get_active_symbols()[:50]  # 获取前50个活跃交易对
-
-            volume_data = []
-
-            for symbol in major_symbols:
-                try:
-                    # 获取最近的K线数据
-                    klines = self.futures_client.get_klines(
-                        symbol=symbol,
-                        interval=interval,
-                        limit=2  # 获取最近2根K线
-                    )
-
-                    if klines and len(klines) >= 1:
-                        # K线数据格式: [开盘时间, 开盘价, 最高价, 最低价, 收盘价, 成交量, 收盘时间, 成交额, ...]
-                        latest_kline = klines[-1]  # 最新的K线
-
-                        open_price = float(latest_kline[1])
-                        high_price = float(latest_kline[2])
-                        low_price = float(latest_kline[3])
-                        close_price = float(latest_kline[4])
-                        volume = float(latest_kline[5])  # 成交量
-                        quote_volume = float(latest_kline[7])  # 成交额(USDT)
-
-                        # 计算价格变化百分比
-                        price_change_percent = ((close_price - open_price) / open_price) * 100 if open_price > 0 else 0
-
-                        volume_data.append({
-                            'symbol': symbol,
-                            'lastPrice': str(close_price),
-                            'highPrice': str(high_price),
-                            'lowPrice': str(low_price),
-                            'volume': str(volume),
-                            'quoteVolume': str(quote_volume),
-                            'priceChangePercent': str(price_change_percent),
-                            'period': period
-                        })
-
-                except Exception as e:
-                    logger.debug(f"获取{symbol} {period}周期K线数据失败: {e}")
-                    continue
-
-            return volume_data
-
-        except Exception as e:
-            logger.error(f"获取{period}周期K线交易量数据失败: {e}")
-            return []
 
 def is_group_mention_required(update: Update) -> bool:
     """群组内是否必须 @ 才响应 —— 已放宽，默认不要求。"""
