@@ -448,45 +448,36 @@ class RankingDataProvider:
         return latest
 
     def fetch_metric(self, table: str, period: str) -> List[Dict]:
-        """通用指标表读取 - 只取最新一批数据（同一时间戳），每个币种只保留一条，按配置过滤币种"""
+        """通用指标读取：按周期过滤，每个币种取自身最新一条（不强制同一时间戳），按配置过滤币种"""
         rows = self._load_table_period(table, period)
         target_period = _normalize_period_value(period)
         allowed = _get_allowed_symbols()
-        
-        # 第一遍：找出最新时间戳（用 datetime 比较）
-        max_ts = datetime.min
+
+        latest_per_symbol: Dict[str, Dict] = {}
+        latest_ts: datetime = datetime.min
+
         for row in rows:
             r = dict(row)
             r_period = _normalize_period_value(str(r.get("周期", "")))
             if r_period != target_period:
                 continue
             sym = str(r.get("交易对", "")).upper()
+            if not sym:
+                continue
             if allowed and sym not in allowed:
                 continue
             ts = _parse_timestamp(str(r.get("数据时间", "")))
-            if ts > max_ts:
-                max_ts = ts
-        
-        if max_ts == datetime.min:
-            return []
-        
-        # 第二遍：只取最新时间戳的数据，每个币种只保留一条
-        seen = set()
-        result = []
-        for row in rows:
-            r = dict(row)
-            r_period = _normalize_period_value(str(r.get("周期", "")))
-            if r_period != target_period:
-                continue
-            ts = _parse_timestamp(str(r.get("数据时间", "")))
-            sym = str(r.get("交易对", "")).upper()
-            if allowed and sym not in allowed:
-                continue
-            if ts == max_ts and sym not in seen:
-                seen.add(sym)
-                result.append(r)
-        
-        return result
+            if ts > latest_ts:
+                latest_ts = ts
+            prev = latest_per_symbol.get(sym)
+            prev_ts = _parse_timestamp(str(prev.get("数据时间"))) if prev else datetime.min
+            if ts >= prev_ts:
+                latest_per_symbol[sym] = r
+
+        if latest_ts != datetime.min:
+            _update_latest(latest_ts)
+
+        return list(latest_per_symbol.values())
 
     def fetch_base_row(self, period: str, symbol: str) -> Dict:
         return self._fetch_single_row("基础数据", period, symbol)
