@@ -3,9 +3,10 @@
 从 HuggingFace 下载历史数据并导入 TimescaleDB
 
 用法:
-    python scripts/download_hf_data.py [--symbols BTCUSDT,ETHUSDT] [--days 365]
+    python scripts/download_hf_data.py [--symbols BTCUSDT,ETHUSDT]
 
 默认下载 main4 币种 (BTC/ETH/BNB/SOL) 的全部历史数据
+Main4 数据集约 415MB，包含 1150 万条记录（2020-2026）
 """
 
 import argparse

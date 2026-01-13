@@ -216,9 +216,6 @@ services/data-service/.venv/bin/pip install pandas psycopg2-binary huggingface_h
 # 下载并导入 main4 币种（BTC/ETH/BNB/SOL）全部历史数据
 python scripts/download_hf_data.py
 
-# 或只下载最近 365 天
-python scripts/download_hf_data.py --days 365
-
 # 或指定币种
 python scripts/download_hf_data.py --symbols BTCUSDT,ETHUSDT,BNBUSDT
 ```

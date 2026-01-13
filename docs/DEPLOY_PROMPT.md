@@ -115,11 +115,8 @@ done
 services/data-service/.venv/bin/pip install pandas psycopg2-binary huggingface_hub
 
 # 下载并导入 main4 币种（BTC/ETH/BNB/SOL）全部历史数据
-# 注意：完整数据约 16GB，下载和导入需要较长时间
+# Main4 数据集约 415MB，包含 1150 万条记录（2020-2026）
 services/data-service/.venv/bin/python scripts/download_hf_data.py
-
-# 或者只下载最近 365 天的数据（更快）
-services/data-service/.venv/bin/python scripts/download_hf_data.py --days 365
 
 # 或者指定特定币种
 services/data-service/.venv/bin/python scripts/download_hf_data.py --symbols BTCUSDT,ETHUSDT

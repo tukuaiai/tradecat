@@ -227,9 +227,6 @@ services/data-service/.venv/bin/pip install pandas psycopg2-binary huggingface_h
 # Download and import main4 symbols (BTC/ETH/BNB/SOL) full history
 python scripts/download_hf_data.py
 
-# Or download only last 365 days
-python scripts/download_hf_data.py --days 365
-
 # Or specify symbols
 python scripts/download_hf_data.py --symbols BTCUSDT,ETHUSDT,BNBUSDT
 ```
