@@ -3060,8 +3060,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer()
         else:
             await query.answer(_t(update, "loading.default", "处理中..."))
-    except Exception:
-        pass  # 忽略 answer 失败（可能已超时）
+    except Exception as e:
+        # 仅记录日志，不阻断流程（可能是超时或重复 answer）
+        logger.debug(f"query.answer failed for {button_data}: {e}")
 
     # 打开语言选择菜单
     if button_data == "lang_menu":
@@ -3069,10 +3070,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # =============================================================================
-    # 配置管理回调 (env_*) - 已禁用
+    # 配置管理回调 (env_*) - 已禁用（硬开关保护）
     # =============================================================================
-    # if button_data.startswith("env_"):
-    #     ... (env_* 回调处理已禁用)
+    if button_data.startswith("env_"):
+        if not ENABLE_ENV_MANAGER:
+            await query.answer("⚠️ 功能已禁用", show_alert=True)
+            return
+        # env_* 回调处理已禁用，此处仅作防护
 
     # 语言切换
     if button_data.startswith("set_lang_"):
@@ -4533,8 +4537,15 @@ async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =============================================================================
 # /env 命令 - 配置管理（为"最糟糕的用户"设计）
 # =============================================================================
+# 硬开关：彻底禁用环境变量管理功能（安全审计要求）
+ENABLE_ENV_MANAGER = False
+
 async def env_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """配置管理命令 /env - 友好的可视化配置界面"""
+    # 硬开关检查 - 即使命令被注册也会被拦截
+    if not ENABLE_ENV_MANAGER:
+        await update.message.reply_text("⚠️ 环境变量管理功能已禁用")
+        return
     from bot.env_manager import (
         CONFIG_CATEGORIES, get_config, set_config, validate_config_value, EDITABLE_CONFIGS
     )

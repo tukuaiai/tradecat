@@ -3134,9 +3134,6 @@ msgstr "... 还有 {count} 条"
 msgid "loading.default"
 msgstr "处理中..."
 
-msgid "loading.data"
-msgstr "📊 正在加载数据..."
-
 msgid "loading.refresh"
 msgstr "🔄 正在刷新..."
 

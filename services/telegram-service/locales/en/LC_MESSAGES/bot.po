@@ -3134,9 +3134,6 @@ msgstr "... {count} more"
 msgid "loading.default"
 msgstr "Processing..."
 
-msgid "loading.data"
-msgstr "📊 Loading data..."
-
 msgid "loading.refresh"
 msgstr "🔄 Refreshing..."
 
