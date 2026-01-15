@@ -219,9 +219,6 @@ msgstr "4小时"
 msgid "period.12h"
 msgstr "12小时"
 
-msgid "period.24h"
-msgstr "24小时"
-
 msgid "period.1d"
 msgstr "1天"
 
@@ -2142,11 +2139,11 @@ msgstr " | 🔄 缓存数据"
 msgid "ai.period"
 msgstr "周期"
 
-msgid "ai.24h_high"
-msgstr "24h高点"
+msgid "ai.1d_high"
+msgstr "1日高点"
 
-msgid "ai.24h_low"
-msgstr "24h低点"
+msgid "ai.1d_low"
+msgstr "1日低点"
 
 msgid "ai.trend_strength_label"
 msgstr "趋势强度"
@@ -2673,10 +2670,10 @@ msgid "ranking.hint.position_market"
 msgstr "💡 持仓/市值比 = 持仓量 / 市值"
 
 msgid "ranking.hint.volume_market"
-msgstr "💡 交易量/市值比 = 24h交易量 / 市值"
+msgstr "💡 交易量/市值比 = 1日交易量 / 市值"
 
 msgid "ranking.hint.volume_oi"
-msgstr "💡 交易量/持仓量比 = 24h交易量 / 持仓量"
+msgstr "💡 交易量/持仓量比 = 1日交易量 / 持仓量"
 
 # Admin module
 msgid "kb.admin"

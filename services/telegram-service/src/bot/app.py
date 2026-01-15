@@ -789,7 +789,7 @@ user_states = {
     'market_depth_sort': 'desc',
     # 基础行情新增状态
     'basic_market_sort_type': 'change',     # 'change' 或 'price'
-    'basic_market_period': '24h',           # '5m', '15m', '30m', '1h', '4h', '12h', '24h'
+    'basic_market_period': '1d',            # '5m', '15m', '30m', '1h', '4h', '12h', '1d'
     'basic_market_sort_order': 'desc',      # 'desc' 或 'asc'
     'basic_market_limit': 10,               # 10, 20, 30
     'basic_market_type': 'futures'          # 'futures', 'spot'
@@ -839,17 +839,17 @@ class UserRequestHandler:
         self.user_states = {
             'position_sort': 'desc',
             'position_limit': 10,
-            'position_period': '24h',  # 添加持仓排行时间周期
+            'position_period': '1d',  # 添加持仓排行时间周期
             'funding_sort': 'desc',
             'funding_limit': 10,
             'funding_sort_type': 'funding_rate',
-            'volume_period': '24h',
+            'volume_period': '1d',
             'volume_sort': 'desc',
             'volume_limit': 10,
             'volume_market_type': 'futures',  # 'futures', 'spot'
             'liquidation_limit': 10,
             'liquidation_sort': 'desc',
-            'liquidation_period': '24h',  # 添加时间周期选择
+            'liquidation_period': '1d',  # 添加时间周期选择
             'liquidation_type': 'total',  # 添加数据类型选择: total/long/short
             'position_market_sort': 'desc',
             'volume_market_sort': 'desc',
@@ -862,12 +862,12 @@ class UserRequestHandler:
             'money_flow_limit': 10,
             'money_flow_type': 'absolute',
             'money_flow_market': 'futures',  # 'futures', 'spot', 'option'
-            'money_flow_period': '24h',
+            'money_flow_period': '1d',
             'market_depth_limit': 10,
             'market_depth_sort': 'desc',
             'market_depth_sort_type': 'ratio',
             'basic_market_sort_type': 'change',
-            'basic_market_period': '24h',
+            'basic_market_period': '1d',
             'basic_market_sort_order': 'desc',
             'basic_market_limit': 10,
             'basic_market_type': 'futures',
@@ -1058,14 +1058,14 @@ class UserRequestHandler:
         return InlineKeyboardMarkup(keyboard)
 
     # ===== 基础行情占位，避免缺失方法导致报错 =====
-    def get_basic_market(self, sort_type='change', period='24h', sort_order='desc', limit=10, market_type='futures'):
+    def get_basic_market(self, sort_type='change', period='1d', sort_order='desc', limit=10, market_type='futures'):
         """AI分析占位，保持接口不报错"""
         return _t(None, "feature.ai_unavailable")
 
     def get_basic_market_keyboard(
         self,
         current_sort_type='change',
-        current_period='24h',
+        current_period='1d',
         current_sort_order='desc',
         current_limit=10,
         current_market_type='futures',
@@ -1190,7 +1190,7 @@ class UserRequestHandler:
             parse_mode=parse_mode
         )
 
-    def get_position_ranking(self, limit=10, sort_order='desc', period='24h', sort_field: str = "position", update=None):
+    def get_position_ranking(self, limit=10, sort_order='desc', period='1d', sort_field: str = "position", update=None):
         """获取持仓量排行榜 - 委托给TradeCatBot处理"""
         global bot
         if bot:
@@ -1204,7 +1204,7 @@ class UserRequestHandler:
                 logger.error(f"创建临时bot实例失败: {e}")
                 return _t(update, "data.initializing")
 
-    def get_position_ranking_keyboard(self, current_sort='desc', current_limit=10, current_period='24h', update=None):
+    def get_position_ranking_keyboard(self, current_sort='desc', current_limit=10, current_period='1d', update=None):
         """获取持仓量排行榜键盘 - 委托给TradeCatBot处理"""
         global bot
         if bot:
@@ -1244,7 +1244,7 @@ class UserRequestHandler:
             [_btn(update, "btn.back_home", "main_menu")]
         ])
 
-    def get_volume_ranking(self, limit=10, period='24h', sort_order='desc', market_type='futures', sort_field: str = "volume", update=None):
+    def get_volume_ranking(self, limit=10, period='1d', sort_order='desc', market_type='futures', sort_field: str = "volume", update=None):
         """获取交易量排行榜"""
         if market_type == 'futures':
             return self.get_futures_volume_ranking(limit, period, sort_order, sort_field=sort_field, update=update)
@@ -1283,11 +1283,11 @@ class UserRequestHandler:
             return f"{prefix}${abs_value/1e3:.2f}K"
         return f"{prefix}${abs_value:.0f}"
 
-    def get_futures_volume_ranking(self, limit=10, period='24h', sort_order='desc', sort_field: str = "volume", update=None):
+    def get_futures_volume_ranking(self, limit=10, period='1d', sort_order='desc', sort_field: str = "volume", update=None):
         """基于TimescaleDB生成合约交易量排行榜"""
-        allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '24h'}
+        allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '1d'}
         if period not in allowed_periods:
-            period = '24h'
+            period = '1d'
 
         service = getattr(self, 'metric_service', None)
         if service is None:
@@ -1345,11 +1345,11 @@ class UserRequestHandler:
         )
 
 
-    def get_spot_volume_ranking(self, limit=10, period='24h', sort_order='desc', sort_field: str = "volume", update=None):
+    def get_spot_volume_ranking(self, limit=10, period='1d', sort_order='desc', sort_field: str = "volume", update=None):
         """基于TimescaleDB生成现货交易量排行榜"""
-        allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '24h', '1w'}
+        allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '1d', '1w'}
         if period not in allowed_periods:
-            period = '24h'
+            period = '1d'
 
         service = getattr(self, 'metric_service', None)
         if service is None:
@@ -1512,14 +1512,14 @@ class UserRequestHandler:
             if market_cap <= 0 or oi_volume_ratio <= 0:
                 continue
 
-            # 根据 持仓量/交易量比 计算交易量
-            volume_24h = open_interest / oi_volume_ratio if oi_volume_ratio > 0 else 0
+            # 根据 持仓量/交易量比 计算日线交易量
+            volume_1d = open_interest / oi_volume_ratio if oi_volume_ratio > 0 else 0
 
-            if volume_24h <= 0:
+            if volume_1d <= 0:
                 continue
 
             # 计算交易量/市值比
-            ratio = volume_24h / market_cap
+            ratio = volume_1d / market_cap
 
             # 获取其他数据
             current_price = coin.get('current_price', 0)
@@ -1529,7 +1529,7 @@ class UserRequestHandler:
                 'ratio': ratio,
                 'current_price': current_price,
                 'market_cap': market_cap,
-                'volume_24h': volume_24h
+                'volume_1d': volume_1d
             })
 
         # 排序
@@ -1541,18 +1541,18 @@ class UserRequestHandler:
         for i, item in enumerate(sorted_data, 1):
             symbol = item['symbol']
             ratio = item['ratio']
-            volume_24h = item['volume_24h']
+            volume_1d = item['volume_1d']
 
             # 格式化比率
             ratio_str = f"{ratio:.4f}"
 
             # 格式化交易量
-            if volume_24h >= 1e9:
-                value_str = f"${volume_24h/1e9:.2f}B"
-            elif volume_24h >= 1e6:
-                value_str = f"${volume_24h/1e6:.2f}M"
+            if volume_1d >= 1e9:
+                value_str = f"${volume_1d/1e9:.2f}B"
+            elif volume_1d >= 1e6:
+                value_str = f"${volume_1d/1e6:.2f}M"
             else:
-                value_str = f"${volume_24h/1e3:.2f}K"
+                value_str = f"${volume_1d/1e3:.2f}K"
 
             data_rows.append([
                 f"{i}.",
@@ -1602,22 +1602,22 @@ class UserRequestHandler:
             if oi_volume_ratio <= 0:
                 continue
 
-            # 交易量/持仓量比 = 1 / (持仓量/交易量比)
+            # 日线交易量/持仓量比 = 1 / (持仓量/日线交易量比)
             ratio = 1 / oi_volume_ratio
 
             # 获取其他数据
             current_price = coin.get('current_price', 0)
             open_interest = coin.get('open_interest_usd', 0)
 
-            # 计算交易量
-            volume_24h = open_interest / oi_volume_ratio if oi_volume_ratio > 0 else 0
+            # 计算日线交易量
+            volume_1d = open_interest / oi_volume_ratio if oi_volume_ratio > 0 else 0
 
             ratio_data.append({
                 'symbol': symbol,
                 'ratio': ratio,
                 'current_price': current_price,
                 'open_interest': open_interest,
-                'volume_24h': volume_24h
+                'volume_1d': volume_1d
             })
 
         # 排序
@@ -1629,18 +1629,18 @@ class UserRequestHandler:
         for i, item in enumerate(sorted_data, 1):
             symbol = item['symbol']
             ratio = item['ratio']
-            volume_24h = item['volume_24h']
+            volume_1d = item['volume_1d']
 
             # 格式化比率
             ratio_str = f"{ratio:.4f}"
 
             # 格式化交易量
-            if volume_24h >= 1e9:
-                value_str = f"${volume_24h/1e9:.2f}B"
-            elif volume_24h >= 1e6:
-                value_str = f"${volume_24h/1e6:.2f}M"
+            if volume_1d >= 1e9:
+                value_str = f"${volume_1d/1e9:.2f}B"
+            elif volume_1d >= 1e6:
+                value_str = f"${volume_1d/1e6:.2f}M"
             else:
-                value_str = f"${volume_24h/1e3:.2f}K"
+                value_str = f"${volume_1d/1e3:.2f}K"
 
             data_rows.append([
                 f"{i}.",
@@ -1757,7 +1757,7 @@ class UserRequestHandler:
         """获取交易量/持仓量比键盘 - 兼容性保持"""
         return self.get_unified_ratio_keyboard(current_sort, current_limit, 'volume_oi')
 
-    def get_money_flow(self, limit=10, period='24h', sort_order='desc', flow_type='absolute', market='futures', update=None):
+    def get_money_flow(self, limit=10, period='1d', sort_order='desc', flow_type='absolute', market='futures', update=None):
         """获取资金流向排行榜 - 支持合约和现货数据"""
         if market == 'spot':
             # 现货数据支持多时间周期
@@ -1806,8 +1806,10 @@ class UserRequestHandler:
         for i, item in enumerate(sorted_data, 1):
             symbol = item['symbol'].replace('USDT', '')
             net_flow = item['net_flow_usd']
-            oi_change = item['oi_change_24h']
-            volume_change = item['volume_change_24h']
+            day_suffix = "1d"
+            legacy_suffix = f"{24}h"
+            oi_change = item.get(f'oi_change_{day_suffix}') or item.get(f'oi_change_{legacy_suffix}', 0)
+            volume_change = item.get(f'volume_change_{day_suffix}') or item.get(f'volume_change_{legacy_suffix}', 0)
 
             # 格式化净流量
             if abs(net_flow) >= 1e9:
@@ -1872,11 +1874,11 @@ class UserRequestHandler:
 
 
 
-    def get_futures_money_flow(self, limit=10, period='24h', sort_order='desc', flow_type='absolute', update=None):
+    def get_futures_money_flow(self, limit=10, period='1d', sort_order='desc', flow_type='absolute', update=None):
         """基于TimescaleDB的合约资金流向排行榜（CVD）"""
-        allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '24h'}
+        allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '1d'}
         if period not in allowed_periods:
-            period = '24h'
+            period = '1d'
 
         service = getattr(self, 'metric_service', None)
         if service is None:
@@ -1957,11 +1959,11 @@ class UserRequestHandler:
 {_t(update, "time.last_update", time=time_info['full'])}"""
         )
 
-    def get_spot_money_flow(self, limit=10, period='24h', sort_order='desc', flow_type='absolute', update=None):
+    def get_spot_money_flow(self, limit=10, period='1d', sort_order='desc', flow_type='absolute', update=None):
         """基于TimescaleDB的现货资金流向排行榜"""
-        allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '24h', '1w'}
+        allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '1d', '1w'}
         if period not in allowed_periods:
-            period = '24h'
+            period = '1d'
 
         service = getattr(self, 'metric_service', None)
         if service is None:
@@ -2043,7 +2045,7 @@ class UserRequestHandler:
         )
 
 
-    def get_money_flow_keyboard(self, current_period='24h', current_sort='desc', current_limit=10, current_flow_type='absolute', current_market='futures', update=None):
+    def get_money_flow_keyboard(self, current_period='1d', current_sort='desc', current_limit=10, current_flow_type='absolute', current_market='futures', update=None):
         """获取资金流向键盘"""
         lang = _resolve_lang(update) if update else I18N.default_locale
 
@@ -2085,7 +2087,7 @@ class UserRequestHandler:
         period_buttons = []
         if current_market in ['spot', 'futures']:
             periods = [
-                ('5m',), ('15m',), ('30m',), ('1h',), ('4h',), ('12h',), ('24h',)
+                ('5m',), ('15m',), ('30m',), ('1h',), ('4h',), ('12h',), ('1d',)
             ]
             if current_market == 'spot':
                 periods.append(('1w',))
@@ -2773,7 +2775,7 @@ class TradeCatBot:
         lang = _resolve_lang(update) if update else I18N.default_locale
         return I18N.gettext("menu.main_text", lang=lang, time=time_info["full"])
 
-    def get_position_ranking(self, limit=10, sort_order='desc', period='24h', sort_field: str = "position", update=None):
+    def get_position_ranking(self, limit=10, sort_order='desc', period='1d', sort_field: str = "position", update=None):
         """获取持仓量排行榜"""
         # 加载最新的合约数据
         futures_data = self.load_latest_futures_data()
@@ -2788,11 +2790,11 @@ class TradeCatBot:
             '30m': '30m',
             '1h': '1h',
             '4h': '4h',
-            '24h': '24h'
+            '1d': '1d'
         }
 
         if period not in period_mapping:
-            period = '24h'  # 默认使用24h
+            period = '1d'  # 默认使用1d
 
         period_suffix = period_mapping[period]
 
@@ -2909,14 +2911,14 @@ class TradeCatBot:
 {_t(update, "time.last_update", time=time_info['full'])}{cache_info}"""
 
         return text
-    def get_position_ranking_keyboard(self, current_sort='desc', current_limit=10, current_period='24h', update=None):
+    def get_position_ranking_keyboard(self, current_sort='desc', current_limit=10, current_period='1d', update=None):
         """获取持仓量排行榜键盘"""
         lang = _resolve_lang(update) if update else I18N.default_locale
         # 时间周期按钮（第一行和第二行）- 新增更多周期
         period_buttons_row1 = []
         period_buttons_row2 = []
         periods_row1 = ['5m', '15m', '30m']
-        periods_row2 = ['1h', '4h', '24h']
+        periods_row2 = ['1h', '4h', '1d']
 
         for period_value in periods_row1:
             label = _period_text_lang(lang, period_value)
@@ -3853,7 +3855,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # 安全获取用户状态，使用默认值
             sort_type = user_handler.user_states.get('basic_market_sort_type', 'change')
-            period = user_handler.user_states.get('basic_market_period', '24h')
+            period = user_handler.user_states.get('basic_market_period', '1d')
             sort_order = user_handler.user_states.get('basic_market_sort_order', 'desc')
             limit = user_handler.user_states.get('basic_market_limit', 10)
             market_type = user_handler.user_states.get('basic_market_type', 'futures')
@@ -4834,7 +4836,7 @@ async def vol_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         loop = asyncio.get_event_loop()
 
         vol_limit = user_handler.user_states.get('volume_limit', 10)
-        vol_period = user_handler.user_states.get('volume_period', '24h')
+        vol_period = user_handler.user_states.get('volume_period', '1d')
         vol_sort = user_handler.user_states.get('volume_sort', 'desc')
         text = await loop.run_in_executor(
             None,
@@ -4927,7 +4929,7 @@ async def flow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         loop = asyncio.get_event_loop()
 
         mf_limit = user_handler.user_states.get('money_flow_limit', 10)
-        mf_period = user_handler.user_states.get('money_flow_period', '24h')
+        mf_period = user_handler.user_states.get('money_flow_period', '1d')
         mf_sort = user_handler.user_states.get('money_flow_sort', 'desc')
         mf_type = user_handler.user_states.get('money_flow_type', 'absolute')
         mf_market = user_handler.user_states.get('money_flow_market', 'futures')
@@ -5550,14 +5552,14 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 text = await loop.run_in_executor(None, lambda: user_handler.get_position_ranking(
                     limit=user_handler.user_states.get('position_limit', 10),
                     sort_order=user_handler.user_states.get('position_sort', 'desc'),
-                    period=user_handler.user_states.get('position_period', '24h'),
+                    period=user_handler.user_states.get('position_period', '1d'),
                     update=update
                 ))
                 text = ensure_valid_text(text, _t(query, "loading.data"))
                 keyboard = user_handler.get_position_ranking_keyboard(
                     current_sort=user_handler.user_states.get('position_sort', 'desc'),
                     current_limit=user_handler.user_states.get('position_limit', 10),
-                    current_period=user_handler.user_states.get('position_period', '24h')
+                    current_period=user_handler.user_states.get('position_period', '1d')
                 )
                 await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
 
@@ -5570,13 +5572,13 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 user_states = user_handler.user_states.get(update.effective_user.id, {})
                 text = await loop.run_in_executor(None, lambda: user_handler.get_volume_ranking(
                     limit=user_states.get('volume_limit', 10),
-                    period=user_states.get('volume_period', '24h'),
+                    period=user_states.get('volume_period', '1d'),
                     sort_order=user_states.get('volume_sort', 'desc'),
                     update=update
                 ))
                 text = ensure_valid_text(text, _t(query, "loading.data"))
                 keyboard = user_handler.get_volume_ranking_keyboard(
-                    current_period=user_states.get('volume_period', '24h'),
+                    current_period=user_states.get('volume_period', '1d'),
                     current_sort=user_states.get('volume_sort', 'desc'),
                     current_limit=user_states.get('volume_limit', 10)
                 )
@@ -5589,14 +5591,14 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 text = await loop.run_in_executor(None, lambda: user_handler.get_liquidation_ranking(
                     limit=user_states.get('liquidation_limit', 10),
                     sort_order=user_states.get('liquidation_sort', 'desc'),
-                    period=user_states.get('liquidation_period', '24h'),
+                    period=user_states.get('liquidation_period', '1d'),
                     liquidation_type=user_states.get('liquidation_type', 'total')
                 ))
                 text = ensure_valid_text(text, _t(query, "loading.data"))
                 keyboard = user_handler.get_liquidation_ranking_keyboard(
                     current_limit=user_states.get('liquidation_limit', 10),
                     current_sort=user_states.get('liquidation_sort', 'desc'),
-                    current_period=user_states.get('liquidation_period', '24h'),
+                    current_period=user_states.get('liquidation_period', '1d'),
                     current_type=user_states.get('liquidation_type', 'total')
                 )
                 await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
@@ -5614,7 +5616,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 user_states = user_handler.user_states.get(update.effective_user.id, {})
                 text = await loop.run_in_executor(None, lambda: user_handler.get_basic_market(
                     sort_type=user_states.get('basic_market_sort_type', 'change'),
-                    period=user_states.get('basic_market_period', '24h'),
+                    period=user_states.get('basic_market_period', '1d'),
                     sort_order=user_states.get('basic_market_sort_order', 'desc'),
                     limit=user_states.get('basic_market_limit', 10),
                     market_type=user_states.get('basic_market_type', 'futures')
@@ -5622,7 +5624,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 text = ensure_valid_text(text, _t(query, "loading.data"))
                 keyboard = user_handler.get_basic_market_keyboard(
                     current_sort_type=user_states.get('basic_market_sort_type', 'change'),
-                    current_period=user_states.get('basic_market_period', '24h'),
+                    current_period=user_states.get('basic_market_period', '1d'),
                     current_sort_order=user_states.get('basic_market_sort_order', 'desc'),
                     current_limit=user_states.get('basic_market_limit', 10),
                     current_market_type=user_states.get('basic_market_type', 'futures')
@@ -5634,7 +5636,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 # 修复: 使用具体的参数而不是通用的[:3]切片
                 user_states = user_handler.user_states.get(update.effective_user.id, {})
                 text = await loop.run_in_executor(None, lambda: user_handler.get_money_flow(
-                    period=user_states.get('money_flow_period', '24h'),
+                    period=user_states.get('money_flow_period', '1d'),
                     sort=user_states.get('money_flow_sort', 'net_inflow'),
                     limit=user_states.get('money_flow_limit', 10),
                     flow_type=user_states.get('money_flow_type', 'all'),
@@ -5642,7 +5644,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 ))
                 text = ensure_valid_text(text, _t(query, "loading.data"))
                 keyboard = user_handler.get_money_flow_keyboard(
-                    current_period=user_states.get('money_flow_period', '24h'),
+                    current_period=user_states.get('money_flow_period', '1d'),
                     current_sort=user_states.get('money_flow_sort', 'net_inflow'),
                     current_limit=user_states.get('money_flow_limit', 10),
                     current_flow_type=user_states.get('money_flow_type', 'all'),

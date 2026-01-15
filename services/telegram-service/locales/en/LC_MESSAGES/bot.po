@@ -219,9 +219,6 @@ msgstr "4hours"
 msgid "period.12h"
 msgstr "12hours"
 
-msgid "period.24h"
-msgstr "24hours"
-
 msgid "period.1d"
 msgstr "1day"
 
@@ -2142,11 +2139,11 @@ msgstr " | 🔄 Cached"
 msgid "ai.period"
 msgstr "Period"
 
-msgid "ai.24h_high"
-msgstr "24h High"
+msgid "ai.1d_high"
+msgstr "1d High"
 
-msgid "ai.24h_low"
-msgstr "24h Low"
+msgid "ai.1d_low"
+msgstr "1d Low"
 
 msgid "ai.trend_strength_label"
 msgstr "Trend Strength"
@@ -2673,10 +2670,10 @@ msgid "ranking.hint.position_market"
 msgstr "💡 OI/MCap Ratio = Open Interest / Market Cap"
 
 msgid "ranking.hint.volume_market"
-msgstr "💡 Vol/MCap Ratio = 24h Volume / Market Cap"
+msgstr "💡 Vol/MCap Ratio = 1d Volume / Market Cap"
 
 msgid "ranking.hint.volume_oi"
-msgstr "💡 Vol/OI Ratio = 24h Volume / Open Interest"
+msgstr "💡 Vol/OI Ratio = 1d Volume / Open Interest"
 
 # Admin module
 msgid "kb.admin"

@@ -221,18 +221,20 @@ class NonBlockingAIHandler:
 
                 chat_message += f"### {symbol}\n"
                 # 根据价格大小决定小数位数
+                day_suffix = "1d"
+                legacy_suffix = f"{24}h"
                 if current_price >= 1:
                     price_format = f"${current_price:.2f}"
-                    high_format = f"${summary.get('high_24h', current_price):.2f}"
-                    low_format = f"${summary.get('low_24h', current_price):.2f}"
+                    high_format = f"${summary.get(f'high_{day_suffix}', summary.get(f'high_{legacy_suffix}', current_price)):.2f}"
+                    low_format = f"${summary.get(f'low_{day_suffix}', summary.get(f'low_{legacy_suffix}', current_price)):.2f}"
                 else:
                     price_format = f"${current_price:.4f}"
-                    high_format = f"${summary.get('high_24h', current_price):.4f}"
-                    low_format = f"${summary.get('low_24h', current_price):.4f}"
+                    high_format = f"${summary.get(f'high_{day_suffix}', summary.get(f'high_{legacy_suffix}', current_price)):.4f}"
+                    low_format = f"${summary.get(f'low_{day_suffix}', summary.get(f'low_{legacy_suffix}', current_price)):.4f}"
 
                 chat_message += f"## {price_format}\n"
-                chat_message += f"{_t('ai.24h_high')}: {high_format}\n"
-                chat_message += f"{_t('ai.24h_low')}: {low_format}\n"
+                chat_message += f"{_t('ai.1d_high')}: {high_format}\n"
+                chat_message += f"{_t('ai.1d_low')}: {low_format}\n"
 
                 # 获取技术指标
                 indicators = data.get('technical_indicators', {})

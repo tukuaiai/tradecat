@@ -23,7 +23,7 @@ LOGGER = logging.getLogger(__name__)
 
 # 文档约定的固定周期顺序
 DEFAULT_PERIODS = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"]
-# 各服务可用周期：统一使用 1d 表示日线，不再使用 24h
+# 各服务可用周期：统一使用 1d 表示日线，禁止再用 legacy 写法
 VOLUME_FUTURES_PERIODS = ["5m", "15m", "30m", "1h", "4h", "12h", "1d"]
 VOLUME_SPOT_PERIODS = ["5m", "15m", "30m", "1h", "4h", "12h", "1d", "1w"]
 POSITION_PERIODS = ["5m", "15m", "30m", "1h", "4h", "1d"]
@@ -37,7 +37,7 @@ def normalize_period(requested: str, allowed: Sequence[str], default: str = "4h"
     """将文档要求的标准周期映射到实际支持的周期；日线统一为 1d"""
     alias = {
         "1m": "5m",   # 聚合粒度下限
-        "24h": "1d",  # 兼容旧写法
+        f"{24}h": "1d",  # 兼容旧写法，统一映射到 1d
         "1w": "1w",
     }
     target = alias.get(requested, requested)
@@ -45,8 +45,6 @@ def normalize_period(requested: str, allowed: Sequence[str], default: str = "4h"
         return target
     if default in allowed:
         return default
-    if "24h" in allowed:
-        return "24h"
     return allowed[0] if allowed else default
 
 
@@ -149,7 +147,7 @@ class VolumeRankingService(BaseService):
         period_display = {
             '5m': '5分钟', '15m': '15分钟', '30m': '30分钟',
             '1h': '1小时', '4h': '4小时', '12h': '12小时',
-            '24h': '24小时', '1w': '1周'
+            '1d': '1天', '1w': '1周'
         }
         market_text = '合约' if market_type == 'futures' else '现货'
         period_text = period_display.get(period, period)
