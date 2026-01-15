@@ -150,7 +150,7 @@ class KDJ排行卡片(RankingCard):
     async def _edit_settings(self, query, h, ensure):
         await query.answer()
         lang = resolve_lang(query)
-        text, kb = await self._build_settings_payload(h, ensure, lang, query)
+        text, kb = await self._build_settings_payload(h, ensure, lang=lang, update=query)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
 
     async def _build_payload(self, h, ensure, lang: str = None, update=None) -> Tuple[str, object]:
@@ -180,7 +180,7 @@ class KDJ排行卡片(RankingCard):
         kb = self._build_keyboard(h)
         return text, kb
 
-    async def _build_settings_payload(self, h, ensure, lang: str, update=None) -> Tuple[str, object]:
+    async def _build_settings_payload(self, h, ensure, lang: str = None, update=None) -> Tuple[str, object]:
         period = h.user_states.get("kdj_period", "15m")
         sort_order = h.user_states.get("kdj_sort", "desc")
         limit = h.user_states.get("kdj_limit", 10)
