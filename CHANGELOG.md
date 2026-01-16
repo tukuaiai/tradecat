@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`d4d6d1fd`** docs(api): 添加 API 调用示例文档
 
 ### Fixed
+- **`60571d28`** fix(telegram): 移除 cards registry 中的重复 query.answer()
 - **`06ffd4cd`** fix(telegram): 移除重复的 query.answer() 调用
   - 修复 app.py: set_lang_, signal_menu, admin_menu, market_sentiment, single_query_, ranking_menu_nop
   - 修复 vis_handler.py: vis_nop, vis_menu, vis_tpl_, vis_sym_, vis_itv_
