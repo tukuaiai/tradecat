@@ -6,6 +6,8 @@
 
 # 🐱 交易猫
 
+本项目ai解读仓库（可能不完全准确）：https://zread.ai/tukuaiai/tradecat
+
 感谢社区ca给我的资金，让我去完成我的梦想！！！真心感谢你们！！！
 <p>
 sol（代币CA，请勿直接转账，否则资产会丢失）：Gysp4iZ6uNuAksAPR37fQwLDRFU9Rz255UjExhiwpump
@@ -523,10 +525,11 @@ graph TD
 | **signal-service** | - | 独立信号检测服务（129条规则、8分类、事件发布） | Python, SQLite, psycopg2 |
 | **telegram-service** | - | Bot 交互、排行榜展示、信号推送 UI（通过 adapter 调用 signal-service） | python-telegram-bot, aiohttp |
 | **ai-service** | - | AI 分析、Wyckoff 方法论（作为 telegram-service 子模块） | Gemini/OpenAI/Claude/DeepSeek |
+| **api-service** | 8000 | REST API 服务（指标/K线/信号数据查询） | FastAPI, Pydantic |
 | **predict-service** | - | 预测市场信号（Polymarket/Kalshi/Opinion） | Node.js, Telegram Bot |
 | **vis-service** | 8087 | 可视化渲染（K线图/指标图/VPVR） | FastAPI, matplotlib, mplfinance |
 | **order-service** | - | 交易执行、Avellaneda-Stoikov 做市 | Python, ccxt, cryptofeed |
-| **TimescaleDB** | 5433 | K线存储、期货数据存储、时序查询优化 | PostgreSQL 16 + TimescaleDB |
+| **TimescaleDB** | 5434 | K线存储、期货数据存储、时序查询优化 | PostgreSQL 16 + TimescaleDB |
 
 ### 数据流向
 
@@ -900,7 +903,17 @@ tradecat/
 │       ├── pyproject.toml
 │       └── requirements.txt
 │
-├── 📂 services-preview/            # 预览版微服务 (5个，开发中)
+├── 📂 services-preview/            # 预览版微服务 (6个，开发中)
+│   │
+│   ├── 📂 api-service/             # REST API 服务
+│   │   ├── 📂 src/
+│   │   │   ├── 📂 routers/         # API 路由
+│   │   │   ├── 📂 schemas/         # Pydantic 模型
+│   │   │   └── app.py              # FastAPI 入口
+│   │   ├── 📂 scripts/
+│   │   ├── Makefile
+│   │   ├── pyproject.toml
+│   │   └── requirements.txt
 │   │
 │   ├── 📂 markets-service/         # 全市场数据采集（美股/A股/宏观）
 │   │   ├── 📂 src/

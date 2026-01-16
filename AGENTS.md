@@ -121,6 +121,7 @@ cd /path/to/tradecat
 | `python scripts/download_hf_data.py` | 从 HuggingFace 下载历史数据并导入 |
 | `python scripts/check_i18n_keys.py` | 检查 i18n 翻译键对齐 |
 | `./scripts/export_timescaledb.sh` | 导出 TimescaleDB 数据（默认端口 5433） |
+| `./scripts/export_timescaledb_main4.sh` | 导出 Main4 精简数据集（默认端口 5433） |
 | `./scripts/timescaledb_compression.sh` | 压缩管理（默认端口 5433） |
 
 ### 3.2 Make 快捷命令
@@ -196,7 +197,7 @@ sqlite3 libs/database/services/telegram-service/market_data.db
 - **配置统一**：所有配置集中在 `config/.env`，各服务共用
 - **数据流向**：`data-service → TimescaleDB → trading-service → SQLite → telegram/ai/signal/vis`
 
-### 4.2 服务清单（10 个）
+### 4.2 服务清单（11 个）
 
 | 服务 | 位置 | 职责 | 入口 |
 |:---|:---|:---|:---|
@@ -205,6 +206,7 @@ sqlite3 libs/database/services/telegram-service/market_data.db
 | telegram-service | services/ | Bot 交互 | `src/main.py` |
 | ai-service | services/ | AI 分析（telegram 子模块） | `src/__main__.py` |
 | signal-service | services/ | 信号检测（129条规则） | `src/__main__.py` |
+| api-service | services-preview/ | REST API 服务（端口 8000） | `src/__main__.py` |
 | markets-service | services-preview/ | 全市场采集 | `src/__main__.py` |
 | vis-service | services-preview/ | 可视化渲染（端口 8087） | `src/__main__.py` |
 | order-service | services-preview/ | 交易执行 | `src/__main__.py` |
@@ -221,6 +223,7 @@ sqlite3 libs/database/services/telegram-service/market_data.db
 | telegram-service | Bot 交互、信号推送 UI | 禁止包含信号检测逻辑 |
 | ai-service | AI 分析、Wyckoff 方法论 | 作为 telegram-service 子模块 |
 | signal-service | 信号检测、规则引擎（独立服务） | 只读数据库，禁止 Telegram 依赖 |
+| api-service | REST API 数据查询 | 只读数据库，禁止写入 |
 | vis-service | 可视化渲染 | 禁止写入数据库 |
 | order-service | 交易执行、做市 | 禁止修改数据采集逻辑 |
 
@@ -326,6 +329,7 @@ tradecat/
 │   ├── check_i18n_keys.py          # i18n 翻译键对齐检查
 │   ├── download_hf_data.py         # HuggingFace 数据下载
 │   ├── export_timescaledb.sh       # 数据导出（默认端口 5433）
+│   ├── export_timescaledb_main4.sh # 导出 Main4 精简数据集（默认端口 5433）
 │   └── timescaledb_compression.sh  # 压缩管理（默认端口 5433）
 │
 ├── services/                       # 稳定版微服务 (5个)
@@ -335,12 +339,13 @@ tradecat/
 │   ├── ai-service/                 # AI 分析
 │   └── signal-service/             # 信号检测（129条规则）
 │
-├── services-preview/               # 预览版微服务 (5个)
+├── services-preview/               # 预览版微服务 (6个)
+│   ├── api-service/                # REST API 服务（端口 8000）
 │   ├── markets-service/            # 全市场数据采集
-│   ├── vis-service/                # 可视化渲染
+│   ├── vis-service/                # 可视化渲染（端口 8087）
 │   ├── order-service/              # 交易执行
 │   ├── predict-service/            # 预测市场（Node.js）
-│   └── fate-service/               # 命理服务
+│   └── fate-service/               # 命理服务（端口 8001）
 │
 ├── libs/
 │   ├── database/                   # 数据库文件

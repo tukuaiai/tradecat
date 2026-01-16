@@ -6,6 +6,8 @@
 
 # 🐱 TradeCat
 
+This project's AI repository (may not be entirely accurate): https://zread.ai/tukuaiai/tradecat
+
 Community-funded open-source project. Thanks for the support!  
 Donations (optional):
 <p>
@@ -532,11 +534,12 @@ graph TD
 | **telegram-service** | - | Bot interaction, rankings display, signal push | python-telegram-bot, aiohttp |
 | **ai-service** | - | AI analysis, Wyckoff methodology (as telegram-service submodule) | Gemini/OpenAI/Claude/DeepSeek |
 | **signal-service** | - | Standalone signal detection (129 rules, 8 categories, event publishing) | Python, SQLite, psycopg2 |
+| **api-service** | 8000 | REST API service (indicators/candlesticks/signals query) [preview] | FastAPI, Pydantic |
 | **markets-service** | - | Multi-market data collection (US/China stocks, macro) [preview] | yfinance, akshare, fredapi, QuantLib |
 | **predict-service** | - | Prediction market signals (Polymarket/Kalshi/Opinion) [preview] | Node.js, Telegram Bot |
 | **vis-service** | 8087 | Visualization rendering (K-line/indicators/VPVR) [preview] | FastAPI, matplotlib, mplfinance |
 | **order-service** | - | Trade execution, Avellaneda-Stoikov market making [preview] | Python, ccxt, cryptofeed |
-| **TimescaleDB** | 5433 | Candlestick storage, futures data, time-series query optimization | PostgreSQL 16 + TimescaleDB |
+| **TimescaleDB** | 5434 | Candlestick storage, futures data, time-series query optimization | PostgreSQL 16 + TimescaleDB |
 
 ### Data Flow
 
@@ -910,7 +913,17 @@ tradecat/
 │       ├── pyproject.toml
 │       └── requirements.txt
 │
-├── 📂 services-preview/            # Preview Microservices (5, in development)
+├── 📂 services-preview/            # Preview Microservices (6, in development)
+│   │
+│   ├── 📂 api-service/             # REST API service
+│   │   ├── 📂 src/
+│   │   │   ├── 📂 routers/         # API routes
+│   │   │   ├── 📂 schemas/         # Pydantic models
+│   │   │   └── app.py              # FastAPI entry
+│   │   ├── 📂 scripts/
+│   │   ├── Makefile
+│   │   ├── pyproject.toml
+│   │   └── requirements.txt
 │   │
 │   ├── 📂 markets-service/         # Multi-market data collection (US/China stocks, macro)
 │   │   ├── 📂 src/
