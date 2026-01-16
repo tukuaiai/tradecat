@@ -3054,8 +3054,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer(_t(update, "loading.query", "🔍 正在查询..."))
         elif button_data.startswith(("set_lang_", "field_")) or button_data.endswith("_toggle_"):
             await query.answer(_t(update, "loading.switch", "✅ 已切换"))
-        elif button_data.startswith(("ranking_", "single_", "position_", "funding_", "money_flow_")):
+        elif button_data.startswith(("ranking_", "single_", "position_", "funding_", "money_flow_", "market_", "basic_market", "admin_")):
             await query.answer(_t(update, "loading.data", "📊 正在加载数据..."))
+        elif button_data.startswith("sig_"):
+            await query.answer(_t(update, "loading.switch", "✅ 处理中..."))
         elif button_data in ("main_menu", "ranking_menu", "help", "lang_menu", "signal_menu", "admin_menu"):
             await query.answer()
         else:
