@@ -24,11 +24,12 @@ LOGGER = logging.getLogger(__name__)
 # 文档约定的固定周期顺序
 DEFAULT_PERIODS = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"]
 # 各服务可用周期：统一使用 1d 表示日线，禁止再用 legacy 写法
-VOLUME_FUTURES_PERIODS = ["5m", "15m", "30m", "1h", "4h", "12h", "1d"]
+# 注意：所有周期列表都应包含 1w，因为数据库中有 1w 数据
+VOLUME_FUTURES_PERIODS = ["5m", "15m", "30m", "1h", "4h", "12h", "1d", "1w"]
 VOLUME_SPOT_PERIODS = ["5m", "15m", "30m", "1h", "4h", "12h", "1d", "1w"]
-POSITION_PERIODS = ["5m", "15m", "30m", "1h", "4h", "1d"]
-LIQUIDATION_PERIODS = ["1h", "4h", "12h", "1d"]
-MONEY_FLOW_FUTURES_PERIODS = ["5m", "15m", "30m", "1h", "4h", "12h", "1d"]
+POSITION_PERIODS = ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
+LIQUIDATION_PERIODS = ["1h", "4h", "12h", "1d", "1w"]
+MONEY_FLOW_FUTURES_PERIODS = ["5m", "15m", "30m", "1h", "4h", "12h", "1d", "1w"]
 MONEY_FLOW_SPOT_PERIODS = ["5m", "15m", "30m", "1h", "4h", "12h", "1d", "1w"]
 MONEY_FLOW_PERIODS = MONEY_FLOW_SPOT_PERIODS
 
