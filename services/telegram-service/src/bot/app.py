@@ -4704,7 +4704,7 @@ async def env_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """配置管理命令 /env - 友好的可视化配置界面"""
     # 硬开关检查 - 即使命令被注册也会被拦截
     if not ENABLE_ENV_MANAGER:
-        await update.message.reply_text("⚠️ 环境变量管理功能已禁用")
+        await update.message.reply_text(_t(update, "admin.env.disabled"))
         return
     from bot.env_manager import (
         CONFIG_CATEGORIES, get_config, set_config, validate_config_value, EDITABLE_CONFIGS
@@ -4836,7 +4836,7 @@ async def vol_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         )
 
-        text = ensure_valid_text(text, _t(query, "loading.data"))
+        text = ensure_valid_text(text, _t(update, "loading.data"))
         keyboard = user_handler.get_volume_ranking_keyboard(current_period=user_handler.user_states['volume_period'], current_sort=user_handler.user_states['volume_sort'], current_limit=user_handler.user_states['volume_limit'])
         await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
     except Exception as e:
@@ -4894,7 +4894,7 @@ async def market_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             market_type=user_handler.user_states['basic_market_type']
         ))
 
-        text = ensure_valid_text(text, _t(query, "loading.data"))
+        text = ensure_valid_text(text, _t(update, "loading.data"))
         keyboard = user_handler.get_basic_market_keyboard(
             current_sort_type=user_handler.user_states['basic_market_sort_type'],
             current_period=user_handler.user_states['basic_market_period'],
@@ -4942,7 +4942,7 @@ async def flow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ),
         )
 
-        text = ensure_valid_text(text, _t(query, "loading.data"))
+        text = ensure_valid_text(text, _t(update, "loading.data"))
         keyboard = user_handler.get_money_flow_keyboard(
             current_period=mf_period,
             current_sort=mf_sort,
@@ -4981,7 +4981,7 @@ async def depth_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_handler.user_states.get('market_depth_sort', 'desc')
         )
 
-        text = ensure_valid_text(text, _t(query, "loading.data"))
+        text = ensure_valid_text(text, _t(update, "loading.data"))
         keyboard = user_handler.get_market_depth_keyboard(
             current_limit=user_handler.user_states.get('market_depth_limit', 10),
             current_sort_type=user_handler.user_states.get('market_depth_sort_type', 'ratio'),
@@ -5015,7 +5015,7 @@ async def ratio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_handler.user_states['position_market_sort']
         ))
 
-        text = ensure_valid_text(text, _t(query, "loading.data"))
+        text = ensure_valid_text(text, _t(update, "loading.data"))
         keyboard = user_handler.get_position_market_ratio_keyboard(current_sort=user_handler.user_states['position_market_sort'], current_limit=user_handler.user_states['position_market_limit'])
         await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
     except Exception as e:
@@ -5075,7 +5075,7 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = user_handler.get_main_menu_keyboard(update)
 
     # 确保文本不为空
-    text = ensure_valid_text(text, _t(query, "welcome.title"))
+    text = ensure_valid_text(text, _t(update, "welcome.title"))
 
     # 先发送简短欢迎消息和常驻键盘来激活常驻键盘
     await update.message.reply_text(
@@ -5588,7 +5588,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     period=user_handler.user_states.get('position_period', '1d'),
                     update=update
                 ))
-                text = ensure_valid_text(text, _t(query, "loading.data"))
+                text = ensure_valid_text(text, _t(update, "loading.data"))
                 keyboard = user_handler.get_position_ranking_keyboard(
                     current_sort=user_handler.user_states.get('position_sort', 'desc'),
                     current_limit=user_handler.user_states.get('position_limit', 10),
@@ -5609,7 +5609,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     sort_order=user_states.get('volume_sort', 'desc'),
                     update=update
                 ))
-                text = ensure_valid_text(text, _t(query, "loading.data"))
+                text = ensure_valid_text(text, _t(update, "loading.data"))
                 keyboard = user_handler.get_volume_ranking_keyboard(
                     current_period=user_states.get('volume_period', '1d'),
                     current_sort=user_states.get('volume_sort', 'desc'),
@@ -5627,7 +5627,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     period=user_states.get('liquidation_period', '1d'),
                     liquidation_type=user_states.get('liquidation_type', 'total')
                 ))
-                text = ensure_valid_text(text, _t(query, "loading.data"))
+                text = ensure_valid_text(text, _t(update, "loading.data"))
                 keyboard = user_handler.get_liquidation_ranking_keyboard(
                     current_limit=user_states.get('liquidation_limit', 10),
                     current_sort=user_states.get('liquidation_sort', 'desc'),
@@ -5638,7 +5638,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
 
             elif action == "market_sentiment":
                 await update.message.reply_text(
-                    _t(query, "feature.sentiment_offline"),
+                    _t(update, "feature.sentiment_offline"),
                     reply_markup=user_handler.get_market_sentiment_keyboard(update),
                     parse_mode='Markdown'
                 )
@@ -5654,7 +5654,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     limit=user_states.get('basic_market_limit', 10),
                     market_type=user_states.get('basic_market_type', 'futures')
                 ))
-                text = ensure_valid_text(text, _t(query, "loading.data"))
+                text = ensure_valid_text(text, _t(update, "loading.data"))
                 keyboard = user_handler.get_basic_market_keyboard(
                     current_sort_type=user_states.get('basic_market_sort_type', 'change'),
                     current_period=user_states.get('basic_market_period', '1d'),
@@ -5675,7 +5675,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     flow_type=user_states.get('money_flow_type', 'all'),
                     market=user_states.get('money_flow_market', 'spot')
                 ))
-                text = ensure_valid_text(text, _t(query, "loading.data"))
+                text = ensure_valid_text(text, _t(update, "loading.data"))
                 keyboard = user_handler.get_money_flow_keyboard(
                     current_period=user_states.get('money_flow_period', '1d'),
                     current_sort=user_states.get('money_flow_sort', 'net_inflow'),

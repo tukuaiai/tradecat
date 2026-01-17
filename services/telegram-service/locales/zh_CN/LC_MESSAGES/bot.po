@@ -3177,3 +3177,50 @@ msgstr "⛔ 您没有权限执行此操作"
 
 msgid "done.reload"
 msgstr "✅ 重载完成"
+
+# 环境变量管理
+msgid "admin.env.disabled"
+msgstr "⚠️ 环境变量管理功能已禁用"
+
+# 信号历史 / 统计
+msgid "signal.history.title"
+msgstr "信号历史"
+
+msgid "signal.history.header"
+msgstr "📜 {title} ({count}条)"
+
+msgid "signal.history.empty"
+msgstr "📜 信号历史\n\n暂无记录"
+
+msgid "signal.history.detail"
+msgstr "{time} | 强度:{strength}"
+
+msgid "signal.history.more"
+msgstr "... 还有 {count} 条"
+
+msgid "signal.stats.title"
+msgstr "📊 信号统计 (近{days}天)"
+
+msgid "signal.stats.total"
+msgstr "总数: {total}条"
+
+msgid "signal.stats.direction"
+msgstr "方向: {text}"
+
+msgid "signal.stats.source"
+msgstr "来源: {text}"
+
+msgid "signal.stats.top"
+msgstr "币种 Top5:"
+
+msgid "signal.stats.symbol_line"
+msgstr "  {symbol}: {count}条"
+
+msgid "signal.stats.empty"
+msgstr "📊 信号统计\n\n暂无数据"
+
+msgid "btn.history_recent"
+msgstr "📜 最近20条"
+
+msgid "btn.stats"
+msgstr "📊 统计"

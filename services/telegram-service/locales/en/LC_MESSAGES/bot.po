@@ -3177,3 +3177,50 @@ msgstr "⛔ You don't have permission for this action"
 
 msgid "done.reload"
 msgstr "✅ Reload complete"
+
+# Env manager
+msgid "admin.env.disabled"
+msgstr "⚠️ Environment variable manager is disabled"
+
+# Signal history / stats
+msgid "signal.history.title"
+msgstr "Signal History"
+
+msgid "signal.history.header"
+msgstr "📜 {title} ({count} entries)"
+
+msgid "signal.history.empty"
+msgstr "📜 Signal History\n\nNo records yet"
+
+msgid "signal.history.detail"
+msgstr "{time} | Strength:{strength}"
+
+msgid "signal.history.more"
+msgstr "... {count} more"
+
+msgid "signal.stats.title"
+msgstr "📊 Signal stats (last {days} days)"
+
+msgid "signal.stats.total"
+msgstr "Total: {total}"
+
+msgid "signal.stats.direction"
+msgstr "Direction: {text}"
+
+msgid "signal.stats.source"
+msgstr "Source: {text}"
+
+msgid "signal.stats.top"
+msgstr "Top 5 symbols:"
+
+msgid "signal.stats.symbol_line"
+msgstr "  {symbol}: {count}"
+
+msgid "signal.stats.empty"
+msgstr "📊 Signal stats\n\nNo data"
+
+msgid "btn.history_recent"
+msgstr "📜 Last 20"
+
+msgid "btn.stats"
+msgstr "📊 Stats"
