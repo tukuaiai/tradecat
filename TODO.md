@@ -1,62 +1,139 @@
-[x] i18n 完善  
-    - ✅ 统一 /lang 与 /ai 入口的语言偏好落盘/读取路径，覆盖按钮流、命令流、快捷触发三条链路。  
-    - ✅ 补齐 locales/en 与 zh_CN 词条缺失项（当前 273 条），运行 ./scripts/verify.sh 后人工对话验收。  
-    - ✅ 所有 InlineKeyboardButton 中文按钮已替换为 _btn/_btn_lang（剩余 0 处）
-    - ✅ i18n 基础设施完成：libs/common/i18n.py + locales/*.po/*.mo
-    - ✅ 39 个卡片文件已添加 i18n 支持
+# TradeCat TODO 清单
 
-[ ] 优化部署流程（简单、方便，有效先使用旧的数据库配置优化流程和实现）  
-    - ⚠️ TimescaleDB 端口不一致：config/.env.example 使用 5434，scripts/export_timescaledb.sh 使用 5433  
-    - [ ] 在 install/init/start 三脚本中补充失败提示与依赖缺失指引，保证全流程零交互可跑通。  
+> 更新时间：2026-01-17
+> 
+> 优先级说明：🔴 紧急 | 🟠 重要 | 🟡 一般 | 🟢 低优先级
 
-[ ] 优化信号功能  
-    - ✅ signals 模块存在：engine_v2.py, formatter.py, pusher_v2.py, ui.py
-    - ✅ signals/ui.py 已添加 i18n 支持
-    - [ ] 检查 telegram-service/src/signals 下规则，补充单元/集成测试或最小复现脚本。  
-    - [ ] 为高频告警增加去重/节流配置项（写入 config/.env.example 并文档化）。  
+---
 
-[x] 适配新的服务和本地 GEMINI CLI 处理 AI 请求的方法  
-    - ✅ ai-service/scripts/start.sh 已实现 test 命令，支持本地测试数据获取
-    - ✅ predict-service 已有完整文档：README.md, AGENTS.md, docs/
-    - ✅ predict-service 包含 3 个子服务：polymarket, opinion, kalshi（各有 package.json）
+## 🔴 紧急修复（灾难性故障）
 
-[ ] 数据库完全迁移到新的 TimescaleDB（RAW/QUALITY schema）  
-    - ⚠️ 端口配置不一致需统一（5433 vs 5434）
-    - [ ] 迁移脚本与 README 说明统一到新端口/新 schema；确保数据导出/恢复/压缩脚本可用。  
-    - [ ] 验收：使用 restore_*.sh 完成一次全量恢复并通过 ./scripts/verify.sh。
+### Bot 响应问题
+- [ ] **全局 bot 即时响应未生效** - 灾难性故障，必须彻底修复
+  - 症状：消息发送后无即时反馈
+  - 影响：用户体验极差，以为 bot 挂了
+  - 排查方向：`telegram-service/src/bot/app.py` 消息处理链路
+  
+- [ ] **币种查询功能问题** - 集中在不响应，没有即时消息响应
+  - `BTC!` / `BTC!!` / `BTC@` 触发无反馈
+  - 检查 `single_token_snapshot.py`、`single_token_txt.py`
 
-[x] 可视化微服务 (vis-service)
+### 群聊安全
+- [ ] **tgbot 群聊消息回调触发白名单** - 防止全部消息都触发 bot 响应
+  - 需实现：群聊白名单机制
+  - 需实现：命令前缀过滤（仅响应 `/` 或 `!` 开头）
+  - 需实现：@bot 提及才响应
 
-    ## 当前状态（2026-01-09 已完成）
-    - ✅ FastAPI 服务框架：`services-preview/vis-service/src/main.py`
-    - ✅ REST API 路由：`/health`, `/templates`, `/render`
-    - ✅ 配置管理：`core/settings.py` (host/port/token/cache)
-    - ✅ 已注册 **9 个模板**（registry.py）：
-      | 模板 ID | 名称 | 类别 | 输出 |
-      |:---|:---|:---|:---|
-      | line-basic | 基础折线 | 通用 | png/json |
-      | kline-basic | K线+均线+量能 | 单币 | png/json |
-      | macd | 价格+MACD | 单币 | png/json |
-      | equity-drawdown | 权益+回撤 | 通用 | png/json |
-      | vpvr-ridge | VPVR山脊图 | 单币 | png/json |
-      | market-vpvr-heat | 全市场VPVR热力图 | 全市场 | png/json |
-      | vpvr-zone-dot | VPVR价值区点阵 | 全市场 | png/json |
-      | vpvr-zone-grid | VPVR价值区卡片 | 全市场 | png/json |
-      | vpvr-zone-strip | VPVR条带散点 | 全市场 | png/json |
+---
 
-    ## Telegram Bot 集成（已完成）
-    - ✅ 主菜单已添加「📈 可视化」入口按钮 (app.py:1141)
-    - ✅ vis_handler.py 完整重写，支持：
-      - 按类别分组显示（单币图表 / 全市场图表）
-      - 单币图表流程：选模板 → 选币种 → 选周期 → 渲染
-      - 全市场图表流程：选模板 → 选周期 → 渲染
-      - 周期快捷切换和刷新
-    - ✅ 模板 ID 统一使用中划线格式
-    - ✅ i18n 词条已添加并编译（vis.template.*, vis.category.*, vis.error.*）
+## 🟠 重要功能（核心体验）
 
-    ## 后续优化（可选）
-    - [ ] 完善 HTTP API 文档（OpenAPI schema 已自动生成）
-    - [ ] 启用 diskcache 渲染缓存
-    - [ ] 支持 SVG 输出格式
-    - [ ] 添加 `/render/batch` 批量渲染接口
-    - [ ] 从 config/.env 读取 SYMBOLS_GROUPS 自定义币种列表
+### i18n 国际化残留
+- [ ] **卡片中文字段与表头中英文问题**
+  - 涉及 39 张卡片（basic/advanced/futures）
+  - 字段名硬编码中文，需改用 i18n key
+  - 表头翻译不完整
+  - 参考：`services/telegram-service/src/cards/i18n.py`
+
+### 数据架构优化
+- [ ] **SQLite 数据迁移到统一 PG 库**（重要但不紧急）
+  - 当前：`libs/database/services/telegram-service/market_data.db`
+  - 目标：统一到 TimescaleDB (5434)
+  - 好处：数据一致性、查询性能、运维简化
+  
+- [ ] **数据库全市场适配**（重要但不紧急）
+  - 当前仅支持币安永续合约
+  - 目标：支持美股/A股/宏观数据
+  - 涉及：markets-service 数据写入、trading-service 指标计算
+
+### 内部通讯与数据消费
+- [ ] **内部 API 通讯层**
+  - 服务间 HTTP/gRPC 调用标准化
+  - 数据消费方法抽象
+  - 考虑发布 PyPI 包供外部使用
+
+---
+
+## 🟡 功能增强
+
+### AI 与策略
+- [ ] **成熟策略组供 AI 使用**
+  - 整理现有指标组合为策略模板
+  - 策略：趋势跟踪、均值回归、动量突破、期货情绪
+  - AI 可根据市场状态选择策略
+
+- [ ] **接入执行模块**
+  - 复用现有开源 AI 项目轮子
+  - 接入统计数据源
+  - 复用 AI 功能消费的数据作为新增字段
+
+### 信号服务增强
+- [ ] **信号规则扩展**（当前 129 条）
+  - core: 20 条
+  - momentum: 27 条
+  - trend: 19 条
+  - volatility: 15 条
+  - volume: 13 条
+  - futures: 11 条
+  - pattern: 16 条
+  - misc: 8 条
+  - 目标：补充跨周期信号、组合信号
+
+### 可视化增强
+- [ ] **vis-service 功能完善**
+  - K线图渲染优化
+  - 指标叠加显示
+  - VPVR 成交量分布图
+  - 端口：8087
+
+---
+
+## 🟢 技术债务
+
+### 代码质量
+- [ ] 统一日志格式（部分服务日志格式不一致）
+- [ ] 补充单元测试（当前覆盖率低）
+- [ ] 类型注解完善（关键函数缺少类型）
+
+### 文档同步
+- [ ] README.md / README_EN.md / AGENTS.md 保持同步
+- [ ] API 文档自动生成（api-service）
+
+### 配置管理
+- [ ] 端口统一（5433 vs 5434 混用问题）
+- [ ] 环境变量校验（启动时检查必填项）
+
+---
+
+## 📊 项目现状统计
+
+| 模块 | 数量 | 状态 |
+|:---|:---:|:---|
+| 稳定版服务 | 5 | data/trading/telegram/ai/signal |
+| 预览版服务 | 6 | api/markets/vis/order/predict/fate |
+| 排行榜卡片 | 39 | basic(9)/advanced(10)/futures(20) |
+| 技术指标 | 32 | batch(22)/incremental(10) |
+| 信号规则 | 129 | 8 个分类 |
+| 数据规模 | 3.73亿 | K线 + 9457万期货指标 |
+
+---
+
+## 📝 备忘
+
+### 服务端口
+- TimescaleDB: 5433 (旧) / 5434 (新)
+- api-service: 8000
+- vis-service: 8087
+- fate-service: 8001
+
+### 关键路径
+- 全局配置：`config/.env`
+- SQLite 数据：`libs/database/services/telegram-service/market_data.db`
+- 冷却持久化：`libs/database/services/signal-service/cooldown.db`
+
+### 验证命令
+```bash
+./scripts/verify.sh          # 代码验证
+./scripts/check_env.sh       # 环境检查
+./scripts/start.sh status    # 服务状态
+```

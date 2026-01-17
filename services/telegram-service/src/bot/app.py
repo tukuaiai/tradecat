@@ -66,6 +66,7 @@ except Exception as exc:  # pragma: no cover - 环境缺依赖时降级
     _MetricService = None
     logger.warning("⚠️ 已禁用数据库指标服务（未安装 psycopg 或不需要PG）: %s", exc)
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+from telegram.constants import ChatAction
 from telegram.request import HTTPXRequest
 from telegram.ext import (
     Application,
@@ -287,9 +288,120 @@ def _get_user_id(update) -> Optional[int]:
     return None
 
 
+_GROUP_ALLOWED_PREFIXES = ("/", "!")
+_GROUP_WHITELIST: set[int] = set()
+_GROUP_REQUIRE_MENTION = True
+
+BOT_USERNAME = os.getenv("BOT_USERNAME", "").lstrip("@").lower()
+BOT_USER_ID: Optional[int] = None
+
+
+def _parse_int_list(raw: str) -> set[int]:
+    ids: set[int] = set()
+    for item in (raw or "").split(","):
+        token = item.strip()
+        if not token:
+            continue
+        try:
+            ids.add(int(token))
+        except ValueError:
+            logger.warning("群聊白名单ID非法: %s", token)
+    return ids
+
+
+def _load_group_whitelist() -> None:
+    """加载群聊白名单（逗号分隔，群ID通常为负数）"""
+    global _GROUP_WHITELIST
+    raw = os.getenv("TELEGRAM_GROUP_WHITELIST") or os.getenv("TG_GROUP_WHITELIST") or ""
+    _GROUP_WHITELIST = _parse_int_list(raw)
+    if _GROUP_WHITELIST:
+        logger.info("✅ 已加载群聊白名单: %s", sorted(_GROUP_WHITELIST))
+    else:
+        logger.warning("⚠️ 未配置 TELEGRAM_GROUP_WHITELIST，群聊消息将被忽略")
+
+
+_load_group_whitelist()
+
+
+def _get_update_message(update):
+    if not update:
+        return None
+    if hasattr(update, "message") and update.message:
+        return update.message
+    if hasattr(update, "callback_query") and update.callback_query and update.callback_query.message:
+        return update.callback_query.message
+    return None
+
+
+def _message_mentions_bot(message) -> bool:
+    if not message:
+        return False
+    text = (message.text or message.caption or "").lower()
+
+    if BOT_USER_ID and getattr(message, "reply_to_message", None):
+        reply_user = message.reply_to_message.from_user if message.reply_to_message else None
+        if reply_user and reply_user.id == BOT_USER_ID:
+            return True
+
+    if getattr(message, "entities", None):
+        for ent in message.entities:
+            if ent.type == "text_mention" and ent.user and BOT_USER_ID and ent.user.id == BOT_USER_ID:
+                return True
+            if BOT_USERNAME and ent.type in ("mention", "bot_command"):
+                part = text[ent.offset: ent.offset + ent.length]
+                if f"@{BOT_USERNAME}" in part:
+                    return True
+
+    if BOT_USERNAME and f"@{BOT_USERNAME}" in text:
+        return True
+
+    return False
+
+
 def _is_command_allowed(update) -> bool:
-    """所有命令都允许"""
+    """群聊安全: 白名单 + 前缀 + @提及，私聊默认允许"""
+    message = _get_update_message(update)
+    if not message or not getattr(message, "chat", None):
+        return False
+
+    chat = message.chat
+    chat_type = getattr(chat, "type", "")
+
+    if chat_type == "private":
+        return True
+
+    if chat_type not in ("group", "supergroup"):
+        return False
+
+    if not _GROUP_WHITELIST or chat.id not in _GROUP_WHITELIST:
+        return False
+
+    if getattr(update, "callback_query", None):
+        return True
+
+    text = (message.text or message.caption or "")
+    if not text:
+        return False
+    if not text.lstrip().startswith(_GROUP_ALLOWED_PREFIXES):
+        return False
+    if _GROUP_REQUIRE_MENTION and not _message_mentions_bot(message):
+        return False
     return True
+
+
+async def _refresh_bot_identity(application) -> None:
+    """缓存 Bot 用户名与ID，用于群聊 @ 提及识别"""
+    global BOT_USERNAME, BOT_USER_ID
+    try:
+        me = await application.bot.get_me()
+        BOT_USERNAME = (me.username or "").lstrip("@").lower()
+        BOT_USER_ID = me.id
+        if BOT_USERNAME:
+            logger.info("✅ Bot身份已确认: @%s (%s)", BOT_USERNAME, BOT_USER_ID)
+        else:
+            logger.warning("⚠️ Bot用户名为空，群聊 @ 提及识别可能受限")
+    except Exception as exc:
+        logger.warning("⚠️ 获取Bot身份失败: %s", exc)
 
 async def send_help_message(update_or_query, context, *, via_query: bool = False):
     """发送帮助消息"""
@@ -412,6 +524,22 @@ CACHE_FILE_SECONDARY = os.path.join(CACHE_DIR, 'cache_data_secondary.json')
 # 全局机器人实例
 bot = None
 user_handler = None
+_user_handler_init_task = None
+
+
+async def _trigger_user_handler_init() -> None:
+    """触发 user_handler 懒初始化，避免首次请求无响应"""
+    global _user_handler_init_task
+    if user_handler is not None and bot is not None:
+        return
+    if _user_handler_init_task is not None and not _user_handler_init_task.done():
+        return
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.get_event_loop()
+    logger.info("⚙️ 触发 user_handler 懒初始化")
+    _user_handler_init_task = loop.run_in_executor(None, initialize_bot_sync)
 
 # 全局点击限制器
 _user_click_timestamps = {}
@@ -2972,8 +3100,8 @@ class TradeCatBot:
 
 
 def is_group_mention_required(update: Update) -> bool:
-    """群组内是否必须 @ 才响应 —— 已放宽，默认不要求。"""
-    return False
+    """群组内是否必须 @ 才响应"""
+    return _GROUP_REQUIRE_MENTION
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """启动命令处理器"""
@@ -2984,6 +3112,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
 
     try:
@@ -3031,6 +3160,13 @@ def _build_ranking_menu_text(group: str, update: Optional[Update] = None) -> str
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """按钮回调处理器"""
     global user_handler, bot
+    if not _is_command_allowed(update):
+        try:
+            if update.callback_query:
+                await update.callback_query.answer()
+        except Exception:
+            pass
+        return
 
     from telegram import InlineKeyboardMarkup
 
@@ -3335,6 +3471,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if button_data.startswith("pattern_toggle_"):
         if user_handler is None:
             await query.edit_message_text(_t(update, "error.not_ready"), parse_mode='Markdown')
+            await _trigger_user_handler_init()
             return
         states = user_handler.user_states.setdefault(user_id, {})
         sym = states.get("single_symbol")
@@ -3359,6 +3496,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if button_data.startswith("single_"):
         if user_handler is None:
             await query.edit_message_text(_t(update, "error.not_ready"), parse_mode='Markdown')
+            await _trigger_user_handler_init()
             return
         states = user_handler.user_states.setdefault(user_id, {})
         sym = states.get("single_symbol")
@@ -4657,6 +4795,7 @@ async def vol_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
 
     try:
@@ -4692,6 +4831,7 @@ async def sentiment_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
 
     try:
@@ -4714,6 +4854,7 @@ async def market_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
 
     try:
@@ -4750,6 +4891,7 @@ async def flow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
 
     try:
@@ -4796,6 +4938,7 @@ async def depth_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
 
     try:
@@ -4829,6 +4972,7 @@ async def ratio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
 
     try:
@@ -4890,6 +5034,7 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
 
     # 发送主菜单，保持永久常驻键盘
@@ -4920,6 +5065,7 @@ async def data_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
     # 先发送带键盘的消息刷新底部键盘
     await update.message.reply_text(_t(update, "start.greet"), reply_markup=user_handler.get_reply_keyboard(update))
@@ -4939,7 +5085,7 @@ async def query_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         coin + "USDT"
         # 触发单币查询
         update.message.text = f"{coin}!"
-        await handle_keyboard_message(update, context)
+        await handle_keyboard_message(update, context, bypass_checks=True)
     else:
         # 显示币种列表
         from common.symbols import get_configured_symbols
@@ -4989,6 +5135,7 @@ async def vis_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
     # 刷新底部键盘
     await update.message.reply_text(_t(update, "start.greet"), reply_markup=user_handler.get_reply_keyboard(update))
@@ -5018,6 +5165,7 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
     # 显示管理面板
     text = _build_admin_menu_text(update)
@@ -5080,6 +5228,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot
     if bot is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
 
     try:
@@ -5132,7 +5281,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"状态命令错误: {e}")
         await update.message.reply_text(_t(update, "error.status_failed"))
 
-async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_TYPE, *, bypass_checks: bool = False):
     """处理常驻键盘按钮消息"""
     global user_handler
 
@@ -5141,8 +5290,13 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
         return
 
     # 全局权限拦截
-    if not _is_command_allowed(update):
+    if not bypass_checks and not _is_command_allowed(update):
         return
+
+    try:
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+    except Exception:
+        pass
 
     message_text = update.message.text
     lang = _resolve_lang(update)
@@ -5155,8 +5309,8 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
 
     if user_handler is None:
         logger.warning("user_handler 未初始化")
-        return
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
 
     # 映射常驻键盘按钮到对应功能
@@ -5196,6 +5350,10 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
         # -------- AI 分析触发：如 "btc@" 或 "BTC@" --------
         import re
         norm_text = (message_text or "").replace("\u200b", "").strip()
+        if norm_text.startswith("!") and len(norm_text) > 1:
+            norm_text = norm_text[1:].strip()
+            if not any(ch in norm_text for ch in ("!", "！", "@")):
+                norm_text = f"{norm_text}!"
 
         if "@" in norm_text:
             m = re.match(r'^([A-Za-z0-9]{2,15})@$', norm_text.strip())
@@ -5653,6 +5811,7 @@ def initialize_bot_sync():
 async def post_init(application):
     """应用启动后的初始化"""
     logger.info("✅ 应用启动完成")
+    await _refresh_bot_identity(application)
 
     # 延迟启动后台缓存加载任务
     async def delayed_init():
