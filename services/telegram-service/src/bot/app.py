@@ -3481,7 +3481,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        await query.answer(_t("ui.processing", update))
+        await query.answer(_t(update, "ui.processing"))
     except Exception:
         pass
 
