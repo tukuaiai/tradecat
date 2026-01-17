@@ -838,6 +838,23 @@ initialize_data_isolation()
 # 立即响应和文件I/O优化函数
 # ===============================
 
+async def _send_instant_reply(update: Update, key: Optional[str] = None) -> None:
+    """发送文本即时响应（不影响主流程）"""
+    message = _get_update_message(update)
+    if not message:
+        return
+    if not key:
+        key = "loading.default"
+    text = _t(update, key)
+    if not text or text == key:
+        text = _t(update, "loading.default")
+    if not text or text == "loading.default":
+        text = "处理中..."
+    try:
+        await message.reply_text(text)
+    except Exception as exc:
+        logger.debug("⚠️ 即时响应发送失败: %s", exc)
+
 def optimize_button_response_logging():
     """优化按钮响应日志记录"""
     import sys
@@ -4798,6 +4815,8 @@ async def vol_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _trigger_user_handler_init()
         return
 
+    await _send_instant_reply(update, "loading.volume_market")
+
     try:
         loop = asyncio.get_event_loop()
 
@@ -4834,6 +4853,8 @@ async def sentiment_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _trigger_user_handler_init()
         return
 
+    await _send_instant_reply(update, "loading.sentiment")
+
     try:
         loop = asyncio.get_event_loop()
         text = await loop.run_in_executor(None, user_handler.get_market_sentiment)
@@ -4856,6 +4877,8 @@ async def market_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(_t(update, "start.initializing"))
         await _trigger_user_handler_init()
         return
+
+    await _send_instant_reply(update, "loading.market")
 
     try:
         loop = asyncio.get_event_loop()
@@ -4893,6 +4916,8 @@ async def flow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(_t(update, "start.initializing"))
         await _trigger_user_handler_init()
         return
+
+    await _send_instant_reply(update, "loading.money_flow")
 
     try:
         loop = asyncio.get_event_loop()
@@ -4941,6 +4966,8 @@ async def depth_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _trigger_user_handler_init()
         return
 
+    await _send_instant_reply(update, "loading.depth")
+
     try:
         loop = asyncio.get_event_loop()
 
@@ -4974,6 +5001,8 @@ async def ratio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(_t(update, "start.initializing"))
         await _trigger_user_handler_init()
         return
+
+    await _send_instant_reply(update, "loading.position_market")
 
     try:
         loop = asyncio.get_event_loop()
@@ -5067,6 +5096,7 @@ async def data_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(_t(update, "start.initializing"))
         await _trigger_user_handler_init()
         return
+    await _send_instant_reply(update, "loading.data")
     # 先发送带键盘的消息刷新底部键盘
     await update.message.reply_text(_t(update, "start.greet"), reply_markup=user_handler.get_reply_keyboard(update))
     text = _build_ranking_menu_text("basic", update)
@@ -5087,6 +5117,7 @@ async def query_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         update.message.text = f"{coin}!"
         await handle_keyboard_message(update, context, bypass_checks=True)
     else:
+        await _send_instant_reply(update, "loading.query")
         # 显示币种列表
         from common.symbols import get_configured_symbols
         symbols = get_configured_symbols()
@@ -5108,6 +5139,7 @@ async def ai_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """AI分析指令 /ai"""
     if not _is_command_allowed(update):
         return
+    await _send_instant_reply(update, "loading.ai")
     try:
         # 记录用户语言偏好，贯通到 AI 服务
         context.user_data["lang_preference"] = _resolve_lang(update)
@@ -5137,6 +5169,7 @@ async def vis_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(_t(update, "start.initializing"))
         await _trigger_user_handler_init()
         return
+    await _send_instant_reply(update, "loading.vis")
     # 刷新底部键盘
     await update.message.reply_text(_t(update, "start.greet"), reply_markup=user_handler.get_reply_keyboard(update))
     # 显示可视化菜单
@@ -5167,6 +5200,7 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(_t(update, "start.initializing"))
         await _trigger_user_handler_init()
         return
+    await _send_instant_reply(update, "loading.stats")
     # 显示管理面板
     text = _build_admin_menu_text(update)
     keyboard = _build_admin_menu_keyboard(update)
@@ -5231,6 +5265,8 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _trigger_user_handler_init()
         return
 
+    await _send_instant_reply(update, "loading.stats")
+
     try:
         # 安全地获取缓存信息，避免Markdown解析错误
         def escape_markdown_safe(text):
@@ -5281,6 +5317,22 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"状态命令错误: {e}")
         await update.message.reply_text(_t(update, "error.status_failed"))
 
+_TEXT_ACTION_INSTANT_KEYS = {
+    "position_ranking": "loading.data",
+    "funding_rate_ranking": "loading.data",
+    "volume_ranking": "loading.data",
+    "liquidation_ranking": "loading.data",
+    "market_sentiment": "loading.sentiment",
+    "basic_market": "loading.market",
+    "money_flow": "loading.money_flow",
+    "market_depth": "loading.depth",
+    "ranking_menu": "loading.data",
+    "signal_menu": "loading.switch",
+    "start_coin_analysis": "loading.ai",
+    "coin_query": "loading.query",
+    "vis_menu": "loading.vis",
+}
+
 async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_TYPE, *, bypass_checks: bool = False):
     """处理常驻键盘按钮消息"""
     global user_handler
@@ -5300,6 +5352,14 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
 
     message_text = update.message.text
     lang = _resolve_lang(update)
+    instant_replied = False
+
+    async def _instant_once(key: Optional[str]) -> None:
+        nonlocal instant_replied
+        if instant_replied:
+            return
+        await _send_instant_reply(update, key)
+        instant_replied = True
 
     # =============================================================================
     # 处理配置编辑的用户输入 - 已禁用
@@ -5363,6 +5423,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     if not AI_SERVICE_AVAILABLE:
                         await update.message.reply_text(_t(update, "ai.not_installed"))
                         return
+                    await _instant_once("loading.ai")
                     context.user_data["lang_preference"] = _resolve_lang(update)
                     ai_handler = get_ai_handler(symbols_provider=lambda: user_handler.get_active_symbols() if user_handler else None)
                     coin = m.group(1).upper()
@@ -5380,6 +5441,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
             if m:
                 sym = m.group(1).upper()
                 try:
+                    await _instant_once("loading.query")
                     from bot.single_token_txt import export_single_token_txt
                     import io
                     from datetime import datetime
@@ -5417,6 +5479,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     sym = tokens[0]
         if sym:
             sym = sym.upper()
+            await _instant_once("loading.query")
             user_id = update.effective_user.id
             # 性能优化：临时关闭单币查询
             if os.getenv("DISABLE_SINGLE_TOKEN_QUERY", "1") == "1":
@@ -5464,6 +5527,9 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
 
         if message_text in button_mapping:
             action = button_mapping[message_text]
+            instant_key = _TEXT_ACTION_INSTANT_KEYS.get(action)
+            if instant_key:
+                await _instant_once(instant_key)
 
             if action == "lang_menu":
                 await lang_command(update, context)
