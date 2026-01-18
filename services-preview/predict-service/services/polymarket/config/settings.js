@@ -6,9 +6,9 @@
 
 const path = require('path');
 // 统一使用 tradecat/config/.env
-const projectRoot = path.resolve(__dirname, '../../../../../../');
+const projectRoot = path.resolve(__dirname, '../../../../../');
 const dotenvPath = path.join(projectRoot, 'config', '.env');
-require('dotenv').config({ path: dotenvPath });
+require('dotenv').config({ path: dotenvPath, override: true });
 
 module.exports = {
     // ==================== Polymarket WebSocket ====================

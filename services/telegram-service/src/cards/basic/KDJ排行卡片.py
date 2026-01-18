@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Dict, List, Tuple
 
-from cards.base import RankingCard
+from cards.base import RankingCard, format_number
 from cards.data_provider import get_ranking_provider, format_symbol
 from cards.i18n import btn_auto as _btn_auto, gettext as _t, resolve_lang, translate_field, format_sort_field
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -331,7 +331,7 @@ class KDJ排行卡片(RankingCard):
             for col_id, _, _ in active_special:
                 val = item.get(col_id)
                 if col_id in {"j", "k", "d"}:
-                    row.append(f"{val:.2f}" if val is not None else "-")
+                    row.append(format_number(val, 2) if val is not None else "-")
                 else:
                     row.append(str(val) if val not in (None, "") else "-")
             for col_id, _, _ in active_general:
@@ -342,9 +342,9 @@ class KDJ排行卡片(RankingCard):
                 elif col_id in {"quote_volume"}:
                     row.append(self._format_volume(val))
                 elif col_id == "price":
-                    row.append(f"{val:.4f}" if val else "-")
+                    row.append(format_number(val, 4) if val else "-")
                 elif isinstance(val, (int, float)):
-                    row.append(f"{val:.2f}")
+                    row.append(format_number(val, 2))
                 else:
                     row.append(str(val) if val not in (None, "") else "-")
             rows.append(row)
