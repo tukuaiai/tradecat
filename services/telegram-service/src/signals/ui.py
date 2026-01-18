@@ -22,6 +22,17 @@ from storage.history import SignalHistory, get_history
 
 logger = logging.getLogger(__name__)
 
+
+def build_binance_url(symbol: str, market: str = "futures") -> str:
+    """构造 Binance 跳转链接。默认永续，回退加 USDT。"""
+    sym = symbol.upper().replace("/", "")
+    if not sym.endswith("USDT"):
+        sym = f"{sym}USDT"
+    if market == "spot":
+        base = sym.replace("USDT", "_USDT", 1)
+        return f"https://www.binance.com/en/trade/{base}?type=spot"
+    return f"https://www.binance.com/en/futures/{sym}?type=perpetual"
+
 # 数据库路径
 _SIGNALS_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(_SIGNALS_DIR))))
@@ -216,7 +227,7 @@ async def handle(update, context) -> bool:
     if not data.startswith("sig_"):
         return False
 
-    await q.answer()
+    # 即时响应已在 app.py 统一处理
     sub = get_sub(uid)
 
     if data == "sig_toggle":
@@ -242,13 +253,13 @@ async def handle(update, context) -> bool:
         pass
     elif data == "sig_hist_recent":
         # 显示最近信号历史
-        text = get_history_text(limit=20)
-        await q.edit_message_text(text, reply_markup=get_history_kb())
+        text = get_history_text(update=update, limit=20)
+        await q.edit_message_text(text, reply_markup=get_history_kb(update=update))
         return True
     elif data == "sig_hist_stats":
         # 显示信号统计
-        text = get_history_stats_text(days=7)
-        await q.edit_message_text(text, reply_markup=get_history_kb())
+        text = get_history_stats_text(update=update, days=7)
+        await q.edit_message_text(text, reply_markup=get_history_kb(update=update))
         return True
     else:
         return False
@@ -271,60 +282,101 @@ def get_signal_push_kb(symbol: str, *, uid: int | None = None, lang: str | None 
         lang = resolve_lang_by_user_id(uid) if uid is not None else resolve_lang()
     analyze_text = f"🔍 {coin}{_t('btn.analyze', lang=lang)}"
     ai_text = f"🤖 {_t('btn.ai_analyze', lang=lang)}"
+    binance_url = build_binance_url(symbol)
+    binance_text = _t("btn.binance", lang=lang)
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton(analyze_text, callback_data=f"single_query_{symbol}"),
             InlineKeyboardButton(ai_text, callback_data=f"ai_coin_{symbol}"),
-        ]
+            InlineKeyboardButton(binance_text, url=binance_url),
+        ],
     ])
 
 
-def get_history_text(limit: int = 20, symbol: str = None) -> str:
-    """获取信号历史文本"""
+def get_history_text(update=None, *, limit: int = 20, symbol: str = None, lang: str | None = None) -> str:
+    """获取信号历史文本（国际化）"""
+    lang = resolve_lang(update, lang=lang)
+    title = _t("signal.history.title", update=update, lang=lang)
     try:
         history = get_history()
         records = history.get_recent(limit=limit, symbol=symbol)
-        return history.format_history_text(records, "信号历史")
     except Exception as e:
         logger.warning(f"获取历史失败: {e}")
-        return "📜 信号历史\n\n暂无记录"
+        records = []
+
+    if not records:
+        return _t("signal.history.empty", update=update, lang=lang)
+
+    header = _t("signal.history.header", update=update, lang=lang, title=title, count=len(records))
+    lines = [header, ""]
+
+    dir_icons = {"BUY": "🟢", "SELL": "🔴", "ALERT": "⚠️"}
+    detail_tpl = _t("signal.history.detail", update=update, lang=lang)
+
+    for r in records[:15]:  # 最多显示15条
+        ts = r.get("timestamp", "")[:16].replace("T", " ")
+        symbol_text = r.get("symbol", "").replace("USDT", "")
+        direction = r.get("direction", "")
+        signal_type = r.get("signal_type", "")
+        strength = r.get("strength", 0)
+        icon = dir_icons.get(direction, "📊")
+
+        lines.append(f"{icon} {symbol_text} | {signal_type}")
+        try:
+            lines.append(detail_tpl.format(time=ts, strength=strength))
+        except Exception:
+            lines.append(f"{ts} | strength: {strength}")
+
+    if len(records) > 15:
+        more = len(records) - 15
+        lines.append("")
+        lines.append(_t("signal.history.more", update=update, lang=lang, count=more))
+
+    return "\n".join(lines)
 
 
-def get_history_stats_text(days: int = 7) -> str:
-    """获取信号统计文本"""
+def get_history_stats_text(update=None, *, days: int = 7, lang: str | None = None) -> str:
+    """获取信号统计文本（国际化）"""
+    lang = resolve_lang(update, lang=lang)
+    title = _t("signal.stats.title", update=update, lang=lang, days=days)
     try:
         history = get_history()
         stats = history.get_stats(days=days)
-        
-        lines = [f"📊 信号统计 (近{days}天)", ""]
-        lines.append(f"总数: {stats['total']}条")
-        
-        if stats.get("by_direction"):
-            dir_icons = {"BUY": "🟢", "SELL": "🔴", "ALERT": "⚠️"}
-            dir_text = " | ".join([f"{dir_icons.get(k, '')} {k}: {v}" for k, v in stats["by_direction"].items()])
-            lines.append(f"方向: {dir_text}")
-        
-        if stats.get("by_source"):
-            src_text = " | ".join([f"{k}: {v}" for k, v in stats["by_source"].items()])
-            lines.append(f"来源: {src_text}")
-        
-        if stats.get("by_symbol"):
-            lines.append("\n币种 Top5:")
-            for item in stats["by_symbol"][:5]:
-                lines.append(f"  {item['symbol'].replace('USDT', '')}: {item['count']}条")
-        
-        return "\n".join(lines)
     except Exception as e:
         logger.warning(f"获取统计失败: {e}")
-        return "📊 信号统计\n\n暂无数据"
+        return _t("signal.stats.empty", update=update, lang=lang)
+
+    if not stats or stats.get("total", 0) <= 0:
+        return _t("signal.stats.empty", update=update, lang=lang)
+
+    lines = [title, ""]
+    lines.append(_t("signal.stats.total", update=update, lang=lang, total=stats["total"]))
+
+    if stats.get("by_direction"):
+        dir_icons = {"BUY": "🟢", "SELL": "🔴", "ALERT": "⚠️"}
+        dir_text = " | ".join([f"{dir_icons.get(k, '')} {k}: {v}" for k, v in stats["by_direction"].items()])
+        lines.append(_t("signal.stats.direction", update=update, lang=lang, text=dir_text))
+
+    if stats.get("by_source"):
+        src_text = " | ".join([f"{k}: {v}" for k, v in stats["by_source"].items()])
+        lines.append(_t("signal.stats.source", update=update, lang=lang, text=src_text))
+
+    if stats.get("by_symbol"):
+        lines.append("")
+        lines.append(_t("signal.stats.top", update=update, lang=lang))
+        for item in stats["by_symbol"][:5]:
+            sym = item["symbol"].replace("USDT", "")
+            lines.append(_t("signal.stats.symbol_line", update=update, lang=lang, symbol=sym, count=item["count"]))
+
+    return "\n".join(lines)
 
 
-def get_history_kb() -> InlineKeyboardMarkup:
-    """信号历史查询键盘"""
+def get_history_kb(update=None) -> InlineKeyboardMarkup:
+    """信号历史查询键盘（国际化）"""
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📜 最近20条", callback_data="sig_hist_recent"),
-            InlineKeyboardButton("📊 统计", callback_data="sig_hist_stats"),
+            InlineKeyboardButton(_t("btn.history_recent", update=update), callback_data="sig_hist_recent"),
+            InlineKeyboardButton(_t("btn.stats", update=update), callback_data="sig_hist_stats"),
         ],
-        [_btn(None, "btn.back_home", "main_menu")]
+        [_btn(update, "btn.back_home", "main_menu")]
     ])

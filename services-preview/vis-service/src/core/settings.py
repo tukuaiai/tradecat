@@ -9,7 +9,8 @@ from functools import lru_cache
 from typing import Optional
 from pathlib import Path
 
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]

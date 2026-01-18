@@ -84,6 +84,17 @@ def main():
     # 持续运行
     import threading
 
+    # 注册持久化：把事件写入历史表
+    try:
+        from storage.history import get_history
+        from events import SignalPublisher
+
+        history = get_history()
+        SignalPublisher.register_persist(lambda ev: history.save(ev, source=ev.source))
+        logger.info("已注册历史持久化回调")
+    except Exception as e:
+        logger.warning(f"历史持久化注册失败: {e}")
+
     threads = []
 
     if args.sqlite or args.all:

@@ -15,6 +15,10 @@ import math
 import os
 import unicodedata
 from typing import Dict, List, Literal, Sequence, Tuple
+try:
+    from wcwidth import wcswidth  # 更精确的终端宽度计算（兼容 emoji/组合字符）
+except ImportError:  # 可选依赖，缺失时回退原逻辑
+    wcswidth = None
 
 from cards.data_provider import format_symbol, get_ranking_provider
 from cards.i18n import gettext as _t, resolve_lang, translate_field, translate_value
@@ -222,9 +226,17 @@ def _get_hidden_fields() -> set:
 
 
 def _disp_width(text: str) -> int:
-    """字符串显示宽度（ASCII=1，宽字符=2）。"""
+    """字符串显示宽度（ASCII=1，宽字符=2），优先使用 wcwidth 精确计算。"""
+    if text is None:
+        return 0
+    s = str(text)
+    if wcswidth:
+        w = wcswidth(s)
+        if w >= 0:
+            return w
+    # 回退：东亚宽度估算
     w = 0
-    for ch in text:
+    for ch in s:
         w += 2 if unicodedata.east_asian_width(ch) in {"F", "W"} else 1
     return w
 

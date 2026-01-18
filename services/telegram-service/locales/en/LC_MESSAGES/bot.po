@@ -219,9 +219,6 @@ msgstr "4hours"
 msgid "period.12h"
 msgstr "12hours"
 
-msgid "period.24h"
-msgstr "24hours"
-
 msgid "period.1d"
 msgstr "1day"
 
@@ -2142,11 +2139,11 @@ msgstr " | 🔄 Cached"
 msgid "ai.period"
 msgstr "Period"
 
-msgid "ai.24h_high"
-msgstr "24h High"
+msgid "ai.1d_high"
+msgstr "1d High"
 
-msgid "ai.24h_low"
-msgstr "24h Low"
+msgid "ai.1d_low"
+msgstr "1d Low"
 
 msgid "ai.trend_strength_label"
 msgstr "Trend Strength"
@@ -2673,10 +2670,10 @@ msgid "ranking.hint.position_market"
 msgstr "💡 OI/MCap Ratio = Open Interest / Market Cap"
 
 msgid "ranking.hint.volume_market"
-msgstr "💡 Vol/MCap Ratio = 24h Volume / Market Cap"
+msgstr "💡 Vol/MCap Ratio = 1d Volume / Market Cap"
 
 msgid "ranking.hint.volume_oi"
-msgstr "💡 Vol/OI Ratio = 24h Volume / Open Interest"
+msgstr "💡 Vol/OI Ratio = 1d Volume / Open Interest"
 
 # Admin module
 msgid "kb.admin"
@@ -3130,3 +3127,104 @@ msgstr "📡 Realtime Signals ({count})"
 
 msgid "signal.pg.more"
 msgstr "... {count} more"
+
+# =============================================================================
+# Instant Response Text - Plan C (Detailed)
+# =============================================================================
+msgid "loading.default"
+msgstr "Processing..."
+
+msgid "loading.refresh"
+msgstr "🔄 Refreshing..."
+
+msgid "loading.query"
+msgstr "🔍 Querying..."
+
+msgid "loading.ai"
+msgstr "🤖 Starting AI analysis..."
+
+msgid "loading.vis"
+msgstr "📈 Rendering chart..."
+
+msgid "loading.switch"
+msgstr "✅ Switched"
+
+msgid "loading.stats"
+msgstr "📊 Calculating stats..."
+
+# Progress messages (slow operations)
+msgid "progress.ai"
+msgstr "🤖 Analyzing {symbol}, this may take 10-30 seconds..."
+
+msgid "progress.vis"
+msgstr "📈 Rendering chart, please wait..."
+
+msgid "progress.reload"
+msgstr "🔄 Reloading system configuration, please wait..."
+
+# Done/Error messages
+msgid "done.success"
+msgstr "✅ Done"
+
+msgid "done.failed"
+msgstr "❌ Failed, please retry"
+
+msgid "done.no_data"
+msgstr "📭 No data available, please try again later"
+
+msgid "done.no_permission"
+msgstr "⛔ You don't have permission for this action"
+
+msgid "done.reload"
+msgstr "✅ Reload complete"
+
+# Env manager
+msgid "admin.env.disabled"
+msgstr "⚠️ Environment variable manager is disabled"
+
+# Signal history / stats
+msgid "signal.history.title"
+msgstr "Signal History"
+
+msgid "signal.history.header"
+msgstr "📜 {title} ({count} entries)"
+
+msgid "signal.history.empty"
+msgstr "📜 Signal History\n\nNo records yet"
+
+msgid "signal.history.detail"
+msgstr "{time} | Strength:{strength}"
+
+msgid "signal.history.more"
+msgstr "... {count} more"
+
+msgid "signal.stats.title"
+msgstr "📊 Signal stats (last {days} days)"
+
+msgid "signal.stats.total"
+msgstr "Total: {total}"
+
+msgid "signal.stats.direction"
+msgstr "Direction: {text}"
+
+msgid "signal.stats.source"
+msgstr "Source: {text}"
+
+msgid "signal.stats.top"
+msgstr "Top 5 symbols:"
+
+msgid "signal.stats.symbol_line"
+msgstr "  {symbol}: {count}"
+
+msgid "signal.stats.empty"
+msgstr "📊 Signal stats\n\nNo data"
+
+msgid "btn.history_recent"
+msgstr "📜 Last 20"
+
+msgid "btn.stats"
+msgstr "📊 Stats"
+
+# Binance link button
+msgid "btn.binance"
+msgstr "🔗 Binance"

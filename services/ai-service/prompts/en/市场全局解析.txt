@@ -372,7 +372,7 @@ Emergency Response:
 ### 💹 Institutional Fund Behavior & Price Momentum
 
 - Volume Changes:  
-  [24h Volume: XXXX], vs Previous Period: [🟢🔼 X% / 🔴🔽 X%]  
+  [1d Volume: XXXX], vs Previous Period: [🟢🔼 X% / 🔴🔽 X%]  
 - Price Momentum:  
   [Based on price change slope, volatility, and momentum indicators, explain current price advancement strength and direction.]  
 - Fund Flow (CVD):  

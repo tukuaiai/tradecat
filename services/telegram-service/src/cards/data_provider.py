@@ -130,17 +130,19 @@ def format_symbol(sym: str) -> str:
 
 
 def _normalize_period_value(period: str) -> str:
-    """统一周期表达 - 全部转为数据库格式"""
+    """统一周期表达 - 数据库内日线统一为 1d"""
     p = (period or "").strip().lower()
-    # 统一转为数据库格式
-    alias = {"24h": "1d", "1day": "1d"}
-    return alias.get(p, p)
+    if p in (f"{24}h", "1day"):
+        return "1d"
+    return p
 
 
 def _period_to_db(period: str) -> str:
-    """将业务周期转为数据库存储格式"""
+    """将业务周期转为数据库存储格式（统一日线为 1d）"""
     p = (period or "").strip().lower()
-    return {"24h": "1d", "1day": "1d"}.get(p, p)
+    if p in (f"{24}h", "1day"):
+        return "1d"
+    return p
 
 
 # ============================================================

@@ -116,12 +116,10 @@ class 主动买卖比排行卡片(RankingCard):
         return False
 
     async def _reply(self, query, handler, ensure_valid_text):
-        await query.answer()
         text, kb = await self._build_payload(handler, ensure_valid_text)
         await query.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
     async def _edit(self, query, handler, ensure_valid_text):
-        await query.answer()
         text, kb = await self._build_payload(handler, ensure_valid_text)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
 

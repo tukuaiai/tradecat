@@ -154,6 +154,21 @@ check_config() {
         else
             info "HTTP_PROXY: 未配置"
         fi
+
+        # 信号服务新鲜度/冷却（可选）
+        local signal_age=$(grep "^SIGNAL_DATA_MAX_AGE=" "$config_file" | cut -d= -f2- | tr -d '"' | tr -d "'")
+        if [ -n "$signal_age" ]; then
+            success "SIGNAL_DATA_MAX_AGE: $signal_age 秒"
+        else
+            warn "SIGNAL_DATA_MAX_AGE: 未配置，默认 600 秒"
+        fi
+
+        local pg_cooldown=$(grep "^COOLDOWN_SECONDS=" "$config_file" | cut -d= -f2- | tr -d '"' | tr -d "'")
+        if [ -n "$pg_cooldown" ]; then
+            success "COOLDOWN_SECONDS: $pg_cooldown 秒"
+        else
+            info "COOLDOWN_SECONDS: 未配置，使用代码默认值"
+        fi
     else
         fail "config/.env 不存在"
         echo "      创建: cp config/.env.example config/.env && chmod 600 config/.env"

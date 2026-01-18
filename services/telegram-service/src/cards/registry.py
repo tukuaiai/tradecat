@@ -135,13 +135,9 @@ class RankingRegistry:
 
         card = self.find_by_callback(query.data)
         if not card:
-            # 统一处理无操作按钮，避免客户端“加载中”卡住
+            # 无操作按钮兜底 (即时响应已在 app.py 统一处理)
             data = query.data or ""
             if data.endswith("nop") or data.endswith("_nop"):
-                try:
-                    await query.answer()
-                except Exception:
-                    pass
                 return True
             return False
 

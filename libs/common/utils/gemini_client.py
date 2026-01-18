@@ -3,14 +3,14 @@
 """
 Gemini CLI 本地调用封装
 
-使用 Gemini CLI 无头模式调用 gemini-2.5-flash 模型。
+使用 Gemini CLI 无头模式调用 gemini-3-flash-preview 模型。
 - 通过 stdin 传入用户内容
 - 通过位置参数传入系统提示词
 - 禁用工具调用，只返回纯文本
 
 依赖：
-- gemini CLI (npm install -g @anthropic-ai/gemini-cli)
-- 需要配置 GOOGLE_API_KEY 环境变量
+- gemini CLI (npm install -g @google/gemini-cli)
+- 需要 OAuth 登录或配置 GEMINI_API_KEY 环境变量
 
 用法：
     from gemini_client import call_gemini, call_gemini_with_system
@@ -34,8 +34,8 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# 默认模型
-DEFAULT_MODEL = "gemini-2.5-flash"
+# 默认模型（按指南推荐使用最新版本）
+DEFAULT_MODEL = "gemini-3-flash-preview"
 
 # Gemini CLI 路径（自动检测）
 GEMINI_CLI = os.getenv("GEMINI_CLI_PATH") or "gemini"
@@ -67,7 +67,7 @@ def call_gemini(
     
     Args:
         prompt: 用户提示词
-        model: 模型名称，默认 gemini-2.5-flash
+        model: 模型名称，默认 gemini-3-flash-preview
         timeout: 超时时间（秒）
         use_proxy: 是否使用代理
         
@@ -91,13 +91,16 @@ def call_gemini_with_system(
     use_proxy: bool = True,
 ) -> Tuple[bool, str]:
     """
-    调用 Gemini CLI（带系统提示词）
+    调用 Gemini CLI（带系统提示词）- 无头模式
     
-    Gemini CLI 无独立 system slot，使用位置参数承载系统提示词，
-    用户内容通过 stdin 传入。
+    按照 GEMINI-HEADLESS.md 标准：
+    - 系统提示词作为位置参数传入
+    - 用户内容通过 stdin 传入
+    - --allowed-tools '' 禁用工具调用
+    - --output-format text 纯文本输出
     
     Args:
-        system_prompt: 系统提示词（可选）
+        system_prompt: 系统提示词（作为位置参数）
         user_content: 用户内容（通过 stdin 传入）
         model: 模型名称
         timeout: 超时时间（秒）
@@ -114,7 +117,7 @@ def call_gemini_with_system(
         "--allowed-tools", "",  # 禁用工具调用
     ]
     
-    # 添加系统提示词作为位置参数
+    # 系统提示词作为位置参数
     if system_prompt:
         cmd.append(system_prompt)
     
@@ -122,7 +125,7 @@ def call_gemini_with_system(
     env = _get_proxy_env() if use_proxy else os.environ.copy()
     
     try:
-        logger.debug(f"执行 Gemini CLI: {' '.join(cmd[:5])}...")
+        logger.debug(f"执行 Gemini CLI: {' '.join(cmd[:6])}...")
         
         result = subprocess.run(
             cmd,

@@ -32,6 +32,7 @@
 |:---|:---|:---|
 | `config/.env` | 生产配置（含密钥） | 只读 |
 | `libs/database/services/telegram-service/market_data.db` | SQLite 指标数据 | 只读 |
+| `libs/database/services/signal-service/cooldown.db` | 信号冷却持久化 | 只读 |
 | `backups/timescaledb/` | 数据库备份 | 禁止修改 |
 
 > 提醒：服务启动脚本会检查 `config/.env` 权限（需 600/400），不符合直接退出。
@@ -118,8 +119,10 @@ cd /path/to/tradecat
 | `./scripts/check_env.sh` | 环境检查（Python/依赖/配置/网络/数据库） |
 | `./scripts/verify.sh` | 代码验证（ruff + py_compile + i18n） |
 | `python scripts/download_hf_data.py` | 从 HuggingFace 下载历史数据并导入 |
-| `./scripts/export_timescaledb.sh` | 导出 TimescaleDB 数据 |
-| `./scripts/timescaledb_compression.sh` | 压缩管理 |
+| `python scripts/check_i18n_keys.py` | 检查 i18n 翻译键对齐 |
+| `./scripts/export_timescaledb.sh` | 导出 TimescaleDB 数据（默认端口 5433） |
+| `./scripts/export_timescaledb_main4.sh` | 导出 Main4 精简数据集（默认端口 5433） |
+| `./scripts/timescaledb_compression.sh` | 压缩管理（默认端口 5433） |
 
 ### 3.2 Make 快捷命令
 
@@ -167,9 +170,15 @@ make status      # 查看状态
 
 ### 3.4 数据库操作
 
+> **端口说明**：`config/.env.example` 默认端口为 **5434**（新库），但导出/压缩脚本默认 **5433**（旧库）。请根据实际部署选择统一端口。
+
 ```bash
-# 连接 TimescaleDB（默认端口 5434）
+# 连接 TimescaleDB（根据 config/.env 中 DATABASE_URL 端口）
+# 新库（5434）
 PGPASSWORD=postgres psql -h localhost -p 5434 -U postgres -d market_data
+
+# 旧库（5433，脚本默认）
+PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d market_data
 
 # 查看 K线数据量
 SELECT COUNT(*) FROM market_data.candles_1m;
@@ -188,7 +197,7 @@ sqlite3 libs/database/services/telegram-service/market_data.db
 - **配置统一**：所有配置集中在 `config/.env`，各服务共用
 - **数据流向**：`data-service → TimescaleDB → trading-service → SQLite → telegram/ai/signal/vis`
 
-### 4.2 服务清单（10 个）
+### 4.2 服务清单（11 个）
 
 | 服务 | 位置 | 职责 | 入口 |
 |:---|:---|:---|:---|
@@ -196,12 +205,13 @@ sqlite3 libs/database/services/telegram-service/market_data.db
 | trading-service | services/ | 指标计算 | `src/__main__.py` |
 | telegram-service | services/ | Bot 交互 | `src/main.py` |
 | ai-service | services/ | AI 分析（telegram 子模块） | `src/__main__.py` |
-| signal-service | services/ | 信号检测 | `src/__main__.py` |
+| signal-service | services/ | 信号检测（129条规则） | `src/__main__.py` |
+| api-service | services-preview/ | REST API 服务（端口 8000） | `src/__main__.py` |
 | markets-service | services-preview/ | 全市场采集 | `src/__main__.py` |
-| vis-service | services-preview/ | 可视化渲染 | `src/__main__.py` |
+| vis-service | services-preview/ | 可视化渲染（端口 8087） | `src/__main__.py` |
 | order-service | services-preview/ | 交易执行 | `src/__main__.py` |
 | predict-service | services-preview/ | 预测市场（Node.js） | `services/*/` |
-| fate-service | services-preview/ | 命理服务 | `services/telegram-service/` |
+| fate-service | services-preview/ | 命理服务（端口 8001） | `services/telegram-service/` |
 
 ### 4.3 模块边界
 
@@ -213,6 +223,7 @@ sqlite3 libs/database/services/telegram-service/market_data.db
 | telegram-service | Bot 交互、信号推送 UI | 禁止包含信号检测逻辑 |
 | ai-service | AI 分析、Wyckoff 方法论 | 作为 telegram-service 子模块 |
 | signal-service | 信号检测、规则引擎（独立服务） | 只读数据库，禁止 Telegram 依赖 |
+| api-service | REST API 数据查询 | 只读数据库，禁止写入 |
 | vis-service | 可视化渲染 | 禁止写入数据库 |
 | order-service | 交易执行、做市 | 禁止修改数据采集逻辑 |
 
@@ -229,7 +240,7 @@ sqlite3 libs/database/services/telegram-service/market_data.db
 
 ### 4.5 兼容性要求
 
-- Python >= 3.12
+- Python >= 3.10（CI 使用 3.12，pyproject.toml 声明 >=3.9）
 - 保持与现有数据库 schema 兼容
 - 新增指标需注册到 `indicators/__init__.py`
 - 新增卡片需注册到 `cards/registry.py`
@@ -276,7 +287,7 @@ ignore_missing_imports = true
 
 | 类型 | 约定 | 示例 |
 |:---|:---|:---|
-| 文件名 | 小写下划线 | `k_pattern.py` |
+| 文件名 | 小写下划线或中文 | `k_pattern.py`, `资金费率卡片.py` |
 | 类名 | PascalCase | `KPattern`, `DataProvider` |
 | 函数名 | snake_case | `compute_indicators()` |
 | 常量 | UPPER_SNAKE | `MAX_WORKERS` |
@@ -306,42 +317,56 @@ logger.error("错误: %s", error, exc_info=True)
 tradecat/
 ├── config/                         # 统一配置（所有服务共用）
 │   ├── .env                        # 生产配置（含密钥，不提交）
-│   ├── .env.example                # 配置模板
+│   ├── .env.example                # 配置模板（默认端口 5434）
 │   └── logrotate.conf              # 日志轮转
 │
 ├── scripts/                        # 全局脚本
 │   ├── init.sh                     # 初始化脚本
 │   ├── install.sh                  # 一键安装
 │   ├── start.sh                    # 统一启动脚本
-│   ├── verify.sh                   # 验证脚本
-│   ├── export_timescaledb.sh       # 数据导出
-│   └── timescaledb_compression.sh  # 压缩管理
+│   ├── verify.sh                   # 验证脚本（ruff + py_compile + i18n）
+│   ├── check_env.sh                # 环境检查
+│   ├── check_i18n_keys.py          # i18n 翻译键对齐检查
+│   ├── download_hf_data.py         # HuggingFace 数据下载
+│   ├── export_timescaledb.sh       # 数据导出（默认端口 5433）
+│   ├── export_timescaledb_main4.sh # 导出 Main4 精简数据集（默认端口 5433）
+│   └── timescaledb_compression.sh  # 压缩管理（默认端口 5433）
 │
 ├── services/                       # 稳定版微服务 (5个)
 │   ├── data-service/               # 加密货币数据采集
-│   ├── trading-service/            # 指标计算
-│   ├── telegram-service/           # Telegram Bot（信号 UI 通过 adapter 调用 signal-service）
+│   ├── trading-service/            # 指标计算（34个指标模块）
+│   ├── telegram-service/           # Telegram Bot（39张卡片）
 │   ├── ai-service/                 # AI 分析
-│   └── signal-service/             # 信号检测（独立服务，129条规则）
+│   └── signal-service/             # 信号检测（129条规则）
 │
-├── services-preview/               # 预览版微服务 (5个)
+├── services-preview/               # 预览版微服务 (6个)
+│   ├── api-service/                # REST API 服务（端口 8000）
 │   ├── markets-service/            # 全市场数据采集
-│   ├── vis-service/                # 可视化渲染
+│   ├── vis-service/                # 可视化渲染（端口 8087）
 │   ├── order-service/              # 交易执行
 │   ├── predict-service/            # 预测市场（Node.js）
-│   └── fate-service/               # 命理服务
+│   └── fate-service/               # 命理服务（端口 8001）
 │
 ├── libs/
 │   ├── database/                   # 数据库文件
+│   │   ├── db/                     # DDL schema 定义
+│   │   ├── csv/                    # CSV 数据
 │   │   └── services/
 │   │       ├── telegram-service/
 │   │       │   └── market_data.db      # 指标数据（Telegram 展示使用）
 │   │       └── signal-service/
 │   │           └── cooldown.db         # 冷却状态持久化（防重复推送）
-│   └── common/                     # 共享工具库
-│       ├── i18n.py                 # 国际化模块
-│       ├── symbols.py              # 币种管理模块
-│       └── proxy_manager.py        # 代理管理器
+│   ├── common/                     # 共享工具库
+│   │   ├── i18n.py                 # 国际化模块
+│   │   ├── symbols.py              # 币种管理模块
+│   │   ├── proxy_manager.py        # 代理管理器
+│   │   └── utils/                  # 工具函数
+│   └── external/                   # 外部依赖/数据
+│
+├── .github/workflows/              # CI 配置
+│   ├── ci.yml                      # ruff + py_compile 抽样检查
+│   ├── pypi-ci.yml                 # PyPI CI
+│   └── pypi-publish.yml            # PyPI 发布
 │
 ├── Makefile                        # 常用命令快捷方式
 ├── pyproject.toml                  # 根级项目配置
@@ -395,7 +420,7 @@ pip install TA-Lib
 ### 7.2 数据库连接失败
 
 ```bash
-# 检查端口（默认 5434）
+# 检查端口（根据 config/.env 配置选择 5433 或 5434）
 ss -tlnp | grep 5434
 
 # 测试连接
@@ -470,6 +495,21 @@ sudo cp /tmp/tradecat-logrotate.conf /etc/logrotate.d/tradecat
 # - 超过上限后暂停重启，告警写入 alerts.log
 ```
 
+### 7.8 端口冲突（双库架构）
+
+```bash
+# 旧库（5433）：与早期数据采集链兼容，export/compression 脚本默认使用
+# 新库（5434）：多 schema 架构（raw/agg/quality），.env.example 默认
+
+# 确认当前使用端口
+grep "DATABASE_URL" config/.env | grep -oP ':\K\d+(?=/)'
+
+# 若需切换端口，需同步修改：
+# - config/.env 中 DATABASE_URL
+# - scripts/export_timescaledb.sh
+# - scripts/timescaledb_compression.sh
+```
+
 ---
 
 ## 8. PR / Commit Rules（提交规则）
@@ -505,6 +545,14 @@ chore: standardize project structure for all services
 - [ ] 相关文档已更新
 - [ ] 配置变更已同步到 `config/.env.example`
 - [ ] 新依赖已添加到 `requirements.txt` 并 `make lock`
+
+### 8.3 CI 说明
+
+CI（`.github/workflows/ci.yml`）仅执行：
+- ruff 静态检查（忽略 E501, E402）
+- py_compile 语法检查（前 50 个 .py 文件抽样）
+
+完整测试需本地运行 `./scripts/verify.sh`。
 
 ---
 
@@ -542,21 +590,38 @@ chore: standardize project structure for all services
 | `BOT_TOKEN` | Telegram Bot Token | `123456:ABC...` |
 | `HTTP_PROXY` | HTTP 代理 | `http://127.0.0.1:9910` |
 | `DEFAULT_LOCALE` | 默认语言 | `en` |
+| `SIGNAL_DATA_MAX_AGE` | 信号数据最大允许时长（秒，超限不触发） | `600` |
+| `COOLDOWN_SECONDS` | signal-service PG 全局冷却时间（秒，持久化） | `300` |
 
 ### 10.2 币种管理
 
 | 变量 | 说明 |
 |:---|:---|
 | `SYMBOLS_GROUPS` | 使用的分组（main4/main6/main20/auto/all） |
+| `SYMBOLS_GROUP_<name>` | 自定义分组定义（如 `SYMBOLS_GROUP_defi`） |
 | `SYMBOLS_EXTRA` | 额外添加的币种 |
 | `SYMBOLS_EXCLUDE` | 强制排除的币种 |
 
-### 10.3 服务配置
+### 10.3 数据采集配置
 
 | 变量 | 服务 | 说明 |
 |:---|:---|:---|
 | `BACKFILL_MODE` | data-service | 回填模式（all/days/none） |
+| `BACKFILL_DAYS` | data-service | 回填天数（BACKFILL_MODE=days 时生效） |
+| `BACKFILL_START_DATE` | data-service | 回填起始日期（可选） |
+| `MAX_CONCURRENT` | data-service | 最大并发请求数（默认 5） |
+| `RATE_LIMIT_PER_MINUTE` | data-service | 每分钟最大请求数（默认 1800） |
+| `INTERVALS` | data-service | K线周期（逗号分隔） |
+| `KLINE_INTERVALS` | data-service | WebSocket 订阅周期 |
+| `FUTURES_INTERVALS` | data-service | 期货指标周期（最小 5m） |
+
+### 10.4 服务配置
+
+| 变量 | 服务 | 说明 |
+|:---|:---|:---|
 | `MAX_WORKERS` | trading-service | 计算线程数 |
+| `COMPUTE_BACKEND` | trading-service | 计算后端（thread/process/hybrid） |
+| `HIGH_PRIORITY_TOP_N` | trading-service | auto 模式高优先级币种数量 |
 | `VIS_SERVICE_PORT` | vis-service | 监听端口（默认 8087） |
 | `FATE_BOT_TOKEN` | fate-service | 命理 Bot Token |
 | `FATE_SERVICE_PORT` | fate-service | API 端口（默认 8001） |
@@ -583,7 +648,7 @@ cd services/<name> && make lint format test
 # 验证
 ./scripts/verify.sh
 
-# 数据库
+# 数据库（根据实际端口选择 5433 或 5434）
 PGPASSWORD=postgres psql -h localhost -p 5434 -U postgres -d market_data
 sqlite3 libs/database/services/telegram-service/market_data.db
 

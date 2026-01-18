@@ -117,13 +117,11 @@ class FuturesTopSentimentCard(RankingCard):
         return False
 
     async def _reply(self, query, h, ensure):
-        await query.answer()
         lang = resolve_lang(query)
         text, kb = await self._build_payload(h, ensure, lang, query)
         await query.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
     async def _edit(self, query, h, ensure):
-        await query.answer()
         lang = resolve_lang(query)
         text, kb = await self._build_payload(h, ensure, lang, query)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")

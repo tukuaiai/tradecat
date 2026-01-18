@@ -11,7 +11,7 @@ from typing import Dict, List, Tuple
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from cards.base import RankingCard
+from cards.base import RankingCard, format_number
 from cards.data_provider import get_ranking_provider, format_symbol
 from cards.i18n import btn_auto as _btn_auto, gettext as _t, resolve_lang
 from cards.排行榜服务 import DEFAULT_PERIODS, normalize_period
@@ -109,13 +109,11 @@ class VolumeRankingCard(RankingCard):
         return False
 
     async def _reply(self, query, h, ensure):
-        await query.answer()
         lang = resolve_lang(query)
         text, kb = await self._build_payload(h, ensure, lang, query)
         await query.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
     async def _edit(self, query, h, ensure):
-        await query.answer()
         lang = resolve_lang(query)
         text, kb = await self._build_payload(h, ensure, lang, query)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
@@ -160,7 +158,7 @@ class VolumeRankingCard(RankingCard):
                 if col_id == "base_volume":
                     row.append(self._format_volume(val))
                 elif isinstance(val, (int, float)):
-                    row.append(f"{val:.2f}")
+                    row.append(format_number(val, 2))
                 else:
                     row.append(str(val) if val not in (None, "") else "-")
             # 通用列
@@ -169,12 +167,12 @@ class VolumeRankingCard(RankingCard):
                 if col_id == "quote_volume":
                     row.append(self._format_volume(val))
                 elif col_id == "price":
-                    row.append(self._format_price(val))
+                    row.append(format_number(val, 4))
                 elif col_id == "振幅":
                     pct = (val * 100) if isinstance(val, (int, float)) and val <= 5 else val
                     row.append(f"{pct:.2f}%" if isinstance(pct, (int, float)) else "-")
                 elif isinstance(val, (int, float)):
-                    row.append(f"{val:.2f}")
+                    row.append(format_number(val, 2))
                 else:
                     row.append(str(val) if val not in (None, "") else "-")
             rows.append(row)

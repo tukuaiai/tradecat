@@ -140,12 +140,10 @@ class MoneyFlowCard(RankingCard):
         return False
 
     async def _reply(self, query, user_handler, ensure_valid_text) -> None:
-        await query.answer()
         text, keyboard = await self._build_payload(user_handler, ensure_valid_text)
         await query.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
 
     async def _edit(self, query, user_handler, ensure_valid_text) -> None:
-        await query.answer()
         text, keyboard = await self._build_payload(user_handler, ensure_valid_text)
         await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
 
@@ -178,6 +176,7 @@ class MoneyFlowCard(RankingCard):
             flow_type,
             market,
             fields_state,
+            lang,
         )
 
         aligned = user_handler.dynamic_align_format(rows) if rows else _t("data.no_data", lang=lang)
@@ -292,6 +291,14 @@ class MoneyFlowCard(RankingCard):
         field_state: Dict[str, bool],
         lang: str | None = None,
     ) -> Tuple[List[List[str]], str]:
+        def _to_float_or_none(v):
+            try:
+                if v is None or v == "":
+                    return None
+                return float(v)
+            except Exception:
+                return None
+
         allowed = MONEY_FLOW_SPOT_PERIODS if market == "spot" else MONEY_FLOW_FUTURES_PERIODS
         period = normalize_period(period, allowed, default="15m")
         handler.user_states["money_flow_period"] = period
@@ -304,19 +311,24 @@ class MoneyFlowCard(RankingCard):
             for sym, r in base_map.items():
                 items.append({
                     "symbol": format_symbol(sym),
-                    "absolute": float(r.get("资金流向") or 0),
-                    "volume": float(r.get("成交额") or 0),
-                    "inflow": float(r.get("主动买额") or 0),
-                    "outflow": float(r.get("主动卖出额") or 0),
-                    "成交笔数": float(r.get("成交笔数") or r.get("交易次数") or 0),
-                    "price": float(r.get("当前价格") or 0),
-                    "quote_volume": float(r.get("成交额") or 0),
+                    "absolute": _to_float_or_none(r.get("资金流向")),
+                    "volume": _to_float_or_none(r.get("成交额")),
+                    "inflow": _to_float_or_none(r.get("主动买额")),
+                    "outflow": _to_float_or_none(r.get("主动卖出额")),
+                    "成交笔数": _to_float_or_none(r.get("成交笔数") or r.get("交易次数")),
+                    "price": _to_float_or_none(r.get("当前价格")),
+                    "quote_volume": _to_float_or_none(r.get("成交额")),
                 })
         except Exception:
             pass
 
         reverse = sort_order != "asc"
-        items.sort(key=lambda x: x.get(flow_type, 0), reverse=reverse)
+        def _key(row):
+            val = row.get(flow_type)
+            if val is None:
+                return float("-inf") if reverse else float("inf")
+            return val
+        items.sort(key=_key, reverse=reverse)
 
         active_special = [f for f in self.special_display_fields if field_state.get(f[0], True)]
         active_general = [f for f in self.general_display_fields if field_state.get(f[0], True)]
@@ -337,7 +349,7 @@ class MoneyFlowCard(RankingCard):
                 if col_id == "quote_volume":
                     row.append(self._format_volume(val))
                 elif col_id == "price":
-                    row.append(f"{val:.4f}" if val else "-")
+                    row.append(f"{val:.4f}" if isinstance(val, (int, float)) else "-")
                 else:
                     row.append(str(val) if val not in (None, "") else "-")
             rows.append(row)

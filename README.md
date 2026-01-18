@@ -6,6 +6,8 @@
 
 # 🐱 交易猫
 
+本项目ai解读仓库（可能不完全准确）：https://zread.ai/tukuaiai/tradecat
+
 感谢社区ca给我的资金，让我去完成我的梦想！！！真心感谢你们！！！
 <p>
 sol（代币CA，请勿直接转账，否则资产会丢失）：Gysp4iZ6uNuAksAPR37fQwLDRFU9Rz255UjExhiwpump
@@ -192,6 +194,7 @@ vim config/.env
 - 核心字段：  
   - `DATABASE_URL`（TimescaleDB，见下方端口说明）  
   - `BOT_TOKEN`（Telegram Bot Token）  
+  - `TELEGRAM_GROUP_WHITELIST`（群聊白名单，逗号分隔；为空仅私聊；群聊仅响应 `/` 或 `!` 开头且需 @bot）  
   - `HTTP_PROXY` / `HTTPS_PROXY`（需要代理时填写）  
   - 币种/周期：`SYMBOLS_GROUPS`、`SYMBOLS_EXTRA`、`SYMBOLS_EXCLUDE`、`INTERVALS`、`KLINE_INTERVALS`、`FUTURES_INTERVALS`  
   - 采集/计算开关：`BACKFILL_MODE`/`BACKFILL_DAYS`/`BACKFILL_ON_START`、`MAX_CONCURRENT`、`RATE_LIMIT_PER_MINUTE`  
@@ -321,6 +324,10 @@ cd .. && rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
 vim config/.env
 ```
 
+关键配置补充（信号服务）：
+- `SIGNAL_DATA_MAX_AGE`：信号数据最大允许时长（秒），超过则跳过不产生信号；默认 600，可按部署环境调整。
+- `COOLDOWN_SECONDS`（signal-service）：PG 信号冷却时间（秒），可与规则级冷却配合，避免重复推送。
+
 #### 5. 启动服务
 
 ```bash
@@ -363,7 +370,7 @@ vim config/.env
 </td>
 <td width="50%">
 
-### 📊 38个技术指标类
+### 📊 34个技术指标模块
 - **趋势指标** - EMA/MACD/SuperTrend/趋势云/趋势线/ADX/Ichimoku
 - **动量指标** - RSI/KDJ/MFI/多空比/斐波那契狙击/CCI/WilliamsR
 - **波动指标** - 布林带/ATR/支撑阻力/VWAP/Donchian/Keltner
@@ -404,7 +411,7 @@ vim config/.env
 <td width="50%">
 
 ### 🔔 信号检测引擎
-- **129条规则** - 覆盖35张指标表（独立 signal-service）
+- **129条规则** - 覆盖8个分类（独立 signal-service）
 - **多维度检测** - 趋势/动量/形态/期货
 - **事件驱动** - SignalPublisher 发布信号事件
 - **订阅管理** - 用户自定义推送偏好
@@ -450,7 +457,7 @@ graph TD
 
     subgraph TS["📊 trading-service<br><small>Python, pandas, numpy, TA-Lib</small>"]
         TR_ENG["engine<br>计算引擎"]
-        TR_IND["indicators<br>35个指标"]
+        TR_IND["indicators<br>34个指标"]
         TR_SCH["scheduler<br>定时调度"]
         TR_PRI["priority<br>高优先级币种筛选"]
     end
@@ -461,7 +468,7 @@ graph TD
     TR_ENG --> TR_IND
     TR_ENG --> TR_PRI
 
-    SQLITE[("📁 market_data.db<br>SQLite 指标结果 38张表")]
+    SQLITE[("📁 market_data.db<br>SQLite 指标结果")]
     TR_IND --> SQLITE
 
     subgraph AI["🧠 AI 智能分析"]
@@ -515,14 +522,15 @@ graph TD
 |:---|:---:|:---|:---|
 | **data-service** | - | 加密货币 K线采集、期货指标采集、历史数据回填 | Python, asyncio, ccxt, cryptofeed |
 | **markets-service** | - | 全市场数据采集（美股/A股/宏观/衍生品定价） | yfinance, akshare, fredapi, QuantLib |
-| **trading-service** | - | 38个技术指标类计算、高优先级币种筛选、定时调度 | Python, pandas, numpy, TA-Lib |
-| **signal-service** | - | 独立信号检测服务（129条规则、SQLite+PG引擎、事件发布） | Python, SQLite, psycopg2 |
+| **trading-service** | - | 34个技术指标模块计算、高优先级币种筛选、定时调度 | Python, pandas, numpy, TA-Lib |
+| **signal-service** | - | 独立信号检测服务（129条规则、8分类、事件发布） | Python, SQLite, psycopg2 |
 | **telegram-service** | - | Bot 交互、排行榜展示、信号推送 UI（通过 adapter 调用 signal-service） | python-telegram-bot, aiohttp |
 | **ai-service** | - | AI 分析、Wyckoff 方法论（作为 telegram-service 子模块） | Gemini/OpenAI/Claude/DeepSeek |
+| **api-service** | 8000 | REST API 服务（指标/K线/信号数据查询） | FastAPI, Pydantic |
 | **predict-service** | - | 预测市场信号（Polymarket/Kalshi/Opinion） | Node.js, Telegram Bot |
 | **vis-service** | 8087 | 可视化渲染（K线图/指标图/VPVR） | FastAPI, matplotlib, mplfinance |
 | **order-service** | - | 交易执行、Avellaneda-Stoikov 做市 | Python, ccxt, cryptofeed |
-| **TimescaleDB** | 5433 | K线存储、期货数据存储、时序查询优化 | PostgreSQL 16 + TimescaleDB |
+| **TimescaleDB** | 5434 | K线存储、期货数据存储、时序查询优化 | PostgreSQL 16 + TimescaleDB |
 
 ### 数据流向
 
@@ -652,7 +660,7 @@ zstd -d futures_metrics_5m.bin.zst -c | psql -h localhost -p 5433 -U postgres -d
 
 </details>
 
-### 📈 技术指标 (38个)
+### 📈 技术指标 (34个模块)
 
 <details>
 <summary><strong>点击展开👉 🔥 趋势指标 (8个)</strong></summary>
@@ -850,7 +858,7 @@ tradecat/
 │   │
 │   ├── 📂 trading-service/         # 指标计算服务
 │   │   ├── 📂 src/
-│   │   │   ├── 📂 indicators/      # 38个指标类
+│   │   │   ├── 📂 indicators/      # 34个指标模块
 │   │   │   ├── 📂 core/            # 计算引擎
 │   │   │   └── simple_scheduler.py
 │   │   ├── 📂 scripts/
@@ -883,10 +891,12 @@ tradecat/
 │   │   ├── pyproject.toml
 │   │   └── requirements.txt
 │   │
-│   └── 📂 signal-service/          # 信号检测服务
+│   └── 📂 signal-service/          # 信号检测服务（129条规则）
 │       ├── 📂 src/
-│       │   ├── 📂 engines/         # 检测引擎
-│       │   ├── 📂 rules/           # 信号规则
+│       │   ├── 📂 engines/         # 检测引擎（SQLite + PG）
+│       │   ├── 📂 rules/           # 信号规则（8个分类）
+│       │   ├── 📂 events/          # 事件发布
+│       │   ├── 📂 storage/         # 冷却持久化
 │       │   └── 📂 formatters/      # 格式化输出
 │       ├── 📂 scripts/
 │       ├── 📂 tests/
@@ -894,7 +904,17 @@ tradecat/
 │       ├── pyproject.toml
 │       └── requirements.txt
 │
-├── 📂 services-preview/            # 预览版微服务 (5个，开发中)
+├── 📂 services-preview/            # 预览版微服务 (6个，开发中)
+│   │
+│   ├── 📂 api-service/             # REST API 服务
+│   │   ├── 📂 src/
+│   │   │   ├── 📂 routers/         # API 路由
+│   │   │   ├── 📂 schemas/         # Pydantic 模型
+│   │   │   └── app.py              # FastAPI 入口
+│   │   ├── 📂 scripts/
+│   │   ├── Makefile
+│   │   ├── pyproject.toml
+│   │   └── requirements.txt
 │   │
 │   ├── 📂 markets-service/         # 全市场数据采集（美股/A股/宏观）
 │   │   ├── 📂 src/
@@ -944,7 +964,8 @@ tradecat/
 │   └── 📂 common/                  # 共享工具
 │       ├── i18n.py                 # 国际化模块
 │       ├── symbols.py              # 币种管理模块
-│       └── proxy_manager.py        # 代理管理器
+│       ├── proxy_manager.py        # 代理管理器
+│       └── utils/                  # 工具函数
 │
 ├── 📂 backups/                     # 备份目录
 │   └── 📂 timescaledb/             # 数据库备份

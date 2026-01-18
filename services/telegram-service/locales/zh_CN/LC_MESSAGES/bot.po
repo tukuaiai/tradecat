@@ -219,9 +219,6 @@ msgstr "4小时"
 msgid "period.12h"
 msgstr "12小时"
 
-msgid "period.24h"
-msgstr "24小时"
-
 msgid "period.1d"
 msgstr "1天"
 
@@ -2142,11 +2139,11 @@ msgstr " | 🔄 缓存数据"
 msgid "ai.period"
 msgstr "周期"
 
-msgid "ai.24h_high"
-msgstr "24h高点"
+msgid "ai.1d_high"
+msgstr "1日高点"
 
-msgid "ai.24h_low"
-msgstr "24h低点"
+msgid "ai.1d_low"
+msgstr "1日低点"
 
 msgid "ai.trend_strength_label"
 msgstr "趋势强度"
@@ -2673,10 +2670,10 @@ msgid "ranking.hint.position_market"
 msgstr "💡 持仓/市值比 = 持仓量 / 市值"
 
 msgid "ranking.hint.volume_market"
-msgstr "💡 交易量/市值比 = 24h交易量 / 市值"
+msgstr "💡 交易量/市值比 = 1日交易量 / 市值"
 
 msgid "ranking.hint.volume_oi"
-msgstr "💡 交易量/持仓量比 = 24h交易量 / 持仓量"
+msgstr "💡 交易量/持仓量比 = 1日交易量 / 持仓量"
 
 # Admin module
 msgid "kb.admin"
@@ -3130,3 +3127,104 @@ msgstr "📡 实时信号 ({count}条)"
 
 msgid "signal.pg.more"
 msgstr "... 还有 {count} 条"
+
+# =============================================================================
+# 即时响应文本 - 方案C（详细提示）
+# =============================================================================
+msgid "loading.default"
+msgstr "处理中..."
+
+msgid "loading.refresh"
+msgstr "🔄 正在刷新..."
+
+msgid "loading.query"
+msgstr "🔍 正在查询..."
+
+msgid "loading.ai"
+msgstr "🤖 启动AI分析..."
+
+msgid "loading.vis"
+msgstr "📈 正在渲染图表..."
+
+msgid "loading.switch"
+msgstr "✅ 已切换"
+
+msgid "loading.stats"
+msgstr "📊 正在统计..."
+
+# 中间消息（慢操作）
+msgid "progress.ai"
+msgstr "🤖 正在对 {symbol} 进行深度分析，预计需要 10-30 秒..."
+
+msgid "progress.vis"
+msgstr "📈 正在渲染图表，请稍候..."
+
+msgid "progress.reload"
+msgstr "🔄 正在重新加载系统配置，请稍候..."
+
+# 完成/错误提示
+msgid "done.success"
+msgstr "✅ 操作完成"
+
+msgid "done.failed"
+msgstr "❌ 操作失败，请重试"
+
+msgid "done.no_data"
+msgstr "📭 暂无数据，请稍后再试"
+
+msgid "done.no_permission"
+msgstr "⛔ 您没有权限执行此操作"
+
+msgid "done.reload"
+msgstr "✅ 重载完成"
+
+# 环境变量管理
+msgid "admin.env.disabled"
+msgstr "⚠️ 环境变量管理功能已禁用"
+
+# 信号历史 / 统计
+msgid "signal.history.title"
+msgstr "信号历史"
+
+msgid "signal.history.header"
+msgstr "📜 {title} ({count}条)"
+
+msgid "signal.history.empty"
+msgstr "📜 信号历史\n\n暂无记录"
+
+msgid "signal.history.detail"
+msgstr "{time} | 强度:{strength}"
+
+msgid "signal.history.more"
+msgstr "... 还有 {count} 条"
+
+msgid "signal.stats.title"
+msgstr "📊 信号统计 (近{days}天)"
+
+msgid "signal.stats.total"
+msgstr "总数: {total}条"
+
+msgid "signal.stats.direction"
+msgstr "方向: {text}"
+
+msgid "signal.stats.source"
+msgstr "来源: {text}"
+
+msgid "signal.stats.top"
+msgstr "币种 Top5:"
+
+msgid "signal.stats.symbol_line"
+msgstr "  {symbol}: {count}条"
+
+msgid "signal.stats.empty"
+msgstr "📊 信号统计\n\n暂无数据"
+
+msgid "btn.history_recent"
+msgstr "📜 最近20条"
+
+msgid "btn.stats"
+msgstr "📊 统计"
+
+# Binance 链接按钮
+msgid "btn.binance"
+msgstr "🔗 Binance"

@@ -114,13 +114,11 @@ class FuturesDivergenceCard(RankingCard):
             return False
 
     async def _reply(self, query, h, ensure):
-        await query.answer()
         lang = resolve_lang(query)
         text, kb = await self._build_payload(h, ensure, lang, query)
         await query.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
     async def _edit(self, query, h, ensure):
-        await query.answer()
         lang = resolve_lang(query)
         text, kb = await self._build_payload(h, ensure, lang, query)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
@@ -262,7 +260,7 @@ class FuturesDivergenceCard(RankingCard):
         header_parts = [
             _t("card.header.rank", lang=lang),
             _t("card.header.symbol", lang=lang),
-        ] + [lab for _, lab, _ in active_special] + [lab for _, lab, _ in active_general]
+        ] + [translate_field(lab, lang=lang) for _, lab, _ in active_special] + [translate_field(lab, lang=lang) for _, lab, _ in active_general]
 
         rows: List[List[str]] = []
         for idx, item in enumerate(items[:limit], 1):

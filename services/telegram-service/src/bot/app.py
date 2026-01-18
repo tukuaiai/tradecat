@@ -12,6 +12,7 @@ import time
 import json
 import threading
 import importlib.util
+import unicodedata
 
 # 提前初始化 logger
 logger = logging.getLogger(__name__)
@@ -65,6 +66,7 @@ except Exception as exc:  # pragma: no cover - 环境缺依赖时降级
     _MetricService = None
     logger.warning("⚠️ 已禁用数据库指标服务（未安装 psycopg 或不需要PG）: %s", exc)
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+from telegram.constants import ChatAction
 from telegram.request import HTTPXRequest
 from telegram.ext import (
     Application,
@@ -286,9 +288,123 @@ def _get_user_id(update) -> Optional[int]:
     return None
 
 
+_GROUP_ALLOWED_PREFIXES = ("/", "!")
+_GROUP_WHITELIST: set[int] = set()
+_GROUP_REQUIRE_MENTION = True
+
+BOT_USERNAME = os.getenv("BOT_USERNAME", "").lstrip("@").lower()
+BOT_USER_ID: Optional[int] = None
+
+
+def _parse_int_list(raw: str) -> set[int]:
+    ids: set[int] = set()
+    for item in (raw or "").split(","):
+        token = item.strip()
+        if not token:
+            continue
+        try:
+            ids.add(int(token))
+        except ValueError:
+            logger.warning("群聊白名单ID非法: %s", token)
+    return ids
+
+
+def _load_group_whitelist() -> None:
+    """加载群聊白名单（逗号分隔，群ID通常为负数）"""
+    global _GROUP_WHITELIST
+    raw = os.getenv("TELEGRAM_GROUP_WHITELIST") or os.getenv("TG_GROUP_WHITELIST") or ""
+    _GROUP_WHITELIST = _parse_int_list(raw)
+    if _GROUP_WHITELIST:
+        logger.info("✅ 已加载群聊白名单: %s", sorted(_GROUP_WHITELIST))
+    else:
+        logger.warning("⚠️ 未配置 TELEGRAM_GROUP_WHITELIST，群聊消息将被忽略")
+
+
+_load_group_whitelist()
+
+
+def _get_update_message(update):
+    if not update:
+        return None
+    if hasattr(update, "message") and update.message:
+        return update.message
+    if hasattr(update, "callback_query") and update.callback_query and update.callback_query.message:
+        return update.callback_query.message
+    return None
+
+
+def _message_mentions_bot(message) -> bool:
+    if not message:
+        return False
+    text = (message.text or message.caption or "").lower()
+
+    if BOT_USER_ID and getattr(message, "reply_to_message", None):
+        reply_user = message.reply_to_message.from_user if message.reply_to_message else None
+        if reply_user and reply_user.id == BOT_USER_ID:
+            return True
+
+    if getattr(message, "entities", None):
+        for ent in message.entities:
+            if ent.type == "text_mention" and ent.user and BOT_USER_ID and ent.user.id == BOT_USER_ID:
+                return True
+            if BOT_USERNAME and ent.type in ("mention", "bot_command"):
+                part = text[ent.offset: ent.offset + ent.length]
+                if f"@{BOT_USERNAME}" in part:
+                    return True
+
+    if BOT_USERNAME and f"@{BOT_USERNAME}" in text:
+        return True
+
+    return False
+
+
 def _is_command_allowed(update) -> bool:
-    """所有命令都允许"""
+    """群聊安全: 白名单 + 前缀 + @提及，私聊默认允许"""
+    message = _get_update_message(update)
+    if not message or not getattr(message, "chat", None):
+        return False
+
+    chat = message.chat
+    chat_type = getattr(chat, "type", "")
+
+    if chat_type == "private":
+        return True
+
+    if chat_type not in ("group", "supergroup"):
+        return False
+
+    # ===== 群聊放宽策略 =====
+    # 只要是显式命令（/、! 前缀或 bot_command 实体）或回调查询，一律放行，便于群内直接使用
+    text = (message.text or message.caption or "")
+    has_command_prefix = bool(text) and text.lstrip().startswith(_GROUP_ALLOWED_PREFIXES)
+    has_bot_command_entity = any(
+        getattr(ent, "type", "") == "bot_command" for ent in (getattr(message, "entities", None) or [])
+    )
+    is_callback = getattr(update, "callback_query", None) is not None
+    if has_command_prefix or has_bot_command_entity or is_callback:
+        return True
+
+    # 其他非命令消息仍按原有白名单+@ 提及约束
+    if not _GROUP_WHITELIST or chat.id not in _GROUP_WHITELIST:
+        return False
+    if _GROUP_REQUIRE_MENTION and not _message_mentions_bot(message):
+        return False
     return True
+
+
+async def _refresh_bot_identity(application) -> None:
+    """缓存 Bot 用户名与ID，用于群聊 @ 提及识别"""
+    global BOT_USERNAME, BOT_USER_ID
+    try:
+        me = await application.bot.get_me()
+        BOT_USERNAME = (me.username or "").lstrip("@").lower()
+        BOT_USER_ID = me.id
+        if BOT_USERNAME:
+            logger.info("✅ Bot身份已确认: @%s (%s)", BOT_USERNAME, BOT_USER_ID)
+        else:
+            logger.warning("⚠️ Bot用户名为空，群聊 @ 提及识别可能受限")
+    except Exception as exc:
+        logger.warning("⚠️ 获取Bot身份失败: %s", exc)
 
 async def send_help_message(update_or_query, context, *, via_query: bool = False):
     """发送帮助消息"""
@@ -411,6 +527,22 @@ CACHE_FILE_SECONDARY = os.path.join(CACHE_DIR, 'cache_data_secondary.json')
 # 全局机器人实例
 bot = None
 user_handler = None
+_user_handler_init_task = None
+
+
+async def _trigger_user_handler_init() -> None:
+    """触发 user_handler 懒初始化，避免首次请求无响应"""
+    global _user_handler_init_task
+    if user_handler is not None and bot is not None:
+        return
+    if _user_handler_init_task is not None and not _user_handler_init_task.done():
+        return
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.get_event_loop()
+    logger.info("⚙️ 触发 user_handler 懒初始化")
+    _user_handler_init_task = loop.run_in_executor(None, initialize_bot_sync)
 
 # 全局点击限制器
 _user_click_timestamps = {}
@@ -443,7 +575,18 @@ def check_click_rate_limit(user_id: int, button_data: str = "", is_ai_feature: b
     return True, 0.0
 
 # ==================== 单币快照辅助 ====================
-def build_single_snapshot_keyboard(enabled_periods: dict, panel: str, enabled_cards: dict, page: int = 0, pages: int = 1, update=None, lang: str = None):
+def _build_binance_url(symbol: str, market: str = "futures") -> str:
+    """构造 Binance 跳转链接，默认永续合约。"""
+    sym = (symbol or "").upper().replace("/", "")
+    if not sym.endswith("USDT"):
+        sym = f"{sym}USDT"
+    if market == "spot":
+        base = sym.replace("USDT", "_USDT", 1)
+        return f"https://www.binance.com/en/trade/{base}?type=spot"
+    return f"https://www.binance.com/en/futures/{sym}?type=perpetual"
+
+
+def build_single_snapshot_keyboard(enabled_periods: dict, panel: str, enabled_cards: dict, page: int = 0, pages: int = 1, update=None, lang: str = None, symbol: str | None = None):
     """构造单币快照按钮：卡片开关/周期开关/面板切换/主控+翻页。"""
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     try:
@@ -598,6 +741,12 @@ def build_single_snapshot_keyboard(enabled_periods: dict, panel: str, enabled_ca
     kb_rows: list[list[InlineKeyboardButton]] = []
     if row_cards:
         kb_rows.extend(row_cards)
+    # Binance 跳转按钮
+    if symbol:
+        market = "futures" if panel == "futures" else "spot"
+        binance_url = _build_binance_url(symbol, market=market)
+        kb_rows.append([InlineKeyboardButton(I18N.gettext("btn.binance", lang=lang), url=binance_url)])
+
     kb_rows.extend([row_period, row_panel, row_ctrl])
     return InlineKeyboardMarkup(kb_rows)
 
@@ -661,7 +810,7 @@ def render_single_snapshot(symbol: str, panel: str, enabled_periods: dict, enabl
         page=page,
         lang=lang,
     )
-    keyboard = build_single_snapshot_keyboard(enabled_periods, panel, enabled_cards, page=page, pages=pages, update=update, lang=lang)
+    keyboard = build_single_snapshot_keyboard(enabled_periods, panel, enabled_cards, page=page, pages=pages, update=update, lang=lang, symbol=symbol)
     return text, keyboard, pages, page
 
 # 🤖 AI分析模块已下线（历史依赖 pandas/numpy/pandas-ta）。
@@ -708,6 +857,23 @@ initialize_data_isolation()
 # ===============================
 # 立即响应和文件I/O优化函数
 # ===============================
+
+async def _send_instant_reply(update: Update, key: Optional[str] = None) -> None:
+    """发送文本即时响应（不影响主流程）"""
+    message = _get_update_message(update)
+    if not message:
+        return
+    if not key:
+        key = "loading.default"
+    text = _t(update, key)
+    if not text or text == key:
+        text = _t(update, "loading.default")
+    if not text or text == "loading.default":
+        text = "处理中..."
+    try:
+        await message.reply_text(text)
+    except Exception as exc:
+        logger.debug("⚠️ 即时响应发送失败: %s", exc)
 
 def optimize_button_response_logging():
     """优化按钮响应日志记录"""
@@ -788,7 +954,7 @@ user_states = {
     'market_depth_sort': 'desc',
     # 基础行情新增状态
     'basic_market_sort_type': 'change',     # 'change' 或 'price'
-    'basic_market_period': '24h',           # '5m', '15m', '30m', '1h', '4h', '12h', '24h'
+    'basic_market_period': '1d',            # '5m', '15m', '30m', '1h', '4h', '12h', '1d'
     'basic_market_sort_order': 'desc',      # 'desc' 或 'asc'
     'basic_market_limit': 10,               # 10, 20, 30
     'basic_market_type': 'futures'          # 'futures', 'spot'
@@ -838,17 +1004,17 @@ class UserRequestHandler:
         self.user_states = {
             'position_sort': 'desc',
             'position_limit': 10,
-            'position_period': '24h',  # 添加持仓排行时间周期
+            'position_period': '1d',  # 添加持仓排行时间周期
             'funding_sort': 'desc',
             'funding_limit': 10,
             'funding_sort_type': 'funding_rate',
-            'volume_period': '24h',
+            'volume_period': '1d',
             'volume_sort': 'desc',
             'volume_limit': 10,
             'volume_market_type': 'futures',  # 'futures', 'spot'
             'liquidation_limit': 10,
             'liquidation_sort': 'desc',
-            'liquidation_period': '24h',  # 添加时间周期选择
+            'liquidation_period': '1d',  # 添加时间周期选择
             'liquidation_type': 'total',  # 添加数据类型选择: total/long/short
             'position_market_sort': 'desc',
             'volume_market_sort': 'desc',
@@ -861,12 +1027,12 @@ class UserRequestHandler:
             'money_flow_limit': 10,
             'money_flow_type': 'absolute',
             'money_flow_market': 'futures',  # 'futures', 'spot', 'option'
-            'money_flow_period': '24h',
+            'money_flow_period': '1d',
             'market_depth_limit': 10,
             'market_depth_sort': 'desc',
             'market_depth_sort_type': 'ratio',
             'basic_market_sort_type': 'change',
-            'basic_market_period': '24h',
+            'basic_market_period': '1d',
             'basic_market_sort_order': 'desc',
             'basic_market_limit': 10,
             'basic_market_type': 'futures',
@@ -945,30 +1111,50 @@ class UserRequestHandler:
 
     def dynamic_align_format(self, data_rows, left_align_cols: int = 2, align_override=None):
         """
-        数据对齐：默认前 left_align_cols 列左对齐，其余右对齐；支持传入对齐列表 ["L","R",...]
+        数据对齐：默认全部右对齐；可传入对齐列表 ["L","R",...] 控制列对齐。
+        额外：自动裁剪数值字符串尾随 0，避免列宽被无效 0 撑大。
         """
         if not data_rows:
             return _t(None, "data.no_data")
 
-        col_cnt = max(len(row) for row in data_rows)
-        if not all(len(row) == col_cnt for row in data_rows):
+        def _trim_zero(text: str) -> str:
+            try:
+                # 保留百分号、单位等特殊格式
+                if "%" in text:
+                    return text
+                val = float(text)
+                trimmed = f"{val:.8f}".rstrip("0").rstrip(".")
+                if trimmed == "-0":
+                    trimmed = "0"
+                return trimmed
+            except Exception:
+                return text
+
+        # 先裁剪所有单元格
+        cleaned = [[_trim_zero(str(cell)) for cell in row] for row in data_rows]
+
+        col_cnt = max(len(row) for row in cleaned)
+        if not all(len(row) == col_cnt for row in cleaned):
             raise ValueError("列数需一致，先清洗或补齐输入数据")
 
         if align_override:
             align = (list(align_override) + ["R"] * (col_cnt - len(align_override)))[:col_cnt]
         else:
-            align = ["L"] * min(left_align_cols, col_cnt) + ["R"] * max(col_cnt - left_align_cols, 0)
+            align = ["R"] * col_cnt
 
-        widths = [max(len(str(row[i])) for row in data_rows) for i in range(col_cnt)]
+        def _disp_width(text: str) -> int:
+            return sum(2 if unicodedata.east_asian_width(ch) in {"F", "W"} else 1 for ch in text)
+
+        widths = [max(_disp_width(row[i]) for row in cleaned) for i in range(col_cnt)]
 
         def fmt(row):
             cells = []
-            for idx, cell in enumerate(row):
-                cell_str = str(cell)
-                cells.append(cell_str.ljust(widths[idx]) if align[idx] == "L" else cell_str.rjust(widths[idx]))
+            for idx, cell_str in enumerate(row):
+                pad = max(widths[idx] - _disp_width(cell_str), 0)
+                cells.append(cell_str + " " * pad if align[idx] == "L" else " " * pad + cell_str)
             return " ".join(cells)
 
-        return "\n".join(fmt(r) for r in data_rows)
+        return "\n".join(fmt(r) for r in cleaned)
 
     def get_current_time_display(self, data_time=None):
         """
@@ -1041,7 +1227,6 @@ class UserRequestHandler:
                 InlineKeyboardButton(I18N.gettext("kb.lang", lang=lang), callback_data="lang_menu"),
             ],
             [
-                InlineKeyboardButton(I18N.gettext("kb.config", lang=lang, fallback="⚙️ 配置"), callback_data="env_back"),
                 InlineKeyboardButton(I18N.gettext("kb.help", lang=lang), callback_data="help"),
             ],
         ]
@@ -1053,14 +1238,14 @@ class UserRequestHandler:
         return InlineKeyboardMarkup(keyboard)
 
     # ===== 基础行情占位，避免缺失方法导致报错 =====
-    def get_basic_market(self, sort_type='change', period='24h', sort_order='desc', limit=10, market_type='futures'):
+    def get_basic_market(self, sort_type='change', period='1d', sort_order='desc', limit=10, market_type='futures'):
         """AI分析占位，保持接口不报错"""
         return _t(None, "feature.ai_unavailable")
 
     def get_basic_market_keyboard(
         self,
         current_sort_type='change',
-        current_period='24h',
+        current_period='1d',
         current_sort_order='desc',
         current_limit=10,
         current_market_type='futures',
@@ -1185,7 +1370,7 @@ class UserRequestHandler:
             parse_mode=parse_mode
         )
 
-    def get_position_ranking(self, limit=10, sort_order='desc', period='24h', sort_field: str = "position", update=None):
+    def get_position_ranking(self, limit=10, sort_order='desc', period='1d', sort_field: str = "position", update=None):
         """获取持仓量排行榜 - 委托给TradeCatBot处理"""
         global bot
         if bot:
@@ -1199,7 +1384,7 @@ class UserRequestHandler:
                 logger.error(f"创建临时bot实例失败: {e}")
                 return _t(update, "data.initializing")
 
-    def get_position_ranking_keyboard(self, current_sort='desc', current_limit=10, current_period='24h', update=None):
+    def get_position_ranking_keyboard(self, current_sort='desc', current_limit=10, current_period='1d', update=None):
         """获取持仓量排行榜键盘 - 委托给TradeCatBot处理"""
         global bot
         if bot:
@@ -1239,7 +1424,7 @@ class UserRequestHandler:
             [_btn(update, "btn.back_home", "main_menu")]
         ])
 
-    def get_volume_ranking(self, limit=10, period='24h', sort_order='desc', market_type='futures', sort_field: str = "volume", update=None):
+    def get_volume_ranking(self, limit=10, period='1d', sort_order='desc', market_type='futures', sort_field: str = "volume", update=None):
         """获取交易量排行榜"""
         if market_type == 'futures':
             return self.get_futures_volume_ranking(limit, period, sort_order, sort_field=sort_field, update=update)
@@ -1278,11 +1463,11 @@ class UserRequestHandler:
             return f"{prefix}${abs_value/1e3:.2f}K"
         return f"{prefix}${abs_value:.0f}"
 
-    def get_futures_volume_ranking(self, limit=10, period='24h', sort_order='desc', sort_field: str = "volume", update=None):
+    def get_futures_volume_ranking(self, limit=10, period='1d', sort_order='desc', sort_field: str = "volume", update=None):
         """基于TimescaleDB生成合约交易量排行榜"""
-        allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '24h'}
+        allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '1d'}
         if period not in allowed_periods:
-            period = '24h'
+            period = '1d'
 
         service = getattr(self, 'metric_service', None)
         if service is None:
@@ -1340,11 +1525,11 @@ class UserRequestHandler:
         )
 
 
-    def get_spot_volume_ranking(self, limit=10, period='24h', sort_order='desc', sort_field: str = "volume", update=None):
+    def get_spot_volume_ranking(self, limit=10, period='1d', sort_order='desc', sort_field: str = "volume", update=None):
         """基于TimescaleDB生成现货交易量排行榜"""
-        allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '24h', '1w'}
+        allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '1d', '1w'}
         if period not in allowed_periods:
-            period = '24h'
+            period = '1d'
 
         service = getattr(self, 'metric_service', None)
         if service is None:
@@ -1507,14 +1692,14 @@ class UserRequestHandler:
             if market_cap <= 0 or oi_volume_ratio <= 0:
                 continue
 
-            # 根据 持仓量/交易量比 计算交易量
-            volume_24h = open_interest / oi_volume_ratio if oi_volume_ratio > 0 else 0
+            # 根据 持仓量/交易量比 计算日线交易量
+            volume_1d = open_interest / oi_volume_ratio if oi_volume_ratio > 0 else 0
 
-            if volume_24h <= 0:
+            if volume_1d <= 0:
                 continue
 
             # 计算交易量/市值比
-            ratio = volume_24h / market_cap
+            ratio = volume_1d / market_cap
 
             # 获取其他数据
             current_price = coin.get('current_price', 0)
@@ -1524,7 +1709,7 @@ class UserRequestHandler:
                 'ratio': ratio,
                 'current_price': current_price,
                 'market_cap': market_cap,
-                'volume_24h': volume_24h
+                'volume_1d': volume_1d
             })
 
         # 排序
@@ -1536,18 +1721,18 @@ class UserRequestHandler:
         for i, item in enumerate(sorted_data, 1):
             symbol = item['symbol']
             ratio = item['ratio']
-            volume_24h = item['volume_24h']
+            volume_1d = item['volume_1d']
 
             # 格式化比率
             ratio_str = f"{ratio:.4f}"
 
             # 格式化交易量
-            if volume_24h >= 1e9:
-                value_str = f"${volume_24h/1e9:.2f}B"
-            elif volume_24h >= 1e6:
-                value_str = f"${volume_24h/1e6:.2f}M"
+            if volume_1d >= 1e9:
+                value_str = f"${volume_1d/1e9:.2f}B"
+            elif volume_1d >= 1e6:
+                value_str = f"${volume_1d/1e6:.2f}M"
             else:
-                value_str = f"${volume_24h/1e3:.2f}K"
+                value_str = f"${volume_1d/1e3:.2f}K"
 
             data_rows.append([
                 f"{i}.",
@@ -1597,22 +1782,22 @@ class UserRequestHandler:
             if oi_volume_ratio <= 0:
                 continue
 
-            # 交易量/持仓量比 = 1 / (持仓量/交易量比)
+            # 日线交易量/持仓量比 = 1 / (持仓量/日线交易量比)
             ratio = 1 / oi_volume_ratio
 
             # 获取其他数据
             current_price = coin.get('current_price', 0)
             open_interest = coin.get('open_interest_usd', 0)
 
-            # 计算交易量
-            volume_24h = open_interest / oi_volume_ratio if oi_volume_ratio > 0 else 0
+            # 计算日线交易量
+            volume_1d = open_interest / oi_volume_ratio if oi_volume_ratio > 0 else 0
 
             ratio_data.append({
                 'symbol': symbol,
                 'ratio': ratio,
                 'current_price': current_price,
                 'open_interest': open_interest,
-                'volume_24h': volume_24h
+                'volume_1d': volume_1d
             })
 
         # 排序
@@ -1624,18 +1809,18 @@ class UserRequestHandler:
         for i, item in enumerate(sorted_data, 1):
             symbol = item['symbol']
             ratio = item['ratio']
-            volume_24h = item['volume_24h']
+            volume_1d = item['volume_1d']
 
             # 格式化比率
             ratio_str = f"{ratio:.4f}"
 
             # 格式化交易量
-            if volume_24h >= 1e9:
-                value_str = f"${volume_24h/1e9:.2f}B"
-            elif volume_24h >= 1e6:
-                value_str = f"${volume_24h/1e6:.2f}M"
+            if volume_1d >= 1e9:
+                value_str = f"${volume_1d/1e9:.2f}B"
+            elif volume_1d >= 1e6:
+                value_str = f"${volume_1d/1e6:.2f}M"
             else:
-                value_str = f"${volume_24h/1e3:.2f}K"
+                value_str = f"${volume_1d/1e3:.2f}K"
 
             data_rows.append([
                 f"{i}.",
@@ -1752,7 +1937,7 @@ class UserRequestHandler:
         """获取交易量/持仓量比键盘 - 兼容性保持"""
         return self.get_unified_ratio_keyboard(current_sort, current_limit, 'volume_oi')
 
-    def get_money_flow(self, limit=10, period='24h', sort_order='desc', flow_type='absolute', market='futures', update=None):
+    def get_money_flow(self, limit=10, period='1d', sort_order='desc', flow_type='absolute', market='futures', update=None):
         """获取资金流向排行榜 - 支持合约和现货数据"""
         if market == 'spot':
             # 现货数据支持多时间周期
@@ -1801,8 +1986,10 @@ class UserRequestHandler:
         for i, item in enumerate(sorted_data, 1):
             symbol = item['symbol'].replace('USDT', '')
             net_flow = item['net_flow_usd']
-            oi_change = item['oi_change_24h']
-            volume_change = item['volume_change_24h']
+            day_suffix = "1d"
+            legacy_suffix = f"{24}h"
+            oi_change = item.get(f'oi_change_{day_suffix}') or item.get(f'oi_change_{legacy_suffix}', 0)
+            volume_change = item.get(f'volume_change_{day_suffix}') or item.get(f'volume_change_{legacy_suffix}', 0)
 
             # 格式化净流量
             if abs(net_flow) >= 1e9:
@@ -1867,11 +2054,11 @@ class UserRequestHandler:
 
 
 
-    def get_futures_money_flow(self, limit=10, period='24h', sort_order='desc', flow_type='absolute', update=None):
+    def get_futures_money_flow(self, limit=10, period='1d', sort_order='desc', flow_type='absolute', update=None):
         """基于TimescaleDB的合约资金流向排行榜（CVD）"""
-        allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '24h'}
+        allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '1d'}
         if period not in allowed_periods:
-            period = '24h'
+            period = '1d'
 
         service = getattr(self, 'metric_service', None)
         if service is None:
@@ -1952,11 +2139,11 @@ class UserRequestHandler:
 {_t(update, "time.last_update", time=time_info['full'])}"""
         )
 
-    def get_spot_money_flow(self, limit=10, period='24h', sort_order='desc', flow_type='absolute', update=None):
+    def get_spot_money_flow(self, limit=10, period='1d', sort_order='desc', flow_type='absolute', update=None):
         """基于TimescaleDB的现货资金流向排行榜"""
-        allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '24h', '1w'}
+        allowed_periods = {'5m', '15m', '30m', '1h', '4h', '12h', '1d', '1w'}
         if period not in allowed_periods:
-            period = '24h'
+            period = '1d'
 
         service = getattr(self, 'metric_service', None)
         if service is None:
@@ -2038,7 +2225,7 @@ class UserRequestHandler:
         )
 
 
-    def get_money_flow_keyboard(self, current_period='24h', current_sort='desc', current_limit=10, current_flow_type='absolute', current_market='futures', update=None):
+    def get_money_flow_keyboard(self, current_period='1d', current_sort='desc', current_limit=10, current_flow_type='absolute', current_market='futures', update=None):
         """获取资金流向键盘"""
         lang = _resolve_lang(update) if update else I18N.default_locale
 
@@ -2080,7 +2267,7 @@ class UserRequestHandler:
         period_buttons = []
         if current_market in ['spot', 'futures']:
             periods = [
-                ('5m',), ('15m',), ('30m',), ('1h',), ('4h',), ('12h',), ('24h',)
+                ('5m',), ('15m',), ('30m',), ('1h',), ('4h',), ('12h',), ('1d',)
             ]
             if current_market == 'spot':
                 periods.append(('1w',))
@@ -2722,30 +2909,48 @@ class TradeCatBot:
 
     def dynamic_align_format(self, data_rows, left_align_cols: int = 2, align_override=None):
         """
-        动态视图对齐：前 left_align_cols 列左对齐，其余右对齐；可传入 align_override=["L","R"...]
+        动态视图对齐：默认全部右对齐；可传入 align_override=["L","R"...] 控制每列。
+        额外：自动裁剪数值字符串尾随 0，避免列宽被无效 0 撑大。
         """
         if not data_rows:
             return _t(None, "data.no_data")
 
-        col_cnt = max(len(row) for row in data_rows)
-        if not all(len(row) == col_cnt for row in data_rows):
+        def _trim_zero(text: str) -> str:
+            try:
+                if "%" in text:
+                    return text
+                val = float(text)
+                trimmed = f"{val:.8f}".rstrip("0").rstrip(".")
+                if trimmed == "-0":
+                    trimmed = "0"
+                return trimmed
+            except Exception:
+                return text
+
+        cleaned = [[_trim_zero(str(cell)) for cell in row] for row in data_rows]
+
+        col_cnt = max(len(row) for row in cleaned)
+        if not all(len(row) == col_cnt for row in cleaned):
             raise ValueError("列数需一致，先清洗或补齐输入数据")
 
         if align_override:
             align = (list(align_override) + ["R"] * (col_cnt - len(align_override)))[:col_cnt]
         else:
-            align = ["L"] * min(left_align_cols, col_cnt) + ["R"] * max(col_cnt - left_align_cols, 0)
+            align = ["R"] * col_cnt
 
-        widths = [max(len(str(row[i])) for row in data_rows) for i in range(col_cnt)]
+        def _disp_width(text: str) -> int:
+            return sum(2 if unicodedata.east_asian_width(ch) in {"F", "W"} else 1 for ch in text)
+
+        widths = [max(_disp_width(row[i]) for row in cleaned) for i in range(col_cnt)]
 
         def fmt(row):
             cells = []
-            for idx, cell in enumerate(row):
-                cell_str = str(cell)
-                cells.append(cell_str.ljust(widths[idx]) if align[idx] == "L" else cell_str.rjust(widths[idx]))
+            for idx, cell_str in enumerate(row):
+                pad = max(widths[idx] - _disp_width(cell_str), 0)
+                cells.append(cell_str + " " * pad if align[idx] == "L" else " " * pad + cell_str)
             return " ".join(cells)
 
-        return "\n".join(fmt(r) for r in data_rows)
+        return "\n".join(fmt(r) for r in cleaned)
 
     def get_current_time_display(self):
         """获取当前时间显示"""
@@ -2764,7 +2969,7 @@ class TradeCatBot:
         lang = _resolve_lang(update) if update else I18N.default_locale
         return I18N.gettext("menu.main_text", lang=lang, time=time_info["full"])
 
-    def get_position_ranking(self, limit=10, sort_order='desc', period='24h', sort_field: str = "position", update=None):
+    def get_position_ranking(self, limit=10, sort_order='desc', period='1d', sort_field: str = "position", update=None):
         """获取持仓量排行榜"""
         # 加载最新的合约数据
         futures_data = self.load_latest_futures_data()
@@ -2779,11 +2984,11 @@ class TradeCatBot:
             '30m': '30m',
             '1h': '1h',
             '4h': '4h',
-            '24h': '24h'
+            '1d': '1d'
         }
 
         if period not in period_mapping:
-            period = '24h'  # 默认使用24h
+            period = '1d'  # 默认使用1d
 
         period_suffix = period_mapping[period]
 
@@ -2900,14 +3105,14 @@ class TradeCatBot:
 {_t(update, "time.last_update", time=time_info['full'])}{cache_info}"""
 
         return text
-    def get_position_ranking_keyboard(self, current_sort='desc', current_limit=10, current_period='24h', update=None):
+    def get_position_ranking_keyboard(self, current_sort='desc', current_limit=10, current_period='1d', update=None):
         """获取持仓量排行榜键盘"""
         lang = _resolve_lang(update) if update else I18N.default_locale
         # 时间周期按钮（第一行和第二行）- 新增更多周期
         period_buttons_row1 = []
         period_buttons_row2 = []
         periods_row1 = ['5m', '15m', '30m']
-        periods_row2 = ['1h', '4h', '24h']
+        periods_row2 = ['1h', '4h', '1d']
 
         for period_value in periods_row1:
             label = _period_text_lang(lang, period_value)
@@ -2962,8 +3167,8 @@ class TradeCatBot:
 
 
 def is_group_mention_required(update: Update) -> bool:
-    """群组内是否必须 @ 才响应 —— 已放宽，默认不要求。"""
-    return False
+    """群组内是否必须 @ 才响应"""
+    return _GROUP_REQUIRE_MENTION
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """启动命令处理器"""
@@ -2974,6 +3179,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
 
     try:
@@ -3021,6 +3227,13 @@ def _build_ranking_menu_text(group: str, update: Optional[Update] = None) -> str
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """按钮回调处理器"""
     global user_handler, bot
+    if not _is_command_allowed(update):
+        try:
+            if update.callback_query:
+                await update.callback_query.answer()
+        except Exception:
+            pass
+        return
 
     from telegram import InlineKeyboardMarkup
 
@@ -3028,226 +3241,47 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     button_data = query.data
 
+    # =============================================================================
+    # 全局统一快速响应 - 方案C（详细提示）
+    # =============================================================================
+    try:
+        if button_data.endswith("_nop") or button_data.endswith("nop"):
+            await query.answer()
+        elif button_data.startswith(("ai_", "start_coin_analysis", "start_ai_analysis")):
+            await query.answer(_t(update, "loading.ai", "🤖 启动AI分析..."))
+        elif button_data.startswith("vis_") or button_data == "vis_menu":
+            await query.answer(_t(update, "loading.vis", "📈 正在渲染图表..."))
+        elif button_data.endswith("_refresh") or button_data == "admin_reload":
+            await query.answer(_t(update, "loading.refresh", "🔄 正在刷新..."))
+        elif button_data.startswith("single_query_") or button_data == "coin_query":
+            await query.answer(_t(update, "loading.query", "🔍 正在查询..."))
+        elif button_data.startswith(("set_lang_", "field_")) or button_data.endswith("_toggle_"):
+            await query.answer(_t(update, "loading.switch", "✅ 已切换"))
+        elif button_data.startswith(("ranking_", "single_", "position_", "funding_", "money_flow_", "market_", "basic_market", "admin_")):
+            await query.answer(_t(update, "loading.data", "📊 正在加载数据..."))
+        elif button_data.startswith("sig_"):
+            await query.answer(_t(update, "loading.switch", "✅ 处理中..."))
+        elif button_data in ("main_menu", "ranking_menu", "help", "lang_menu", "signal_menu", "admin_menu"):
+            await query.answer()
+        else:
+            await query.answer(_t(update, "loading.default", "处理中..."))
+    except Exception as e:
+        # 仅记录日志，不阻断流程（可能是超时或重复 answer）
+        logger.debug(f"query.answer failed for {button_data}: {e}")
+
     # 打开语言选择菜单
     if button_data == "lang_menu":
         await lang_command(update, context)
         return
 
     # =============================================================================
-    # 配置管理回调 (env_*) - 为"最糟糕的用户"设计
-    # 原则：3步内完成、即时反馈、友好文案、不让用户迷路
+    # 配置管理回调 (env_*) - 已禁用（硬开关保护）
     # =============================================================================
     if button_data.startswith("env_"):
-        from bot.env_manager import (
-            get_editable_configs_by_category, CONFIG_CATEGORIES,
-            get_config, set_config, EDITABLE_CONFIGS
-        )
-        await query.answer()
-        
-        # 分类按钮 env_cat_<category>
-        if button_data.startswith("env_cat_"):
-            category = button_data.replace("env_cat_", "")
-            cat_info = CONFIG_CATEGORIES.get(category, {})
-            configs = get_editable_configs_by_category().get(category, [])
-            
-            if not configs:
-                await query.edit_message_text("🤔 这个分类暂时没有可配置的项目")
-                return
-            
-            # 友好的分类标题和说明
-            lines = [
-                f"{cat_info.get('icon', '⚙️')} *{cat_info.get('name', category)}*",
-                f"_{cat_info.get('desc', '')}_\n",
-            ]
-            
-            buttons = []
-            for cfg in configs:
-                config_info = EDITABLE_CONFIGS.get(cfg["key"], {})
-                name = config_info.get("name", cfg["key"])
-                value = cfg["value"]
-                
-                # 格式化显示值
-                if not value:
-                    display_value = "未设置"
-                elif len(value) > 15:
-                    display_value = value[:12] + "..."
-                else:
-                    # 对于选项类型，显示友好标签
-                    options = config_info.get("options", [])
-                    if options and isinstance(options[0], dict):
-                        for opt in options:
-                            if opt["value"] == value:
-                                display_value = opt["label"]
-                                break
-                        else:
-                            display_value = value
-                    else:
-                        display_value = value
-                
-                hot_icon = "🚀" if cfg["hot_reload"] else "⏳"
-                # name 已包含图标，如 "💰 监控币种"
-                lines.append(f"{name}：{display_value} {hot_icon}")
-                
-                # 按钮显示完整名称
-                buttons.append(InlineKeyboardButton(
-                    f"✏️ {name}",
-                    callback_data=f"env_edit_{cfg['key']}"
-                ))
-            
-            lines.append("\n🚀 = 立即生效  ⏳ = 重启生效")
-            
-            # 每行 1 个按钮，更清晰
-            keyboard_rows = [[btn] for btn in buttons]
-            keyboard_rows.append([InlineKeyboardButton("⬅️ 返回配置中心", callback_data="env_back")])
-            
-            await query.edit_message_text(
-                "\n".join(lines),
-                reply_markup=InlineKeyboardMarkup(keyboard_rows),
-                parse_mode='Markdown'
-            )
+        if not ENABLE_ENV_MANAGER:
+            await query.answer("⚠️ 功能已禁用", show_alert=True)
             return
-        
-        # 编辑按钮 env_edit_<key>
-        if button_data.startswith("env_edit_"):
-            key = button_data.replace("env_edit_", "")
-            config_info = EDITABLE_CONFIGS.get(key, {})
-            current_value = get_config(key) or ""
-            
-            name = config_info.get("name", key)
-            desc = config_info.get("desc", "")
-            help_text = config_info.get("help", "")
-            category = config_info.get("category", "symbols")
-            
-            # 如果有预设选项，显示友好的选项按钮
-            options = config_info.get("options")
-            if options:
-                buttons = []
-                # 新格式选项 [{value, label, detail}, ...]
-                if isinstance(options[0], dict):
-                    for opt in options:
-                        is_current = (opt["value"] == current_value)
-                        prefix = "✅ " if is_current else ""
-                        label = opt.get("label", opt["value"])
-                        buttons.append(InlineKeyboardButton(
-                            f"{prefix}{label}",
-                            callback_data=f"env_set_{key}_{opt['value']}"
-                        ))
-                else:
-                    # 旧格式选项 ["a", "b", ...]
-                    for opt in options:
-                        prefix = "✅ " if opt == current_value else ""
-                        buttons.append(InlineKeyboardButton(
-                            f"{prefix}{opt}",
-                            callback_data=f"env_set_{key}_{opt}"
-                        ))
-                
-                # 每行 1-2 个按钮
-                if len(buttons) <= 3:
-                    keyboard_rows = [[btn] for btn in buttons]
-                else:
-                    keyboard_rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
-                keyboard_rows.append([InlineKeyboardButton("⬅️ 返回", callback_data=f"env_cat_{category}")])
-                
-                # 友好的编辑界面
-                text = f"✏️ *{name}*\n\n"
-                text += f"{desc}\n\n"
-                if current_value:
-                    text += f"📍 当前：`{current_value}`\n\n"
-                else:
-                    text += f"📍 当前：未设置\n\n"
-                text += "👇 点击选择："
-                
-                await query.edit_message_text(
-                    text,
-                    reply_markup=InlineKeyboardMarkup(keyboard_rows),
-                    parse_mode='Markdown'
-                )
-            else:
-                # 无预设选项，提示用户手动输入
-                placeholder = config_info.get("placeholder", "")
-                context.user_data["env_editing_key"] = key
-                
-                text = f"✏️ *{name}*\n\n"
-                text += f"{desc}\n\n"
-                if help_text:
-                    text += f"💡 {help_text}\n\n"
-                if current_value:
-                    text += f"📍 当前值：`{current_value}`\n\n"
-                else:
-                    text += f"📍 当前值：未设置\n\n"
-                text += "📝 请直接发送新的值：\n"
-                if placeholder:
-                    text += f"_例如：{placeholder}_"
-                
-                keyboard_rows = [
-                    [InlineKeyboardButton("🗑️ 清空此项", callback_data=f"env_clear_{key}")],
-                    [InlineKeyboardButton("⬅️ 返回", callback_data=f"env_cat_{category}")],
-                ]
-                
-                await query.edit_message_text(
-                    text,
-                    reply_markup=InlineKeyboardMarkup(keyboard_rows),
-                    parse_mode='Markdown'
-                )
-            return
-        
-        # 清空配置 env_clear_<key>
-        if button_data.startswith("env_clear_"):
-            key = button_data.replace("env_clear_", "")
-            success, msg = set_config(key, "")
-            config_info = EDITABLE_CONFIGS.get(key, {})
-            category = config_info.get("category", "symbols")
-            
-            # 添加返回按钮
-            keyboard = InlineKeyboardMarkup([[
-                InlineKeyboardButton("👍 好的", callback_data=f"env_cat_{category}")
-            ]])
-            await query.edit_message_text(msg, reply_markup=keyboard, parse_mode='Markdown')
-            return
-        
-        # 设置选项 env_set_<key>_<value>
-        if button_data.startswith("env_set_"):
-            parts = button_data.replace("env_set_", "").split("_", 1)
-            if len(parts) == 2:
-                key, value = parts
-                success, msg = set_config(key, value)
-                config_info = EDITABLE_CONFIGS.get(key, {})
-                category = config_info.get("category", "symbols")
-                
-                # 成功后提供返回按钮
-                keyboard = InlineKeyboardMarkup([[
-                    InlineKeyboardButton("👍 好的", callback_data=f"env_cat_{category}")
-                ]])
-                await query.edit_message_text(msg, reply_markup=keyboard, parse_mode='Markdown')
-            return
-        
-        # 返回主配置菜单
-        if button_data == "env_back":
-            # 按优先级排序分类
-            sorted_cats = sorted(CONFIG_CATEGORIES.items(), key=lambda x: x[1].get("priority", 99))
-            
-            text = "⚙️ *配置中心*\n\n"
-            text += "在这里可以调整 Bot 的各项设置~\n\n"
-            text += "👇 选择要配置的类别："
-            
-            buttons = []
-            for cat_id, cat_info in sorted_cats:
-                name = cat_info.get("name", cat_id)
-                buttons.append(InlineKeyboardButton(
-                    name,
-                    callback_data=f"env_cat_{cat_id}"
-                ))
-            
-            # 每行 2 个按钮
-            keyboard_rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
-            keyboard_rows.append([InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")])
-            
-            await query.edit_message_text(
-                text,
-                reply_markup=InlineKeyboardMarkup(keyboard_rows),
-                parse_mode='Markdown'
-            )
-            return
+        # env_* 回调处理已禁用，此处仅作防护
 
     # 语言切换
     if button_data.startswith("set_lang_"):
@@ -3264,7 +3298,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "zh_CN": I18N.gettext("lang.zh", lang=new_lang),
             "en": I18N.gettext("lang.en", lang=new_lang),
         }
-        await query.answer()
+        # 注意: 即时响应已在前面统一处理，此处不再重复 query.answer()
         await query.edit_message_text(
             I18N.gettext("lang.set", lang=new_lang, lang_name=display_names.get(new_lang, new_lang))
         )
@@ -3358,7 +3392,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             from signals import ui as signal_ui
             if button_data == "signal_menu":
-                await query.answer()
+                # 注意: 即时响应已在前面统一处理
                 await query.edit_message_text(
                     signal_ui.get_menu_text(user_id),
                     reply_markup=signal_ui.get_menu_kb(user_id, update=update),
@@ -3378,7 +3412,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not _is_admin(update):
             await query.answer(_t(update, "admin.no_permission", "⛔ 无权限"), show_alert=True)
             return
-        await query.answer()
+        # 注意: 即时响应已在前面统一处理，此处不再重复 query.answer()
         
         if button_data == "admin_menu":
             text = _build_admin_menu_text(update)
@@ -3457,7 +3491,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 信号推送的币种分析跳转
     if button_data.startswith("single_query_"):
         symbol = button_data.replace("single_query_", "")
-        await query.answer()
+        # 注意: 即时响应已在前面统一处理，此处不再重复 query.answer()
         try:
             if os.getenv("DISABLE_SINGLE_TOKEN_QUERY", "1") == "1":
                 await query.edit_message_text(_t(update, "query.disabled"))
@@ -3480,7 +3514,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 page=0,
                 lang=lang,
             )
-            kb = build_single_snapshot_keyboard(enabled_periods, "basic", {}, page=0, pages=pages, update=update, lang=lang)
+            kb = build_single_snapshot_keyboard(enabled_periods, "basic", {}, page=0, pages=pages, update=update, lang=lang, symbol=symbol)
             await query.edit_message_text(text, reply_markup=kb, parse_mode='Markdown')
         except Exception as e:
             logger.error(f"单币查询跳转失败: {e}")
@@ -3494,7 +3528,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        await query.answer(_t("ui.processing", update))
+        await query.answer(_t(update, "ui.processing"))
     except Exception:
         pass
 
@@ -3504,6 +3538,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if button_data.startswith("pattern_toggle_"):
         if user_handler is None:
             await query.edit_message_text(_t(update, "error.not_ready"), parse_mode='Markdown')
+            await _trigger_user_handler_init()
             return
         states = user_handler.user_states.setdefault(user_id, {})
         sym = states.get("single_symbol")
@@ -3528,6 +3563,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if button_data.startswith("single_"):
         if user_handler is None:
             await query.edit_message_text(_t(update, "error.not_ready"), parse_mode='Markdown')
+            await _trigger_user_handler_init()
             return
         states = user_handler.user_states.setdefault(user_id, {})
         sym = states.get("single_symbol")
@@ -3782,8 +3818,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
 
         elif query.data == "ranking_menu_nop":
-            # 提示按钮，点击无响应
-            await query.answer()
+            # 提示按钮，点击无响应 (即时响应已在前面统一处理)
+            pass
 
         elif query.data == "coin_query":
             # 币种查询入口 - 显示配置的币种列表
@@ -3831,12 +3867,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
         elif query.data == "market_sentiment":
+            # 注意: 即时响应已在前面统一处理
             await query.message.reply_text(
                 _t(query, "feature.sentiment_offline"),
                 reply_markup=InlineKeyboardMarkup([[_btn(update, "btn.back_home", "main_menu")]]),
                 parse_mode='Markdown'
             )
-            await query.answer()
 
         elif query.data == "basic_market":
             # 免费功能 - 直接提供服务
@@ -3844,7 +3880,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # 安全获取用户状态，使用默认值
             sort_type = user_handler.user_states.get('basic_market_sort_type', 'change')
-            period = user_handler.user_states.get('basic_market_period', '24h')
+            period = user_handler.user_states.get('basic_market_period', '1d')
             sort_order = user_handler.user_states.get('basic_market_sort_order', 'desc')
             limit = user_handler.user_states.get('basic_market_limit', 10)
             market_type = user_handler.user_states.get('basic_market_type', 'futures')
@@ -4708,8 +4744,15 @@ async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =============================================================================
 # /env 命令 - 配置管理（为"最糟糕的用户"设计）
 # =============================================================================
+# 硬开关：彻底禁用环境变量管理功能（安全审计要求）
+ENABLE_ENV_MANAGER = False
+
 async def env_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """配置管理命令 /env - 友好的可视化配置界面"""
+    # 硬开关检查 - 即使命令被注册也会被拦截
+    if not ENABLE_ENV_MANAGER:
+        await update.message.reply_text(_t(update, "admin.env.disabled"))
+        return
     from bot.env_manager import (
         CONFIG_CATEGORIES, get_config, set_config, validate_config_value, EDITABLE_CONFIGS
     )
@@ -4819,13 +4862,16 @@ async def vol_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
+
+    await _send_instant_reply(update, "loading.volume_market")
 
     try:
         loop = asyncio.get_event_loop()
 
         vol_limit = user_handler.user_states.get('volume_limit', 10)
-        vol_period = user_handler.user_states.get('volume_period', '24h')
+        vol_period = user_handler.user_states.get('volume_period', '1d')
         vol_sort = user_handler.user_states.get('volume_sort', 'desc')
         text = await loop.run_in_executor(
             None,
@@ -4837,7 +4883,7 @@ async def vol_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         )
 
-        text = ensure_valid_text(text, _t(query, "loading.data"))
+        text = ensure_valid_text(text, _t(update, "loading.data"))
         keyboard = user_handler.get_volume_ranking_keyboard(current_period=user_handler.user_states['volume_period'], current_sort=user_handler.user_states['volume_sort'], current_limit=user_handler.user_states['volume_limit'])
         await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
     except Exception as e:
@@ -4854,7 +4900,10 @@ async def sentiment_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
+
+    await _send_instant_reply(update, "loading.sentiment")
 
     try:
         loop = asyncio.get_event_loop()
@@ -4876,7 +4925,10 @@ async def market_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
+
+    await _send_instant_reply(update, "loading.market")
 
     try:
         loop = asyncio.get_event_loop()
@@ -4889,7 +4941,7 @@ async def market_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             market_type=user_handler.user_states['basic_market_type']
         ))
 
-        text = ensure_valid_text(text, _t(query, "loading.data"))
+        text = ensure_valid_text(text, _t(update, "loading.data"))
         keyboard = user_handler.get_basic_market_keyboard(
             current_sort_type=user_handler.user_states['basic_market_sort_type'],
             current_period=user_handler.user_states['basic_market_period'],
@@ -4912,13 +4964,16 @@ async def flow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
+
+    await _send_instant_reply(update, "loading.money_flow")
 
     try:
         loop = asyncio.get_event_loop()
 
         mf_limit = user_handler.user_states.get('money_flow_limit', 10)
-        mf_period = user_handler.user_states.get('money_flow_period', '24h')
+        mf_period = user_handler.user_states.get('money_flow_period', '1d')
         mf_sort = user_handler.user_states.get('money_flow_sort', 'desc')
         mf_type = user_handler.user_states.get('money_flow_type', 'absolute')
         mf_market = user_handler.user_states.get('money_flow_market', 'futures')
@@ -4934,7 +4989,7 @@ async def flow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ),
         )
 
-        text = ensure_valid_text(text, _t(query, "loading.data"))
+        text = ensure_valid_text(text, _t(update, "loading.data"))
         keyboard = user_handler.get_money_flow_keyboard(
             current_period=mf_period,
             current_sort=mf_sort,
@@ -4958,7 +5013,10 @@ async def depth_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
+
+    await _send_instant_reply(update, "loading.depth")
 
     try:
         loop = asyncio.get_event_loop()
@@ -4970,7 +5028,7 @@ async def depth_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_handler.user_states.get('market_depth_sort', 'desc')
         )
 
-        text = ensure_valid_text(text, _t(query, "loading.data"))
+        text = ensure_valid_text(text, _t(update, "loading.data"))
         keyboard = user_handler.get_market_depth_keyboard(
             current_limit=user_handler.user_states.get('market_depth_limit', 10),
             current_sort_type=user_handler.user_states.get('market_depth_sort_type', 'ratio'),
@@ -4991,7 +5049,10 @@ async def ratio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
+
+    await _send_instant_reply(update, "loading.position_market")
 
     try:
         loop = asyncio.get_event_loop()
@@ -5001,7 +5062,7 @@ async def ratio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_handler.user_states['position_market_sort']
         ))
 
-        text = ensure_valid_text(text, _t(query, "loading.data"))
+        text = ensure_valid_text(text, _t(update, "loading.data"))
         keyboard = user_handler.get_position_market_ratio_keyboard(current_sort=user_handler.user_states['position_market_sort'], current_limit=user_handler.user_states['position_market_limit'])
         await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
     except Exception as e:
@@ -5052,6 +5113,7 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
 
     # 发送主菜单，保持永久常驻键盘
@@ -5060,7 +5122,7 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = user_handler.get_main_menu_keyboard(update)
 
     # 确保文本不为空
-    text = ensure_valid_text(text, _t(query, "welcome.title"))
+    text = ensure_valid_text(text, _t(update, "welcome.title"))
 
     # 先发送简短欢迎消息和常驻键盘来激活常驻键盘
     await update.message.reply_text(
@@ -5082,7 +5144,9 @@ async def data_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
+    await _send_instant_reply(update, "loading.data")
     # 先发送带键盘的消息刷新底部键盘
     await update.message.reply_text(_t(update, "start.greet"), reply_markup=user_handler.get_reply_keyboard(update))
     text = _build_ranking_menu_text("basic", update)
@@ -5101,8 +5165,9 @@ async def query_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         coin + "USDT"
         # 触发单币查询
         update.message.text = f"{coin}!"
-        await handle_keyboard_message(update, context)
+        await handle_keyboard_message(update, context, bypass_checks=True)
     else:
+        await _send_instant_reply(update, "loading.query")
         # 显示币种列表
         from common.symbols import get_configured_symbols
         symbols = get_configured_symbols()
@@ -5124,6 +5189,7 @@ async def ai_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """AI分析指令 /ai"""
     if not _is_command_allowed(update):
         return
+    await _send_instant_reply(update, "loading.ai")
     try:
         # 记录用户语言偏好，贯通到 AI 服务
         context.user_data["lang_preference"] = _resolve_lang(update)
@@ -5151,7 +5217,9 @@ async def vis_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
+    await _send_instant_reply(update, "loading.vis")
     # 刷新底部键盘
     await update.message.reply_text(_t(update, "start.greet"), reply_markup=user_handler.get_reply_keyboard(update))
     # 显示可视化菜单
@@ -5180,7 +5248,9 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global user_handler
     if user_handler is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
+    await _send_instant_reply(update, "loading.stats")
     # 显示管理面板
     text = _build_admin_menu_text(update)
     keyboard = _build_admin_menu_keyboard(update)
@@ -5242,7 +5312,10 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global bot
     if bot is None:
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
+
+    await _send_instant_reply(update, "loading.stats")
 
     try:
         # 安全地获取缓存信息，避免Markdown解析错误
@@ -5294,7 +5367,23 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"状态命令错误: {e}")
         await update.message.reply_text(_t(update, "error.status_failed"))
 
-async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+_TEXT_ACTION_INSTANT_KEYS = {
+    "position_ranking": "loading.data",
+    "funding_rate_ranking": "loading.data",
+    "volume_ranking": "loading.data",
+    "liquidation_ranking": "loading.data",
+    "market_sentiment": "loading.sentiment",
+    "basic_market": "loading.market",
+    "money_flow": "loading.money_flow",
+    "market_depth": "loading.depth",
+    "ranking_menu": "loading.data",
+    "signal_menu": "loading.switch",
+    "start_coin_analysis": "loading.ai",
+    "coin_query": "loading.query",
+    "vis_menu": "loading.vis",
+}
+
+async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_TYPE, *, bypass_checks: bool = False):
     """处理常驻键盘按钮消息"""
     global user_handler
 
@@ -5302,57 +5391,51 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
     if not update or not update.message or not hasattr(update.message, 'text') or not update.message.text:
         return
 
-    # 全局权限拦截
-    if not _is_command_allowed(update):
-        return
+    # 全局权限拦截（群聊：允许“已知键盘文本”和 AI 触发词，即使未在白名单）
+    if not bypass_checks and not _is_command_allowed(update):
+        if getattr(update.message.chat, "type", "") in ("group", "supergroup"):
+            text = update.message.text.strip()
+            # 与下方 button_mapping 共享的快捷键文本（无需 admin/白名单）
+            known_texts = {
+                "🐋 持仓量排行", "💱 资金费率排行", "📈 成交量排行", "💥 爆仓排行",
+                "🎭 市场情绪", "📡 行情总览", "📈 市场总览", "💧 资金流向排行",
+                "🧊 市场深度排行", "📊 数据面板", "🚨 信号", "🔔 信号",
+                "🤖 AI分析", "🔍 币种查询", "📈 可视化", "📈 Charts",
+                "🏠 主菜单", "ℹ️ 帮助", "🌐 语言", "🌐 Language",
+            }
+            # 允许形如 "BTC@" 的 AI 触发词
+            is_ai_trigger = text.endswith("@") and 2 <= len(text) <= 12
+            if text not in known_texts and not is_ai_trigger:
+                return
+        else:
+            return
+
+    try:
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+    except Exception:
+        pass
 
     message_text = update.message.text
     lang = _resolve_lang(update)
+    instant_replied = False
+
+    async def _instant_once(key: Optional[str]) -> None:
+        nonlocal instant_replied
+        if instant_replied:
+            return
+        await _send_instant_reply(update, key)
+        instant_replied = True
 
     # =============================================================================
-    # 处理配置编辑的用户输入（友好反馈）
+    # 处理配置编辑的用户输入 - 已禁用
     # =============================================================================
-    if context.user_data.get("env_editing_key"):
-        from bot.env_manager import set_config, validate_config_value, EDITABLE_CONFIGS, CONFIG_CATEGORIES
-        key = context.user_data.pop("env_editing_key")
-        config_info = EDITABLE_CONFIGS.get(key, {})
-        config_name = config_info.get("name", key)
-        category = config_info.get("category", "symbols")
-        
-        # 取消操作 - 友好提示
-        if message_text.strip().lower() in ("取消", "cancel"):
-            keyboard = InlineKeyboardMarkup([[
-                InlineKeyboardButton("⬅️ 返回配置", callback_data=f"env_cat_{category}")
-            ]])
-            await update.message.reply_text(
-                f"👌 好的，{config_name} 保持不变",
-                reply_markup=keyboard
-            )
-            return
-        
-        value = message_text.strip()
-        valid, msg = validate_config_value(key, value)
-        if not valid:
-            # 验证失败 - 友好提示，保留编辑状态让用户重试
-            context.user_data["env_editing_key"] = key
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("⬅️ 放弃修改", callback_data=f"env_cat_{category}")]
-            ])
-            await update.message.reply_text(msg, reply_markup=keyboard, parse_mode='Markdown')
-            return
-        
-        # 保存成功 - 提供返回按钮
-        success, result_msg = set_config(key, value)
-        keyboard = InlineKeyboardMarkup([[
-            InlineKeyboardButton("👍 好的", callback_data=f"env_cat_{category}")
-        ]])
-        await update.message.reply_text(result_msg, reply_markup=keyboard, parse_mode='Markdown')
-        return
+    # if context.user_data.get("env_editing_key"):
+    #     ... (env 配置编辑已禁用)
 
     if user_handler is None:
         logger.warning("user_handler 未初始化")
-        return
         await update.message.reply_text(_t(update, "start.initializing"))
+        await _trigger_user_handler_init()
         return
 
     # 映射常驻键盘按钮到对应功能
@@ -5380,9 +5463,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
         "📈 Charts": "vis_menu",
         I18N.gettext("kb.home", lang=lang): "main_menu",
         "🏠 主菜单": "main_menu",
-        I18N.gettext("kb.config", lang=lang, fallback="⚙️ 配置"): "env_back",
-        "⚙️ 配置": "env_back",
-        "⚙️ Config": "env_back",
+
         I18N.gettext("kb.help", lang=lang): "help",
         "ℹ️ 帮助": "help",
         I18N.gettext("kb.lang", lang=lang): "lang_menu",
@@ -5394,6 +5475,10 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
         # -------- AI 分析触发：如 "btc@" 或 "BTC@" --------
         import re
         norm_text = (message_text or "").replace("\u200b", "").strip()
+        if norm_text.startswith("!") and len(norm_text) > 1:
+            norm_text = norm_text[1:].strip()
+            if not any(ch in norm_text for ch in ("!", "！", "@")):
+                norm_text = f"{norm_text}!"
 
         if "@" in norm_text:
             m = re.match(r'^([A-Za-z0-9]{2,15})@$', norm_text.strip())
@@ -5403,6 +5488,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     if not AI_SERVICE_AVAILABLE:
                         await update.message.reply_text(_t(update, "ai.not_installed"))
                         return
+                    await _instant_once("loading.ai")
                     context.user_data["lang_preference"] = _resolve_lang(update)
                     ai_handler = get_ai_handler(symbols_provider=lambda: user_handler.get_active_symbols() if user_handler else None)
                     coin = m.group(1).upper()
@@ -5420,9 +5506,11 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
             if m:
                 sym = m.group(1).upper()
                 try:
+                    await _instant_once("loading.query")
                     from bot.single_token_txt import export_single_token_txt
                     import io
                     from datetime import datetime
+                    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
                     # 获取用户语言
                     lang = _resolve_lang(update)
@@ -5432,11 +5520,20 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     file_obj = io.BytesIO(txt_content.encode('utf-8'))
                     file_obj.name = f"{sym}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
 
+                    # Binance 跳转按钮（与信号一致，默认永续）
+                    binance_btn = InlineKeyboardMarkup([[
+                        InlineKeyboardButton(
+                            I18N.gettext("btn.binance", lang=lang),
+                            url=_build_binance_url(sym, market="futures")
+                        )
+                    ]])
+
                     # 发送文件
                     await update.message.reply_document(
                         document=file_obj,
                         filename=file_obj.name,
-                        caption=_t("export.caption", update, symbol=sym)
+                        caption=_t(update, "export.caption", symbol=sym),
+                        reply_markup=binance_btn,
                     )
                 except Exception as e:
                     logger.error(f"完整TXT导出失败: {e}")
@@ -5457,6 +5554,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     sym = tokens[0]
         if sym:
             sym = sym.upper()
+            await _instant_once("loading.query")
             user_id = update.effective_user.id
             # 性能优化：临时关闭单币查询
             if os.getenv("DISABLE_SINGLE_TOKEN_QUERY", "1") == "1":
@@ -5474,7 +5572,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
             try:
                 from bot.single_token_snapshot import SingleTokenSnapshot
                 lang = _resolve_lang(update)
-                kb = build_single_snapshot_keyboard(enabled_periods, "basic", ustate["single_cards"], page=0, pages=1, update=update, lang=lang)
+                kb = build_single_snapshot_keyboard(enabled_periods, "basic", ustate["single_cards"], page=0, pages=1, update=update, lang=lang, symbol=sym)
                 snap = SingleTokenSnapshot()
                 text, pages = snap.render_table(
                     sym,
@@ -5484,7 +5582,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     page=0,
                     lang=lang,
                 )
-                kb = build_single_snapshot_keyboard(enabled_periods, "basic", ustate["single_cards"], page=0, pages=pages, update=update, lang=lang)
+                kb = build_single_snapshot_keyboard(enabled_periods, "basic", ustate["single_cards"], page=0, pages=pages, update=update, lang=lang, symbol=sym)
                 try:
                     await update.message.reply_text(text, reply_markup=kb, parse_mode='Markdown')
                 except BadRequest as e:
@@ -5504,6 +5602,9 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
 
         if message_text in button_mapping:
             action = button_mapping[message_text]
+            instant_key = _TEXT_ACTION_INSTANT_KEYS.get(action)
+            if instant_key:
+                await _instant_once(instant_key)
 
             if action == "lang_menu":
                 await lang_command(update, context)
@@ -5541,14 +5642,14 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 text = await loop.run_in_executor(None, lambda: user_handler.get_position_ranking(
                     limit=user_handler.user_states.get('position_limit', 10),
                     sort_order=user_handler.user_states.get('position_sort', 'desc'),
-                    period=user_handler.user_states.get('position_period', '24h'),
+                    period=user_handler.user_states.get('position_period', '1d'),
                     update=update
                 ))
-                text = ensure_valid_text(text, _t(query, "loading.data"))
+                text = ensure_valid_text(text, _t(update, "loading.data"))
                 keyboard = user_handler.get_position_ranking_keyboard(
                     current_sort=user_handler.user_states.get('position_sort', 'desc'),
                     current_limit=user_handler.user_states.get('position_limit', 10),
-                    current_period=user_handler.user_states.get('position_period', '24h')
+                    current_period=user_handler.user_states.get('position_period', '1d')
                 )
                 await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
 
@@ -5561,13 +5662,13 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 user_states = user_handler.user_states.get(update.effective_user.id, {})
                 text = await loop.run_in_executor(None, lambda: user_handler.get_volume_ranking(
                     limit=user_states.get('volume_limit', 10),
-                    period=user_states.get('volume_period', '24h'),
+                    period=user_states.get('volume_period', '1d'),
                     sort_order=user_states.get('volume_sort', 'desc'),
                     update=update
                 ))
-                text = ensure_valid_text(text, _t(query, "loading.data"))
+                text = ensure_valid_text(text, _t(update, "loading.data"))
                 keyboard = user_handler.get_volume_ranking_keyboard(
-                    current_period=user_states.get('volume_period', '24h'),
+                    current_period=user_states.get('volume_period', '1d'),
                     current_sort=user_states.get('volume_sort', 'desc'),
                     current_limit=user_states.get('volume_limit', 10)
                 )
@@ -5580,21 +5681,21 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 text = await loop.run_in_executor(None, lambda: user_handler.get_liquidation_ranking(
                     limit=user_states.get('liquidation_limit', 10),
                     sort_order=user_states.get('liquidation_sort', 'desc'),
-                    period=user_states.get('liquidation_period', '24h'),
+                    period=user_states.get('liquidation_period', '1d'),
                     liquidation_type=user_states.get('liquidation_type', 'total')
                 ))
-                text = ensure_valid_text(text, _t(query, "loading.data"))
+                text = ensure_valid_text(text, _t(update, "loading.data"))
                 keyboard = user_handler.get_liquidation_ranking_keyboard(
                     current_limit=user_states.get('liquidation_limit', 10),
                     current_sort=user_states.get('liquidation_sort', 'desc'),
-                    current_period=user_states.get('liquidation_period', '24h'),
+                    current_period=user_states.get('liquidation_period', '1d'),
                     current_type=user_states.get('liquidation_type', 'total')
                 )
                 await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
 
             elif action == "market_sentiment":
                 await update.message.reply_text(
-                    _t(query, "feature.sentiment_offline"),
+                    _t(update, "feature.sentiment_offline"),
                     reply_markup=user_handler.get_market_sentiment_keyboard(update),
                     parse_mode='Markdown'
                 )
@@ -5605,15 +5706,15 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 user_states = user_handler.user_states.get(update.effective_user.id, {})
                 text = await loop.run_in_executor(None, lambda: user_handler.get_basic_market(
                     sort_type=user_states.get('basic_market_sort_type', 'change'),
-                    period=user_states.get('basic_market_period', '24h'),
+                    period=user_states.get('basic_market_period', '1d'),
                     sort_order=user_states.get('basic_market_sort_order', 'desc'),
                     limit=user_states.get('basic_market_limit', 10),
                     market_type=user_states.get('basic_market_type', 'futures')
                 ))
-                text = ensure_valid_text(text, _t(query, "loading.data"))
+                text = ensure_valid_text(text, _t(update, "loading.data"))
                 keyboard = user_handler.get_basic_market_keyboard(
                     current_sort_type=user_states.get('basic_market_sort_type', 'change'),
-                    current_period=user_states.get('basic_market_period', '24h'),
+                    current_period=user_states.get('basic_market_period', '1d'),
                     current_sort_order=user_states.get('basic_market_sort_order', 'desc'),
                     current_limit=user_states.get('basic_market_limit', 10),
                     current_market_type=user_states.get('basic_market_type', 'futures')
@@ -5625,15 +5726,15 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                 # 修复: 使用具体的参数而不是通用的[:3]切片
                 user_states = user_handler.user_states.get(update.effective_user.id, {})
                 text = await loop.run_in_executor(None, lambda: user_handler.get_money_flow(
-                    period=user_states.get('money_flow_period', '24h'),
+                    period=user_states.get('money_flow_period', '1d'),
                     sort=user_states.get('money_flow_sort', 'net_inflow'),
                     limit=user_states.get('money_flow_limit', 10),
                     flow_type=user_states.get('money_flow_type', 'all'),
                     market=user_states.get('money_flow_market', 'spot')
                 ))
-                text = ensure_valid_text(text, _t(query, "loading.data"))
+                text = ensure_valid_text(text, _t(update, "loading.data"))
                 keyboard = user_handler.get_money_flow_keyboard(
-                    current_period=user_states.get('money_flow_period', '24h'),
+                    current_period=user_states.get('money_flow_period', '1d'),
                     current_sort=user_states.get('money_flow_sort', 'net_inflow'),
                     current_limit=user_states.get('money_flow_limit', 10),
                     current_flow_type=user_states.get('money_flow_type', 'all'),
@@ -5723,25 +5824,26 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     logger.error(f"可视化菜单加载失败: {e}")
                     await update.message.reply_text(_t(update, "error.vis_failed", "可视化功能暂不可用"))
 
-            elif action == "env_back":
-                # 配置中心入口
-                from bot.env_manager import CONFIG_CATEGORIES
-                sorted_cats = sorted(CONFIG_CATEGORIES.items(), key=lambda x: x[1].get("priority", 99))
-                
-                text = "⚙️ *配置中心*\n\n"
-                text += "👋 在这里可以轻松调整 Bot 的各项设置\n\n"
-                text += "👇 选择要配置的类别："
-                
-                buttons = []
-                for cat_id, cat_info in sorted_cats:
-                    name = cat_info.get("name", cat_id)
-                    buttons.append(InlineKeyboardButton(name, callback_data=f"env_cat_{cat_id}"))
-                
-                keyboard_rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
-                keyboard_rows.append([InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")])
-                keyboard = InlineKeyboardMarkup(keyboard_rows)
-                
-                await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
+            # env_back 功能已禁用
+            # elif action == "env_back":
+            #     # 配置中心入口
+            #     from bot.env_manager import CONFIG_CATEGORIES
+            #     sorted_cats = sorted(CONFIG_CATEGORIES.items(), key=lambda x: x[1].get("priority", 99))
+            #     
+            #     text = "⚙️ *配置中心*\n\n"
+            #     text += "👋 在这里可以轻松调整 Bot 的各项设置\n\n"
+            #     text += "👇 选择要配置的类别："
+            #     
+            #     buttons = []
+            #     for cat_id, cat_info in sorted_cats:
+            #         name = cat_info.get("name", cat_id)
+            #         buttons.append(InlineKeyboardButton(name, callback_data=f"env_cat_{cat_id}"))
+            #     
+            #     keyboard_rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
+            #     keyboard_rows.append([InlineKeyboardButton("🏠 返回主菜单", callback_data="main_menu")])
+            #     keyboard = InlineKeyboardMarkup(keyboard_rows)
+            #     
+            #     await update.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
 
             elif action in {"aggregated_alerts", "coin_search"}:
                 await update.message.reply_text(_t(update, "feature.coming_soon"))
@@ -5850,6 +5952,7 @@ def initialize_bot_sync():
 async def post_init(application):
     """应用启动后的初始化"""
     logger.info("✅ 应用启动完成")
+    await _refresh_bot_identity(application)
 
     # 延迟启动后台缓存加载任务
     async def delayed_init():
@@ -6083,8 +6186,9 @@ def main():
         logger.info("✅ /admin 命令处理器已注册")
         application.add_handler(CommandHandler("lang", lang_command))
         logger.info("✅ /lang 命令处理器已注册")
-        application.add_handler(CommandHandler("env", env_command))
-        logger.info("✅ /env 命令处理器已注册")
+        # /env 命令已禁用
+        # application.add_handler(CommandHandler("env", env_command))
+        # logger.info("✅ /env 命令处理器已注册")
 
         # 保留旧命令兼容性
         application.add_handler(CommandHandler("stats", user_command))

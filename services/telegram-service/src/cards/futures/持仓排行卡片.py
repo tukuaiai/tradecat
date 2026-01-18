@@ -124,12 +124,10 @@ class PositionRankingCard(RankingCard):
         return False
 
     async def _reply(self, query, user_handler, ensure_valid_text) -> None:
-        await query.answer()
         text, keyboard = await self._build_payload(user_handler, ensure_valid_text)
         await query.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
 
     async def _edit(self, query, user_handler, ensure_valid_text) -> None:
-        await query.answer()
         text, keyboard = await self._build_payload(user_handler, ensure_valid_text)
         await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
 

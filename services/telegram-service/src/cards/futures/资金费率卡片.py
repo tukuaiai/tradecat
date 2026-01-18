@@ -123,12 +123,10 @@ class FundingRateCard(RankingCard):
         return False
 
     async def _reply(self, query, user_handler, ensure_valid_text) -> None:
-        await query.answer()
         text, keyboard = await self._build_payload(user_handler, ensure_valid_text)
         await query.message.reply_text(text, reply_markup=keyboard, parse_mode='Markdown')
 
     async def _edit(self, query, user_handler, ensure_valid_text) -> None:
-        await query.answer()
         text, keyboard = await self._build_payload(user_handler, ensure_valid_text)
         await query.edit_message_text(text, reply_markup=keyboard, parse_mode='Markdown')
 
@@ -169,7 +167,7 @@ class FundingRateCard(RankingCard):
         sort_order = h.user_states.get('funding_sort', 'desc')
         current_limit = h.user_states.get('funding_limit', 10)
         sort_type = h.user_states.get('funding_sort_type', 'funding_rate')
-        h.user_states.get('funding_period', '24h')
+        h.user_states.get('funding_period', '1d')
 
         def b(label: str, data: str, active: bool = False, disabled: bool = False):
 
@@ -202,8 +200,8 @@ class FundingRateCard(RankingCard):
         # 行5 专用排序
         special_sort = [(cid, lab) for cid, lab, _ in self.special_display_fields]
         kb.append([b(lbl, f"funding_sort_field_{cid}", active=(sort_type == cid)) for cid, lbl in special_sort])
-        # 行6 周期（固定24h）
-        period_label = _t("period.24h")
+        # 行6 周期（固定1d）
+        period_label = _t("period.1d")
         kb.append([InlineKeyboardButton(f"✅{period_label}", callback_data="funding_nop")])
         # 行7 排序方向 + 条数
         kb.append([

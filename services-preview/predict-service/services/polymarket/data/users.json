@@ -1,1 +1,66 @@
-[]
+[
+  {
+    "chatId": 1464471494,
+    "subscribed": true,
+    "notifications": {
+      "arbitrage": true,
+      "orderbook": true,
+      "closing": true,
+      "whale": true,
+      "priceSpike": true,
+      "newMarket": false,
+      "largeTrade": true,
+      "smartMoney": true
+    },
+    "thresholds": {
+      "arbitrage": 1,
+      "orderbook": 1,
+      "closing": 1,
+      "priceSpike": 1,
+      "whale": 1,
+      "largeTrade": 1,
+      "smartMoney": 1,
+      "newMarket": 1
+    },
+    "displayMode": "detailed",
+    "lang": "en",
+    "registeredAt": 1768729272009,
+    "lastActive": 1768729272009,
+    "visitCount": 1,
+    "username": "tianbing1999",
+    "firstName": "blackOne",
+    "lastName": null
+  },
+  {
+    "chatId": 6511182257,
+    "subscribed": true,
+    "notifications": {
+      "arbitrage": true,
+      "orderbook": true,
+      "closing": true,
+      "whale": true,
+      "priceSpike": true,
+      "newMarket": false,
+      "largeTrade": true,
+      "smartMoney": true
+    },
+    "thresholds": {
+      "arbitrage": 1,
+      "orderbook": 1,
+      "closing": 1,
+      "priceSpike": 1,
+      "whale": 1,
+      "largeTrade": 1,
+      "smartMoney": 1,
+      "newMarket": 1
+    },
+    "displayMode": "detailed",
+    "lang": "zh-CN",
+    "registeredAt": 1768729272015,
+    "lastActive": 1768729272015,
+    "visitCount": 1,
+    "username": "desci0",
+    "firstName": "123olp",
+    "lastName": null
+  }
+]

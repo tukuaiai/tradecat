@@ -13,7 +13,14 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from cards.base import RankingCard
 from cards.data_provider import get_ranking_provider, format_symbol
-from cards.i18n import btn_auto as _btn_auto, gettext as _t, resolve_lang, translate_field, format_sort_field
+from cards.i18n import (
+    btn_auto as _btn_auto,
+    gettext as _t,
+    resolve_lang,
+    translate_field,
+    translate_value,
+    format_sort_field,
+)
 
 
 class ATR排行卡片(RankingCard):
@@ -112,14 +119,12 @@ class ATR排行卡片(RankingCard):
         return False
 
     async def _reply(self, query, h, ensure):
-        await query.answer()
         lang = resolve_lang(query)
         text, kb = await self._build_payload(h, ensure, lang, query)
         await query.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
     async def _edit(self, query, h, ensure):
         lang = resolve_lang(query)
-        await query.answer()
         lang = resolve_lang(query)
         text, kb = await self._build_payload(h, ensure, lang, query)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
@@ -271,7 +276,8 @@ class ATR排行卡片(RankingCard):
                 elif isinstance(val, (int, float)):
                     row.append(f"{val:.2f}")
                 else:
-                    row.append(str(val) if val not in (None, "") else "-")
+                    translated = translate_value(val, lang=lang)
+                    row.append(str(translated) if translated not in (None, "") else "-")
             for col_id, _, _ in active_general:
                 val = item.get(col_id)
                 if col_id == "振幅":
@@ -284,7 +290,8 @@ class ATR排行卡片(RankingCard):
                 elif isinstance(val, (int, float)):
                     row.append(f"{val:.2f}")
                 else:
-                    row.append(str(val) if val not in (None, "") else "-")
+                    translated = translate_value(val, lang=lang)
+                    row.append(str(translated) if translated not in (None, "") else "-")
             rows.append(row)
         return rows, "/".join(header_parts)
 

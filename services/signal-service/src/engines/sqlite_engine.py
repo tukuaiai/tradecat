@@ -10,12 +10,12 @@ import time
 from collections.abc import Callable
 
 try:
-    from ..config import get_sqlite_path
+    from ..config import DATA_MAX_AGE_SECONDS, get_sqlite_path
     from ..events import SignalEvent, SignalPublisher
     from ..rules import ALL_RULES, RULES_BY_TABLE, SignalRule
     from ..storage.cooldown import get_cooldown_storage
 except ImportError:
-    from config import get_sqlite_path
+    from config import DATA_MAX_AGE_SECONDS, get_sqlite_path
     from events import SignalEvent, SignalPublisher
     from rules import ALL_RULES, RULES_BY_TABLE, SignalRule
     from storage.cooldown import get_cooldown_storage
@@ -50,6 +50,7 @@ class SQLiteSignalEngine(BaseEngine):
 
         # 符号白名单：与 PG 引擎一致，遵守 SIGNAL_SYMBOLS / SYMBOLS_GROUPS / EXTRA / EXCLUDE
         self.allowed_symbols = set(_get_default_symbols())
+        self._last_symbol_refresh = time.time()
         logger.info("符号白名单: %s", sorted(self.allowed_symbols) if self.allowed_symbols else "未设置，默认全量")
 
         # 统计
@@ -57,6 +58,8 @@ class SQLiteSignalEngine(BaseEngine):
             "checks": 0,
             "signals": 0,
             "errors": 0,
+            "stale": 0,
+            "symbol_filtered": 0,
         }
 
     def enable_rule(self, name: str) -> bool:
@@ -74,6 +77,75 @@ class SQLiteSignalEngine(BaseEngine):
         conn.row_factory = sqlite3.Row
         return conn
 
+    def _maybe_refresh_symbols(self):
+        """定期刷新符号白名单，支持热更新 .env 配置"""
+        if time.time() - self._last_symbol_refresh < 300:
+            return
+        self.allowed_symbols = set(_get_default_symbols())
+        self._last_symbol_refresh = time.time()
+        logger.info("符号白名单已刷新: %s", sorted(self.allowed_symbols))
+
+    @staticmethod
+    def _parse_ts(row_dict: dict) -> float:
+        """提取时间戳（秒）用于新鲜度判断"""
+        for key in (
+            "更新时间",
+            "时间",
+            "时间戳",
+            "数据时间",
+            "update_time",
+            "时间(UTC)",
+            "时间_utc",
+            "timestamp",
+            "ts",
+            "created_at",
+            "updated_at",
+            "event_time",
+        ):
+            if key in row_dict and row_dict[key]:
+                val = row_dict[key]
+                try:
+                    if isinstance(val, (int, float)):
+                        v = float(val)
+                        if v > 1e12:  # 可能是毫秒级 epoch
+                            v = v / 1000.0
+                        return v
+                    from datetime import datetime
+
+                    return datetime.fromisoformat(str(val)).timestamp()
+                except Exception:
+                    continue
+        return 0.0
+
+    @staticmethod
+    def _tf_seconds(timeframe: str) -> float:
+        """将 1h/4h/1d 等周期转为秒，无法解析则返回 0"""
+        try:
+            unit = timeframe[-1].lower()
+            val = float(timeframe[:-1])
+            if unit == "m":
+                return val * 60
+            if unit == "h":
+                return val * 3600
+            if unit == "d":
+                return val * 86400
+            if unit == "w":
+                return val * 604800
+        except Exception:
+            return 0
+        return 0
+
+    def _is_fresh(self, ts_seconds: float, timeframe: str) -> bool:
+        """数据是否新鲜：基于周期动态阈值"""
+        if ts_seconds <= 0:
+            return False
+        tf_secs = self._tf_seconds(timeframe) or 0
+        # 允许的数据年龄：max(全局阈值, 1.5个周期)
+        allowed = max(DATA_MAX_AGE_SECONDS, tf_secs * 1.5 if tf_secs else 0)
+        if allowed <= 0:
+            allowed = DATA_MAX_AGE_SECONDS
+        return (time.time() - ts_seconds) <= allowed
+
     def _get_table_data(self, table: str, timeframe: str) -> dict[str, dict]:
         """获取表中指定周期的所有数据"""
         if table not in RULES_BY_TABLE:
@@ -82,7 +154,16 @@ class SQLiteSignalEngine(BaseEngine):
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
-            cursor.execute(f'SELECT * FROM "{table}" WHERE "周期" = ? OR "周期" IS NULL', (timeframe,))
+            cursor.execute(
+                f'''
+                SELECT * FROM "{table}"
+                WHERE "周期" = ? OR "周期" IS NULL
+                ORDER BY
+                    COALESCE("更新时间","时间","时间戳") DESC,
+                    rowid DESC
+                ''',
+                (timeframe,),
+            )
             rows = cursor.fetchall()
             conn.close()
 
@@ -91,7 +172,17 @@ class SQLiteSignalEngine(BaseEngine):
                 row_dict = dict(row)
                 symbol = row_dict.get("交易对", "")
                 if symbol:
+                    if symbol in result:
+                        # 已有该符号最新行
+                        continue
+                    ts_seconds = self._parse_ts(row_dict)
+                    if not self._is_fresh(ts_seconds, timeframe):
+                        self.stats["stale"] += 1
+                        logger.debug("跳过陈旧行 %s %s ts=%s", table, symbol, ts_seconds)
+                        continue
+                    self._maybe_refresh_symbols()
                     if self.allowed_symbols and symbol.upper() not in self.allowed_symbols:
+                        self.stats["symbol_filtered"] += 1
                         continue
                     result[symbol] = row_dict
             return result

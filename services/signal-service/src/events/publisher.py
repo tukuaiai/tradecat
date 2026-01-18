@@ -9,6 +9,9 @@ from .types import SignalEvent
 
 logger = logging.getLogger(__name__)
 
+# 可选持久化回调列表（用于写历史、审计）
+_persist_callbacks: list[Callable[[SignalEvent], None]] = []
+
 
 class SignalPublisher:
     """
@@ -23,6 +26,13 @@ class SignalPublisher:
 
     _callbacks: list[Callable[[SignalEvent], None]] = []
     _async_callbacks: list[Callable[[SignalEvent], None]] = []
+
+    @classmethod
+    def register_persist(cls, callback: Callable[[SignalEvent], None]):
+        """注册持久化回调（同步执行，失败记录警告）"""
+        if callback not in _persist_callbacks:
+            _persist_callbacks.append(callback)
+            logger.info(f"注册持久化回调: {callback.__name__}")
 
     @classmethod
     def subscribe(cls, callback: Callable[[SignalEvent], None], is_async: bool = False):
@@ -60,6 +70,12 @@ class SignalPublisher:
         """
         logger.debug(f"发布信号: {event.symbol} {event.direction} - {event.signal_type}")
 
+        for callback in _persist_callbacks:
+            try:
+                callback(event)
+            except Exception as e:
+                logger.warning(f"持久化回调失败 [{callback.__name__}]: {e}")
+
         for callback in cls._callbacks:
             try:
                 callback(event)
@@ -77,6 +93,12 @@ class SignalPublisher:
         import asyncio
 
         logger.debug(f"异步发布信号: {event.symbol} {event.direction} - {event.signal_type}")
+
+        for callback in _persist_callbacks:
+            try:
+                callback(event)
+            except Exception as e:
+                logger.warning(f"持久化回调失败 [{callback.__name__}]: {e}")
 
         # 先执行同步回调
         for callback in cls._callbacks:

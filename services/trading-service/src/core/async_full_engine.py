@@ -136,11 +136,11 @@ def get_high_priority_symbols(cache, interval: str = "5m", top_n: int = 15) -> t
     动态获取高优先级币种 - 11个维度取并集:
     
     K线维度(6个):
-    1. 24h交易额 Top30
+    1. 1d 交易额 Top30
     2. 市值近似 Top30
     3. 价格波动率 Top30
     4. 成交量异常(量比>2) 
-    5. 24h涨跌幅 Top30
+    5. 1d 涨跌幅 Top30
     6. 价格突破(突破20周期高/低点)
     
     期货维度(5个):
@@ -193,7 +193,7 @@ def get_high_priority_symbols(cache, interval: str = "5m", top_n: int = 15) -> t
                 if ma20_vol > 0 and vol / ma20_vol > 2.0:
                     vol_spike.add(symbol)
 
-            # 5. 24h涨跌幅 (用最近24根K线)
+            # 5. 1d 涨跌幅 (用最近24根K线)
             lookback = min(24, len(df) - 1)
             close_prev = float(df['close'].iloc[-lookback - 1] or close)
             if close_prev > 0:

@@ -15,11 +15,13 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 try:
-    from ..config import COOLDOWN_SECONDS, get_database_url
+    from ..config import COOLDOWN_SECONDS, DATA_MAX_AGE_SECONDS, get_database_url
     from ..events import SignalEvent, SignalPublisher
+    from ..storage.cooldown import get_cooldown_storage
 except ImportError:
-    from config import COOLDOWN_SECONDS, get_database_url
+    from config import COOLDOWN_SECONDS, DATA_MAX_AGE_SECONDS, get_database_url
     from events import SignalEvent, SignalPublisher
+    from storage.cooldown import get_cooldown_storage
 
 from .base import BaseEngine
 
@@ -417,9 +419,17 @@ class PGSignalEngine(BaseEngine):
         self.cooldowns: dict[str, float] = {}
         self.cooldown_seconds = COOLDOWN_SECONDS
         self._conn = None
+        self._cooldown_storage = get_cooldown_storage()
+        # 只加载 PG 前缀的冷却记录，避免与 SQLite 互相干扰
+        self.cooldowns = {
+            k: v for k, v in self._cooldown_storage.load_all().items() if k.startswith("pg:")
+        }
+        if self.cooldowns:
+            logger.info("PG 冷却记录已加载: %d", len(self.cooldowns))
+        self.persistence_failures = 0
 
         # 统计
-        self.stats = {"checks": 0, "signals": 0, "errors": 0}
+        self.stats = {"checks": 0, "signals": 0, "errors": 0, "stale": 0}
 
     def _get_conn(self):
         """获取数据库连接"""
@@ -436,12 +446,25 @@ class PGSignalEngine(BaseEngine):
                 return None
         return self._conn
 
-    def _is_cooled_down(self, signal_key: str) -> bool:
-        last = self.cooldowns.get(signal_key, 0)
-        return time.time() - last > self.cooldown_seconds
+    @staticmethod
+    def _tf_seconds(timeframe: str) -> float:
+        """将 1m/5m/1h/4h/1d 转为秒，未知返回 0"""
+        try:
+            unit = timeframe[-1].lower()
+            val = float(timeframe[:-1])
+            if unit == "m":
+                return val * 60
+            if unit == "h":
+                return val * 3600
+            if unit == "d":
+                return val * 86400
+        except Exception:
+            return 0
+        return 0
 
-    def _set_cooldown(self, signal_key: str):
-        self.cooldowns[signal_key] = time.time()
+    def _is_cooled_down(self, signal_key: str, cooldown_seconds: float) -> bool:
+        last = self.cooldowns.get(signal_key, 0)
+        return time.time() - last > cooldown_seconds
 
     def _fetch_latest_candles(self) -> dict[str, dict]:
         """获取最新K线数据"""
@@ -483,6 +506,17 @@ class PGSignalEngine(BaseEngine):
             logger.error(f"Fetch candles error: {e}")
             self.stats["errors"] += 1
         return result
+
+    def _is_fresh(self, ts: datetime | None, timeframe: str, fallback_seconds: float) -> bool:
+        """数据是否新鲜，按周期动态阈值"""
+        if ts is None:
+            return False
+        age = (datetime.now(ts.tzinfo) - ts).total_seconds()
+        tf_secs = self._tf_seconds(timeframe) or fallback_seconds
+        allowed = max(DATA_MAX_AGE_SECONDS, tf_secs * 1.5 if tf_secs else 0)
+        if allowed <= 0:
+            allowed = DATA_MAX_AGE_SECONDS
+        return age <= allowed
 
     def _fetch_latest_metrics(self) -> dict[str, dict]:
         """获取最新期货指标数据"""
@@ -542,6 +576,19 @@ class PGSignalEngine(BaseEngine):
             if not curr_candle:
                 continue
 
+            # 数据新鲜度检查
+            ts_candle = curr_candle.get("bucket_ts")
+            if not self._is_fresh(ts_candle, "1m", 60):
+                self.stats["stale"] += 1
+                logger.warning("跳过陈旧K线数据 %s ts=%s", symbol, ts_candle)
+                continue
+            if curr_metric:
+                ts_metric = curr_metric.get("create_time")
+                if not self._is_fresh(ts_metric, "5m", 300):
+                    self.stats["stale"] += 1
+                    logger.warning("跳过陈旧期货指标 %s ts=%s", symbol, ts_metric)
+                    curr_metric = None
+
             checkers = [
                 (rules.check_price_surge, [curr_candle, prev_candle, 2.0]),
                 (rules.check_price_dump, [curr_candle, prev_candle, 2.0]),
@@ -564,17 +611,20 @@ class PGSignalEngine(BaseEngine):
 
             for checker, args in checkers:
                 try:
-                    signal = checker(*args)
-                    if signal:
-                        signal_key = f"{signal.symbol}_{signal.signal_type}"
-                        if self._is_cooled_down(signal_key):
-                            signals.append(signal)
-                            self._set_cooldown(signal_key)
-                            self.stats["signals"] += 1
-                            logger.info(f"PG Signal: {signal.symbol} - {signal.signal_type}")
-
-                            # 发布事件
-                            self._publish_event(signal)
+                        signal = checker(*args)
+                        if signal:
+                            signal_key = f"pg:{signal.symbol}_{signal.signal_type}"
+                            cooldown_seconds = self.cooldown_seconds
+                            if self._is_cooled_down(signal_key, cooldown_seconds):
+                                if self._set_cooldown(signal_key):
+                                    signals.append(signal)
+                                    self.stats["signals"] += 1
+                                    logger.info(f"PG Signal: {signal.symbol} - {signal.signal_type}")
+                                    # 发布事件
+                                    self._publish_event(signal)
+                                else:
+                                    self.stats["errors"] += 1
+                                    logger.error("冷却持久化失败，跳过信号推送: %s", signal_key)
                 except Exception as e:
                     logger.warning(f"Check error: {e}")
                     self.stats["errors"] += 1
@@ -601,6 +651,18 @@ class PGSignalEngine(BaseEngine):
             extra=signal.extra,
         )
         SignalPublisher.publish(event)
+
+    def _set_cooldown(self, signal_key: str) -> bool:
+        """设置冷却并持久化。失败则返回 False，调用方应跳过推送。"""
+        ts = time.time()
+        self.cooldowns[signal_key] = ts
+        try:
+            self._cooldown_storage.set(signal_key, ts)
+            return True
+        except Exception as e:
+            self.persistence_failures += 1
+            logger.error("写入冷却存储失败: %s", e)
+            return False
 
     def run_loop(self, interval: int = 60):
         """持续运行"""

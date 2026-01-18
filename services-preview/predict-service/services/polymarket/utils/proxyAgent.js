@@ -66,17 +66,21 @@ function getTelegramBotOptions() {
         };
     }
 
-    // 解析代理 URL
-    const url = new URL(proxyUrl);
-    
+    // Telegram polling 必须走代理，避免直连被阻断
+    if (proxyUrl.startsWith('socks')) {
+        return {
+            polling: true,
+            request: {
+                agentClass: SocksProxyAgent,
+                agentOptions: proxyUrl
+            }
+        };
+    }
+
     return {
         polling: true,
         request: {
-            agentClass: HttpsProxyAgent,
-            agentOptions: {
-                host: url.hostname,
-                port: parseInt(url.port) || 80
-            }
+            proxy: proxyUrl
         }
     };
 }

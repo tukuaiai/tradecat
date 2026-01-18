@@ -54,6 +54,8 @@ DEFAULT_TIMEFRAMES = ["1h", "4h", "1d"]
 DEFAULT_MIN_VOLUME = 100000
 DEFAULT_CHECK_INTERVAL = 60  # 秒
 COOLDOWN_SECONDS = 300  # 同一信号冷却时间
+# 数据新鲜度阈值（秒），超过则视为陈旧数据不参与信号计算
+DATA_MAX_AGE_SECONDS = int(os.environ.get("SIGNAL_DATA_MAX_AGE", "600"))
 
 # 历史记录配置
 MAX_RETENTION_DAYS = int(os.environ.get("SIGNAL_HISTORY_RETENTION_DAYS", "30"))

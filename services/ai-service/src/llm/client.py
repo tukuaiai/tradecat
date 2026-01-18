@@ -23,7 +23,7 @@ LLM_BACKEND = os.getenv("LLM_BACKEND", "cli")
 
 async def call_llm(
     messages: List[Dict[str, str]],
-    model: str = "gemini-2.5-flash",
+    model: str = "gemini-3-flash-preview",
     backend: str = None,
 ) -> Tuple[str, str]:
     """
@@ -117,7 +117,7 @@ async def _call_gemini_cli(messages: List[Dict[str, str]], model: str) -> Tuple[
 
 
 # 便捷函数
-async def call_gemini(prompt: str, model: str = "gemini-2.5-flash") -> str:
+async def call_gemini(prompt: str, model: str = "gemini-3-flash-preview") -> str:
     """简单调用 Gemini（使用 CLI）"""
     messages = [{"role": "user", "content": prompt}]
     content, _ = await _call_gemini_cli(messages, model)

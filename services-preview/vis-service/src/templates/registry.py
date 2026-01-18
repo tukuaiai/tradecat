@@ -11,8 +11,14 @@
 from __future__ import annotations
 
 import io
+import json
 import logging
 import math
+import os
+import re
+from datetime import datetime, timezone
+from functools import lru_cache
+from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Tuple
 
 import matplotlib
@@ -197,6 +203,289 @@ def render_kline_basic(params: Dict, output: str) -> Tuple[object, str]:
     }
     fig, _ = mpf.plot(df, **mpf_kwargs)
     return _fig_to_png(fig), "image/png"
+
+
+# ==================== 多周期K线包络（复用外部模板） ====================
+_INTERVAL_PATTERN = re.compile(r"^(\d+)([smhdwM])$")
+_INTERVAL_UNIT_SECONDS = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800, "M": 2592000}
+_ALLOWED_INTERVALS = {
+    "1m", "3m", "5m", "15m", "30m",
+    "1h", "2h", "4h", "6h", "8h", "12h",
+    "1d", "3d", "1w", "1M",
+}
+_DEFAULT_RANGE_DAYS = 30
+
+
+def _parse_range_days(val: object) -> int | None:
+    """解析 range 参数，支持 '30d'/'7'/'90D' 等。"""
+    if val is None:
+        return None
+    if isinstance(val, (int, float)):
+        return int(val)
+    text = str(val).strip().lower()
+    if text.endswith("d"):
+        text = text[:-1]
+    if not text:
+        return None
+    try:
+        return int(float(text))
+    except ValueError:
+        return None
+
+
+def _select_intervals_by_span(span_ms: int) -> List[str]:
+    """根据时间跨度选择可视周期层级（LOD）。"""
+    days = max(span_ms / 86400000, 0.0)
+    if days > 180:
+        return ["1d", "4h"]
+    if days > 60:
+        return ["1d", "4h", "1h"]
+    if days > 14:
+        return ["4h", "1h", "15m"]
+    if days > 3:
+        return ["1h", "15m", "5m"]
+    return ["15m", "5m", "1m"]
+
+
+def _normalize_interval(interval: str) -> str:
+    """标准化周期字符串，并确保在允许列表内。"""
+    match = _INTERVAL_PATTERN.match(str(interval).strip())
+    if not match:
+        raise ValueError(f"无效周期: {interval}")
+    value, unit = match.groups()
+    value = int(value)
+    if unit == "M":
+        normalized = f"{value}M"
+    else:
+        normalized = f"{value}{unit.lower()}"
+    if normalized not in _ALLOWED_INTERVALS:
+        raise ValueError(f"不支持的周期: {normalized}")
+    return normalized
+
+
+def _interval_seconds(interval: str) -> int:
+    """返回周期秒数。"""
+    match = _INTERVAL_PATTERN.match(interval)
+    if not match:
+        raise ValueError(f"无效周期: {interval}")
+    value, unit = match.groups()
+    return int(value) * _INTERVAL_UNIT_SECONDS[unit]
+
+
+def _interval_table(interval: str) -> str:
+    """周期到视图表名映射。"""
+    if interval.endswith("M"):
+        return '"candles_1M"'
+    return f"candles_{interval}"
+
+
+@lru_cache(maxsize=2)
+def _load_envelope_template() -> str:
+    """加载外部包络可视化 HTML 模板（原样复用）。"""
+    template_path = Path(__file__).resolve().parents[4] / "libs" / "external" / "Financial-Fractal-KLine-main" / "multi_period_kline_static.html"
+    if not template_path.exists():
+        raise ValueError(f"未找到模板文件: {template_path}")
+    return template_path.read_text(encoding="utf-8")
+
+
+def _replace_embedded_payload(html: str, payload: Dict, title: str | None = None, lead: str | None = None) -> str:
+    """将 payload 注入模板中的 embedded-klines 节点。"""
+    payload_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    html = re.sub(
+        r'(<script type="application/json" id="embedded-klines">)(.*?)(</script>)',
+        rf"\1{payload_json}\3",
+        html,
+        flags=re.S,
+    )
+    if title:
+        html = re.sub(r"(<h1>)(.*?)(</h1>)", rf"\1{title}\3", html, count=1, flags=re.S)
+    if lead:
+        html = re.sub(r'(<p class="lead">)(.*?)(</p>)', rf"\1{lead}\3", html, count=1, flags=re.S)
+    return html
+
+
+def _fetch_multi_interval_klines(params: Dict) -> Dict:
+    """按时间窗口逐周期查询 TimescaleDB，构造包络可视化数据。"""
+    from core.settings import get_settings
+    import psycopg2
+
+    symbol = params.get("symbol")
+    if not symbol:
+        raise ValueError("缺少参数 symbol")
+    symbol = str(symbol).upper()
+
+    exchange = params.get("exchange") or os.environ.get("BINANCE_WS_DB_EXCHANGE") or os.environ.get("DB_EXCHANGE") or "binance_futures_um"
+    intervals_param = params.get("intervals")
+
+    if intervals_param and str(intervals_param).strip().lower() != "auto":
+        if isinstance(intervals_param, str):
+            intervals = [s.strip() for s in intervals_param.split(",") if s.strip()]
+        else:
+            intervals = list(intervals_param)
+    else:
+        intervals = []
+
+    limit = int(params.get("limit", 500))
+    if limit <= 0:
+        raise ValueError("limit 必须 > 0")
+
+    end_ms = params.get("end_time") or params.get("endTime")
+    start_ms = params.get("start_time") or params.get("startTime")
+    range_days = _parse_range_days(params.get("range_days") or params.get("rangeDays") or params.get("range"))
+
+    settings = get_settings()
+    if not settings.database_url:
+        raise ValueError("未配置 DATABASE_URL / VIS_SERVICE_DATABASE_URL")
+
+    with psycopg2.connect(settings.database_url) as conn:
+        if end_ms is None:
+            with conn.cursor() as cur:
+                candidates = []
+                if intervals:
+                    candidates = list(intervals)
+                else:
+                    candidates = ["1m", "5m", "15m", "1h", "4h", "1d"]
+                resolved_base = None
+                for interval in candidates:
+                    table = _interval_table(interval)
+                    try:
+                        cur.execute(
+                            f"SELECT MAX(bucket_ts) FROM market_data.{table} WHERE symbol = %s AND exchange = %s",
+                            (symbol, exchange),
+                        )
+                        row = cur.fetchone()
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("读取 %s 失败: %s", table, exc)
+                        continue
+                    if row and row[0] is not None:
+                        end_ms = int(row[0].timestamp() * 1000)
+                        resolved_base = interval
+                        break
+                if end_ms is None:
+                    if "1m" not in candidates:
+                        table = _interval_table("1m")
+                        try:
+                            cur.execute(
+                                f"SELECT MAX(bucket_ts) FROM market_data.{table} WHERE symbol = %s AND exchange = %s",
+                                (symbol, exchange),
+                            )
+                            row = cur.fetchone()
+                            if row and row[0] is not None:
+                                end_ms = int(row[0].timestamp() * 1000)
+                                resolved_base = "1m"
+                        except Exception as exc:  # noqa: BLE001
+                            logger.warning("读取 %s 失败: %s", table, exc)
+                    if end_ms is None:
+                        raise ValueError(f"无可用数据: {symbol} {exchange} ({','.join(candidates)})")
+                if resolved_base:
+                    base_interval = resolved_base
+
+        if start_ms is None:
+            if range_days is None:
+                range_days = _DEFAULT_RANGE_DAYS
+            start_ms = int(end_ms - (range_days * 86400000))
+
+        if start_ms > end_ms:
+            start_ms, end_ms = end_ms, start_ms
+
+        span_ms = end_ms - start_ms
+
+        if not intervals:
+            intervals = _select_intervals_by_span(span_ms)
+
+        intervals = [_normalize_interval(iv) for iv in intervals]
+        if not intervals:
+            raise ValueError("intervals 为空")
+
+        base_interval = params.get("base_interval")
+        if base_interval:
+            base_interval = _normalize_interval(base_interval)
+            if base_interval not in intervals:
+                intervals.insert(0, base_interval)
+        base_interval = base_interval or min(intervals, key=_interval_seconds)
+
+        payload = {
+            "symbol": symbol,
+            "exchange": exchange,
+            "fetchedAt": datetime.now(timezone.utc).isoformat(),
+            "source": "TimescaleDB",
+            "intervals": intervals,
+            "klines": {},
+        }
+
+        has_any = False
+        for interval in intervals:
+            table = _interval_table(interval)
+            interval_ms = _interval_seconds(interval) * 1000
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        f"""
+                        SELECT bucket_ts, open, high, low, close, volume
+                        FROM market_data.{table}
+                        WHERE symbol = %s
+                          AND exchange = %s
+                          AND bucket_ts >= to_timestamp(%s / 1000.0)
+                          AND bucket_ts <= to_timestamp(%s / 1000.0)
+                        ORDER BY bucket_ts ASC
+                        """,
+                        (symbol, exchange, start_ms, end_ms),
+                    )
+                    rows = cur.fetchall()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("查询 %s 失败: %s", table, exc)
+                rows = []
+
+            series = []
+            for bucket_ts, open_v, high_v, low_v, close_v, volume_v in rows:
+                open_time = int(bucket_ts.timestamp() * 1000)
+                series.append(
+                    {
+                        "openTime": open_time,
+                        "open": float(open_v),
+                        "high": float(high_v),
+                        "low": float(low_v),
+                        "close": float(close_v),
+                        "volume": float(volume_v) if volume_v is not None else 0.0,
+                        "closeTime": int(open_time + interval_ms - 1),
+                    }
+                )
+
+            payload["klines"][interval] = series
+            if series:
+                has_any = True
+
+    if not has_any:
+        raise ValueError(f"无可用数据: {symbol} {exchange} ({','.join(intervals)})")
+
+    return payload
+
+
+def render_kline_envelope(params: Dict, output: str) -> Tuple[object, str]:
+    """
+    多周期 K 线包络（复用 Financial-Fractal-KLine 的前端逻辑）。
+
+    必填：
+    - symbol: 交易对
+
+    可选：
+    - intervals: 周期列表或逗号分隔字符串（默认 5m,1h,4h,1d）
+    - base_interval: 用于计算窗口的基准周期
+    - limit: 基准周期根数（默认 500）
+    - startTime/endTime: 毫秒时间戳窗口
+    - exchange: 交易所（默认 Binance）
+    - title/lead: HTML 标题与说明
+    """
+    payload = _fetch_multi_interval_klines(params)
+
+    if output == "json":
+        return payload, "application/json"
+
+    html = _load_envelope_template()
+    title = params.get("title")
+    lead = params.get("lead")
+    html = _replace_embedded_payload(html, payload, title=title, lead=lead)
+    return html, "text/html; charset=utf-8"
 
 
 def render_macd(params: Dict, output: str) -> Tuple[object, str]:
@@ -1495,6 +1784,35 @@ def register_defaults() -> TemplateRegistry:
             },
         ),
         render_kline_basic,
+    )
+    registry.register(
+        TemplateMeta(
+            template_id="kline-envelope",
+            name="多周期K线包络",
+            description="复用 Financial-Fractal-KLine 的多周期包络可视化（HTML/JSON）",
+            outputs=["html", "json"],
+            params=[
+                "symbol(str)",
+                "intervals?(list[str] | str)",
+                "base_interval?(str)",
+                "limit?(int)",
+                "startTime?(int)",
+                "endTime?(int)",
+                "exchange?(str)",
+                "title?(str)",
+                "lead?(str)",
+            ],
+            sample={
+                "template_id": "kline-envelope",
+                "output": "html",
+                "params": {
+                    "symbol": "BTCUSDT",
+                    "intervals": ["5m", "1h", "4h", "1d"],
+                    "limit": 500,
+                },
+            },
+        ),
+        render_kline_envelope,
     )
     registry.register(
         TemplateMeta(

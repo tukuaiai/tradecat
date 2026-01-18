@@ -389,12 +389,12 @@ class VisHandler:
 
         # 无操作占位
         if data == "vis_nop":
-            await query.answer()
+            # 即时响应已在 app.py 统一处理
             return True
 
         # 可视化主菜单
         if data == "vis_menu":
-            await query.answer()
+            # 即时响应已在 app.py 统一处理
             text = _t(update, "vis.menu.title", "📈 选择图表类型")
             keyboard = self.build_main_menu(update)
             try:
@@ -406,7 +406,7 @@ class VisHandler:
         # 选择模板
         if data.startswith("vis_tpl_"):
             template_id = data.replace("vis_tpl_", "")
-            await query.answer()
+            # 即时响应已在 app.py 统一处理
 
             tpl = VIS_TEMPLATES.get(template_id)
             if not tpl:
@@ -439,7 +439,7 @@ class VisHandler:
             if len(parts) < 2:
                 return False
             template_id, symbol = parts
-            await query.answer()
+            # 即时响应已在 app.py 统一处理
 
             self._set_state(user_id, symbol=symbol)
 
@@ -462,7 +462,7 @@ class VisHandler:
             symbol = parts[1]
             interval = parts[2]
 
-            await query.answer(_t(update, "vis.rendering", "正在渲染..."))
+            # 即时响应已在 app.py 统一处理 ("📈 正在渲染图表...")
 
             self._set_state(user_id, interval=interval)
 

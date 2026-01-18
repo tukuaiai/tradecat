@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+import math
 from typing import Any, Dict, Iterable, List, Sequence
 
 
@@ -56,3 +57,28 @@ class RankingCard(ABC):
         """如有必要检查并扣除积分"""
         # 全部卡片改为免费模式，直接放行，避免出现任何积分/扣费提示
         return True
+
+
+# ==================== 通用格式化工具 ====================
+def format_number(value: Any, digits: int = 4) -> str:
+    """数值格式化，裁剪尾随 0，非数值安全回退。
+
+    - 默认保留 4 位小数，然后去掉尾随 0 与小数点
+    - 处理 nan/inf/None 返回 "-"
+    """
+    try:
+        val = float(value)
+    except (TypeError, ValueError):
+        return str(value) if value not in (None, "") else "-"
+
+    if math.isnan(val) or math.isinf(val):
+        return "-"
+
+    fmt = f"{val:.{digits}f}"
+    fmt = fmt.rstrip("0").rstrip(".")
+    if fmt == "-0":  # 避免 -0 展示
+        fmt = "0"
+    return fmt
+
+
+__all__ = ["RankingCard", "format_number"]

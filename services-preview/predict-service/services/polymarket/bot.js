@@ -4,12 +4,20 @@
  * 集成所有信号检测模块
  */
 
+const path = require('path');
+const projectRoot = path.resolve(__dirname, '../../../../../');
+const dotenvPath = path.join(projectRoot, 'config', '.env');
+
 // 全局代理注入 - 必须在最开头
-require('dotenv').config();
+require('dotenv').config({ path: dotenvPath, override: true });
+if (process.env.HTTP_PROXY && !process.env.GLOBAL_AGENT_HTTP_PROXY) {
+    process.env.GLOBAL_AGENT_HTTP_PROXY = process.env.HTTP_PROXY;
+}
+if (process.env.HTTPS_PROXY && !process.env.GLOBAL_AGENT_HTTPS_PROXY) {
+    process.env.GLOBAL_AGENT_HTTPS_PROXY = process.env.HTTPS_PROXY;
+}
 const { bootstrap } = require('global-agent');
 bootstrap();
-
-const path = require('path');
 
 // 加载配置
 const config = require('./config/settings');
@@ -223,6 +231,16 @@ class PolymarketSignalBot {
             // 传递检测器引用
             this.commandHandler.setDetectors(this.modules);
             this.setupTelegramHandlers();
+
+            // 确保 polling 已启动（防止代理或初始化异常导致未启动）
+            if (typeof this.telegramBot.isPolling === 'function' && !this.telegramBot.isPolling()) {
+                this.telegramBot.startPolling().catch((error) => {
+                    console.error('❌ Telegram polling 启动失败:', error?.message || error);
+                });
+            }
+            this.telegramBot.on('polling_error', (error) => {
+                console.error('❌ Telegram polling 错误:', error?.message || error);
+            });
         }
 
         // 初始化翻译服务
@@ -1291,12 +1309,17 @@ class PolymarketSignalBot {
         const newFilters = [];
 
         for (let i = 0; i < normalizedIds.length; i += chunkSize) {
-            newFilters.push(JSON.stringify(normalizedIds.slice(i, i + chunkSize)));
+            newFilters.push(normalizedIds.slice(i, i + chunkSize));
         }
+
+        const isSameGroup = (a, b) => Array.isArray(a)
+            && Array.isArray(b)
+            && a.length === b.length
+            && a.every((v, idx) => v === b[idx]);
 
         const filtersUnchanged = !force
             && this.lastOrderbookFilters.length === newFilters.length
-            && this.lastOrderbookFilters.every((value, index) => value === newFilters[index]);
+            && this.lastOrderbookFilters.every((value, index) => isSameGroup(value, newFilters[index]));
 
         if (filtersUnchanged) {
             return;
@@ -1332,7 +1355,7 @@ class PolymarketSignalBot {
             });
 
             this.orderbookSubscribed = true;
-            this.lastOrderbookFilters = newFilters;
+            this.lastOrderbookFilters = newFilters.map((group) => group.slice());
             console.log(`✅ 订单簿订阅刷新: ${normalizedIds.length} 个 token，${newFilters.length} 条消息`);
         } catch (error) {
             console.error('❌ 订单簿订阅失败:', error.message);

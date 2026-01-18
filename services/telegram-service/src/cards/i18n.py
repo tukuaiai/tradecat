@@ -310,6 +310,8 @@ FIELD_ID_LABEL_MAP = {
     "oi_z": "持仓Z分数",
     "oi_z_abs": "|Z分数|",
     "outflow": "流出",
+    "long": "多头",
+    "short": "空头",
     "pattern": "形态",
     "percent_b": "百分比",
     "position": "持仓占比",

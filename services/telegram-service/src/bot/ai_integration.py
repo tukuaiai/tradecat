@@ -169,7 +169,7 @@ class AIAnalysisHandler:
         query = update.callback_query
         if not query or not query.data:
             return SELECTING_COIN
-        await query.answer()
+        # 即时响应已在 app.py 统一处理
         data = query.data
 
         if data == "ai_back_to_coin":
@@ -208,7 +208,7 @@ class AIAnalysisHandler:
         query = update.callback_query
         if not query or not query.data:
             return SELECTING_COIN
-        await query.answer()
+        # 即时响应已在 app.py 统一处理
         data = query.data
 
         if data == "ai_select_prompt":
@@ -277,7 +277,7 @@ class AIAnalysisHandler:
         query = update.callback_query
         if not query or not query.data:
             return SELECTING_COIN
-        await query.answer()
+        # 即时响应已在 app.py 统一处理
 
         prompt_key = query.data.replace("ai_set_prompt_", "", 1)
         context.user_data["ai_prompt_name"] = prompt_key

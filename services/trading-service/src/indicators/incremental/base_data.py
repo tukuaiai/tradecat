@@ -37,10 +37,37 @@ class BaseData(Indicator):
         vol = safe_float(bar.get("volume"))
         quote = safe_float(bar.get("quote_volume"), vol * c)
         trade_count = safe_int(bar.get("trade_count"))
-        tbv = safe_float(bar.get("taker_buy_volume"), vol * 0.5)
-        tbq = safe_float(bar.get("taker_buy_quote_volume"), quote * 0.5)
-        sell_vol = max(vol - tbv, 0)
-        sell_quote = max(quote - tbq, 0)
+        tbv_raw = bar.get("taker_buy_volume")
+        tbq_raw = bar.get("taker_buy_quote_volume")
+
+        # ---- 主动买数据兜底策略 ----
+        # 优先使用现成字段；仅在能推导时估算，避免“对半分”造成净流=0的假象
+        tbv = safe_float(tbv_raw, None)
+        tbq = safe_float(tbq_raw, None)
+
+        # 若仅有量或额，尝试用价格推算另一项
+        if tbq is None and tbv is not None and c:
+            tbq = tbv * c
+        if tbv is None and tbq is not None and c:
+            tbv = tbq / c
+
+        # 若仍缺失，不伪造：保持 None，后续格式化为 "-"
+        if tbv is None:
+            tbv = None
+        if tbq is None:
+            tbq = None
+
+        if tbv is not None and tbq is not None:
+            sell_vol = max(vol - tbv, 0)
+            sell_quote = max(quote - tbq, 0)
+            buy_ratio = tbv / vol if vol else 0
+            net_flow = tbq - sell_quote
+        else:
+            sell_vol = None
+            sell_quote = None
+            buy_ratio = None
+            net_flow = None
+
         return self._make_result(df, symbol, interval, {
             "开盘价": o,
             "最高价": h,
@@ -57,8 +84,8 @@ class BaseData(Indicator):
             "主动买量": tbv,
             "主动买额": tbq,
             "主动卖出量": sell_vol,
-            "主动买卖比": tbv / vol if vol else 0,
+            "主动买卖比": buy_ratio,
             "主动卖出额": sell_quote,
-            "资金流向": tbq - sell_quote,
+            "资金流向": net_flow,
             "平均每笔成交额": quote / trade_count if trade_count else 0,
         })
