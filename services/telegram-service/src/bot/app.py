@@ -5510,6 +5510,7 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     from bot.single_token_txt import export_single_token_txt
                     import io
                     from datetime import datetime
+                    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
                     # 获取用户语言
                     lang = _resolve_lang(update)
@@ -5519,11 +5520,20 @@ async def handle_keyboard_message(update: Update, context: ContextTypes.DEFAULT_
                     file_obj = io.BytesIO(txt_content.encode('utf-8'))
                     file_obj.name = f"{sym}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
 
+                    # Binance 跳转按钮（与信号一致，默认永续）
+                    binance_btn = InlineKeyboardMarkup([[
+                        InlineKeyboardButton(
+                            I18N.gettext("btn.binance", lang=lang),
+                            url=_build_binance_url(sym, market="futures")
+                        )
+                    ]])
+
                     # 发送文件
                     await update.message.reply_document(
                         document=file_obj,
                         filename=file_obj.name,
-                        caption=_t(update, "export.caption", symbol=sym)
+                        caption=_t(update, "export.caption", symbol=sym),
+                        reply_markup=binance_btn,
                     )
                 except Exception as e:
                     logger.error(f"完整TXT导出失败: {e}")
