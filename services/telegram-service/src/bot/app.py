@@ -1094,13 +1094,30 @@ class UserRequestHandler:
 
     def dynamic_align_format(self, data_rows, left_align_cols: int = 2, align_override=None):
         """
-        数据对齐：默认全部右对齐；可传入对齐列表 ["L","R",...] 控制列对齐
+        数据对齐：默认全部右对齐；可传入对齐列表 ["L","R",...] 控制列对齐。
+        额外：自动裁剪数值字符串尾随 0，避免列宽被无效 0 撑大。
         """
         if not data_rows:
             return _t(None, "data.no_data")
 
-        col_cnt = max(len(row) for row in data_rows)
-        if not all(len(row) == col_cnt for row in data_rows):
+        def _trim_zero(text: str) -> str:
+            try:
+                # 保留百分号、单位等特殊格式
+                if "%" in text:
+                    return text
+                val = float(text)
+                trimmed = f"{val:.8f}".rstrip("0").rstrip(".")
+                if trimmed == "-0":
+                    trimmed = "0"
+                return trimmed
+            except Exception:
+                return text
+
+        # 先裁剪所有单元格
+        cleaned = [[_trim_zero(str(cell)) for cell in row] for row in data_rows]
+
+        col_cnt = max(len(row) for row in cleaned)
+        if not all(len(row) == col_cnt for row in cleaned):
             raise ValueError("列数需一致，先清洗或补齐输入数据")
 
         if align_override:
@@ -1111,17 +1128,16 @@ class UserRequestHandler:
         def _disp_width(text: str) -> int:
             return sum(2 if unicodedata.east_asian_width(ch) in {"F", "W"} else 1 for ch in text)
 
-        widths = [max(_disp_width(str(row[i])) for row in data_rows) for i in range(col_cnt)]
+        widths = [max(_disp_width(row[i]) for row in cleaned) for i in range(col_cnt)]
 
         def fmt(row):
             cells = []
-            for idx, cell in enumerate(row):
-                cell_str = str(cell)
+            for idx, cell_str in enumerate(row):
                 pad = max(widths[idx] - _disp_width(cell_str), 0)
                 cells.append(cell_str + " " * pad if align[idx] == "L" else " " * pad + cell_str)
             return " ".join(cells)
 
-        return "\n".join(fmt(r) for r in data_rows)
+        return "\n".join(fmt(r) for r in cleaned)
 
     def get_current_time_display(self, data_time=None):
         """
@@ -2876,13 +2892,28 @@ class TradeCatBot:
 
     def dynamic_align_format(self, data_rows, left_align_cols: int = 2, align_override=None):
         """
-        动态视图对齐：默认全部右对齐；可传入 align_override=["L","R"...] 控制每列
+        动态视图对齐：默认全部右对齐；可传入 align_override=["L","R"...] 控制每列。
+        额外：自动裁剪数值字符串尾随 0，避免列宽被无效 0 撑大。
         """
         if not data_rows:
             return _t(None, "data.no_data")
 
-        col_cnt = max(len(row) for row in data_rows)
-        if not all(len(row) == col_cnt for row in data_rows):
+        def _trim_zero(text: str) -> str:
+            try:
+                if "%" in text:
+                    return text
+                val = float(text)
+                trimmed = f"{val:.8f}".rstrip("0").rstrip(".")
+                if trimmed == "-0":
+                    trimmed = "0"
+                return trimmed
+            except Exception:
+                return text
+
+        cleaned = [[_trim_zero(str(cell)) for cell in row] for row in data_rows]
+
+        col_cnt = max(len(row) for row in cleaned)
+        if not all(len(row) == col_cnt for row in cleaned):
             raise ValueError("列数需一致，先清洗或补齐输入数据")
 
         if align_override:
@@ -2893,17 +2924,16 @@ class TradeCatBot:
         def _disp_width(text: str) -> int:
             return sum(2 if unicodedata.east_asian_width(ch) in {"F", "W"} else 1 for ch in text)
 
-        widths = [max(_disp_width(str(row[i])) for row in data_rows) for i in range(col_cnt)]
+        widths = [max(_disp_width(row[i]) for row in cleaned) for i in range(col_cnt)]
 
         def fmt(row):
             cells = []
-            for idx, cell in enumerate(row):
-                cell_str = str(cell)
+            for idx, cell_str in enumerate(row):
                 pad = max(widths[idx] - _disp_width(cell_str), 0)
                 cells.append(cell_str + " " * pad if align[idx] == "L" else " " * pad + cell_str)
             return " ".join(cells)
 
-        return "\n".join(fmt(r) for r in data_rows)
+        return "\n".join(fmt(r) for r in cleaned)
 
     def get_current_time_display(self):
         """获取当前时间显示"""
